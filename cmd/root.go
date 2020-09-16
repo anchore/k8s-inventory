@@ -16,9 +16,15 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"path/filepath"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -29,17 +35,13 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "kia",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "KIA tells Anchore which images are in use in your Kubernetes Cluster",
+	Long: `KIA (Kubernetes Inventory Agent) can be configured to either poll or watch (using SharedInformers) a 
+    Kubernetes Cluster to tell Anchore which Images are currently in-use`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Hey dude")
+		main()
 	},
 }
 
@@ -90,4 +92,74 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+type AnchorePod struct {
+	Name      string   `json:"name,omitempty"`
+	Images    []string `json:"images"`
+	Namespace string   `json:"namespace"`
+}
+
+func NewAnchorePod(name string, images []string, namespace string) *AnchorePod {
+	ap := new(AnchorePod)
+	ap.Name = name
+	ap.Images = images
+	ap.Namespace = namespace
+	return ap
+}
+
+func main() {
+	var kubeconfig *string
+	if home := homeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	// use the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+	for idx, pod := range pods.Items {
+
+		if idx == 0 {
+			fullPodJson, _ := json.MarshalIndent(pod, "", "    ")
+			fmt.Printf(string(fullPodJson))
+		}
+		podName := pod.ObjectMeta.Name
+		namespace := pod.ObjectMeta.Namespace
+
+		imageMap := make(map[string]bool, 0)
+		for _, container := range pod.Spec.Containers {
+			imageMap[container.Image] = true
+		}
+		imageSlice := make([]string, 0, len(imageMap))
+		for k := range imageMap {
+			imageSlice = append(imageSlice, k)
+		}
+		anchorePod := NewAnchorePod(podName, imageSlice, namespace)
+		anchorePodJson, _ := json.MarshalIndent(anchorePod, "", "    ")
+		fmt.Printf(string(anchorePodJson))
+	}
+}
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
 }
