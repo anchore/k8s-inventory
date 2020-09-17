@@ -34,7 +34,7 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "kia",
+	Use:   "kai",
 	Short: "KIA tells Anchore which images are in use in your Kubernetes Cluster",
 	Long: `KIA (Kubernetes Inventory Agent) can be configured to either poll or watch (using SharedInformers) a 
     Kubernetes Cluster to tell Anchore which Images are currently in-use`,
@@ -61,7 +61,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kia.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kai.yaml)")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -81,9 +81,9 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".kia" (without extension).
+		// Search config in home directory with name ".kai" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigName(".kia")
+		viper.SetConfigName(".kai")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

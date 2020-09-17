@@ -1,8 +1,8 @@
-# KIA (Kubernetes Inventory Agent)
+# KAI (Kubernetes Automated Inventory)
 Prototype for listing in-use images from k8s API
 
 ## Build
-`go build -o ./kia .`
+`go build -o ./kai .`
 
 ## Run
-`./kia`
+`./kai`

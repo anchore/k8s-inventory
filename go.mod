@@ -1,4 +1,4 @@
-module github.com/anchore/kia
+module github.com/anchore/kai
 
 go 1.14
 

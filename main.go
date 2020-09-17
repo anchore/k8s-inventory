@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/anchore/kia/cmd"
+import "github.com/anchore/kai/cmd"
 
 func main() {
 	cmd.Execute()
