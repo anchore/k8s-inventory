@@ -1,9 +1,9 @@
 package ui
 
 import (
-	kaiEvent "github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/internal/ui/common"
+	kaiEvent "github.com/anchore/kai/kai/event"
 	"github.com/wagoodman/go-partybus"
 )
 

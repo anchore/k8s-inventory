@@ -2,8 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime/pprof"
+	"time"
+
+	"github.com/anchore/kai/internal"
 	"github.com/anchore/kai/internal/bus"
 	"github.com/anchore/kai/internal/ui"
+	"github.com/anchore/kai/internal/version"
 	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/anchore/kai/kai/result"
@@ -13,14 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"path/filepath"
-	"runtime/pprof"
-	"time"
 
 	"github.com/spf13/viper"
 )
-
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -28,7 +30,7 @@ var rootCmd = &cobra.Command{
 	Short: "KAI tells Anchore which images are in use in your Kubernetes Cluster",
 	Long: `KAI (Kubernetes Automated Inventory) can be configured to either poll or watch (using SharedInformers) a 
     Kubernetes Cluster to tell Anchore which Images are currently in-use`,
-    Args: cobra.MaximumNArgs(0),
+	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		if appConfig.Dev.ProfileCPU {
 			f, err := os.Create("cpu.profile")
@@ -83,26 +85,44 @@ func init() {
 	}
 }
 
+//nolint:funlen
 func getImageResults() <-chan error {
 	errs := make(chan error)
 	go func() {
 		defer close(errs)
 
+		if appConfig.CheckForAppUpdate {
+			isAvailable, newVersion, err := version.IsUpdateAvailable()
+			if err != nil {
+				log.Errorf(err.Error())
+			}
+			if isAvailable {
+				log.Infof("New version of %s is available: %s", internal.ApplicationName, newVersion)
+
+				bus.Publish(partybus.Event{
+					Type:  event.AppUpdateAvailable,
+					Value: newVersion,
+				})
+			} else {
+				log.Debugf("No new %s update available", internal.ApplicationName)
+			}
+		}
+
 		// use the current context in kubeconfig
 		config, err := clientcmd.BuildConfigFromFlags("", appConfig.KubeConfig)
 		if err != nil {
-			errs <- fmt.Errorf("Failed to build kube client config: %w", err)
+			errs <- fmt.Errorf("failed to build kube client config: %w", err)
 		}
 
 		// create the clientset
 		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
-			errs <- fmt.Errorf("Failed to build kube clientset: %w", err)
+			errs <- fmt.Errorf("failed to build kube clientset: %w", err)
 		}
 
 		pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
 		if err != nil {
-			errs <- fmt.Errorf("Failed to List Pods: %w", err)
+			errs <- fmt.Errorf("failed to List Pods: %w", err)
 		}
 		log.Debugf("There are %d pods in the cluster\n", len(pods.Items))
 
@@ -113,11 +133,10 @@ func getImageResults() <-chan error {
 				continue
 			}
 
-			imageList := make([]string, 0)
 			if value, ok := namespaceMap[namespace]; ok {
 				value.AddImages(getUniqueImagesFromPodSpec(pod.Spec.Containers))
 			} else {
-				imageList = getUniqueImagesFromPodSpec(pod.Spec.Containers)
+				imageList := getUniqueImagesFromPodSpec(pod.Spec.Containers)
 				namespaceMap[namespace] = &result.Namespace{
 					Name:   namespace,
 					Images: imageList,
@@ -125,7 +144,6 @@ func getImageResults() <-chan error {
 			}
 		}
 
-		log.Errorf(";asdfkj;asldkfjasdf")
 		namespaces := make([]result.Namespace, 0)
 		for _, value := range namespaceMap {
 			namespaces = append(namespaces, *value)
@@ -149,7 +167,7 @@ func runDefaultCmd() error {
 }
 
 func getUniqueImagesFromPodSpec(containers []v1.Container) []string {
-	imageMap := make(map[string]struct{}, 0)
+	imageMap := make(map[string]struct{})
 	for _, container := range containers {
 		imageMap[container.Image] = struct{}{}
 	}

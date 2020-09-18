@@ -25,8 +25,8 @@ func TestJsonPresenter(t *testing.T) {
 	}
 
 	var namespace2 = result.Namespace{
-		Name:   "kube-system",
-		Images: []string {
+		Name: "kube-system",
+		Images: []string{
 			"k8s.gcr.io/coredns:1.6.2",
 			"k8s.gcr.io/etcd:3.3.15-0",
 			"k8s.gcr.io/kube-apiserver:v1.16.5",
@@ -41,7 +41,7 @@ func TestJsonPresenter(t *testing.T) {
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
 	var mockResult = result.Result{
 		Timestamp: testTime.Format(time.RFC3339),
-		Results: []result.Namespace{namespace1, namespace2},
+		Results:   []result.Namespace{namespace1, namespace2},
 	}
 
 	pres := NewPresenter(mockResult)

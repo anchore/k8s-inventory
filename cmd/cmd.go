@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/format"
 	"github.com/anchore/kai/internal/logger"
@@ -11,7 +13,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wagoodman/go-partybus"
 	"gopkg.in/yaml.v2"
-	"os"
 )
 
 var appConfig *config.Application

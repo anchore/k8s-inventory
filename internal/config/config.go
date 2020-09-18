@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
+
+	"github.com/adrg/xdg"
 	"github.com/anchore/kai/internal"
 	"github.com/anchore/kai/kai/presenter"
+	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"github.com/mitchellh/go-homedir"
-	"github.com/adrg/xdg"
 
 	"path"
 	"strings"
@@ -27,7 +28,7 @@ type Application struct {
 	CliOptions        CliOnlyOptions
 	Dev               Development `mapstructure:"dev"`
 	CheckForAppUpdate bool        `mapstructure:"check-for-app-update"`
-	KubeConfig 		  string `mapstructure:"kubeconfig"`
+	KubeConfig        string      `mapstructure:"kubeconfig"`
 }
 
 type Logging struct {

@@ -1,22 +1,23 @@
 package table
 
 import (
-	"github.com/anchore/kai/kai/result"
 	"io"
 	"sort"
+
+	"github.com/anchore/kai/kai/result"
 
 	"github.com/olekukonko/tablewriter"
 )
 
 // Presenter is a generic struct for holding fields needed for reporting
 type Presenter struct {
-	result          result.Result
+	result result.Result
 }
 
 // NewPresenter is a *Presenter constructor
 func NewPresenter(result result.Result) *Presenter {
 	return &Presenter{
-		result:          result,
+		result: result,
 	}
 }
 
@@ -28,7 +29,7 @@ func (pres *Presenter) Present(output io.Writer) error {
 	for _, n := range pres.result.Results {
 		namespace := n.Name
 		for _, image := range n.Images {
-			row := []string {namespace, image}
+			row := []string{namespace, image}
 			rows = append(rows, row)
 		}
 	}

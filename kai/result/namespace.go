@@ -2,8 +2,8 @@ package result
 
 // Represents a Namespace Images list result
 type Namespace struct {
-	Name 	string
-	Images	[]string
+	Name   string
+	Images []string
 }
 
 func (n *Namespace) AddImages(images []string) {
@@ -11,7 +11,7 @@ func (n *Namespace) AddImages(images []string) {
 		n.Images = images
 	} else {
 		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
-		imageSet := make(map[string]struct{}, 0)
+		imageSet := make(map[string]struct{})
 		for _, image := range n.Images {
 			imageSet[image] = struct{}{}
 		}

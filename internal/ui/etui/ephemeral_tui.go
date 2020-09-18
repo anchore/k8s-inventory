@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/internal/logger"
 	"github.com/anchore/kai/internal/ui/common"
 	kaiEvent "github.com/anchore/kai/kai/event"
 	kaiUI "github.com/anchore/kai/ui"
-	"os"
-	"sync"
 
 	"github.com/wagoodman/go-partybus"
 	"github.com/wagoodman/jotframe/pkg/frame"
@@ -90,10 +91,10 @@ eventLoop:
 					log.Errorf("unable to show %s event: %+v", e.Type, err)
 				}
 
-			//case e.Type == kaiEvent.AppUpdateAvailable:
-			//	if err = appUpdateAvailableHandler(ctx, fr, e, wg); err != nil {
-			//		log.Errorf("unable to show %s event: %+v", e.Type, err)
-			//	}
+			case e.Type == kaiEvent.AppUpdateAvailable:
+				if err = appUpdateAvailableHandler(ctx, fr, e, wg); err != nil {
+					log.Errorf("unable to show %s event: %+v", e.Type, err)
+				}
 
 			case e.Type == kaiEvent.ImageResultsRetrieved:
 				// we may have other background processes still displaying progress, wait for them to

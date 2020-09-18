@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"fmt"
+
 	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/wagoodman/go-partybus"
@@ -32,8 +33,21 @@ func checkEventType(actual, expected partybus.EventType) error {
 	return nil
 }
 
+func ParseAppUpdateAvailable(e partybus.Event) (string, error) {
+	if err := checkEventType(e.Type, event.AppUpdateAvailable); err != nil {
+		return "", err
+	}
+
+	newVersion, ok := e.Value.(string)
+	if !ok {
+		return "", newPayloadErr(e.Type, "Value", e.Value)
+	}
+
+	return newVersion, nil
+}
+
 func ParseImageResultsRetrieved(e partybus.Event) (presenter.Presenter, error) {
-	if err:= checkEventType(e.Type, event.ImageResultsRetrieved); err != nil {
+	if err := checkEventType(e.Type, event.ImageResultsRetrieved); err != nil {
 		return nil, err
 	}
 

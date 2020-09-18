@@ -1,10 +1,11 @@
 package presenter
 
 import (
+	"io"
+
 	"github.com/anchore/kai/kai/presenter/json"
 	"github.com/anchore/kai/kai/presenter/table"
 	"github.com/anchore/kai/kai/result"
-	"io"
 )
 
 // Presenter is the main interface other Presenters need to implement
