@@ -2,7 +2,9 @@
 Prototype for listing in-use images from k8s API
 
 ## Build
-`go build -o ./kai .`
+Note: Can't point this to ./kai because there's already a subdirectory named kai
+
+`go build -o <localpath>/kai .`
 
 ## Run
-`./kai`
+`<localpath>/kai`

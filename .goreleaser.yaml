@@ -1,0 +1,54 @@
+release:
+  # If set to auto, will mark the release as not ready for production
+  # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
+  # If set to true, will mark the release as not ready for production.
+  prerelease: false
+
+signs:
+  - artifacts: checksum
+    args: ["--output", "${signature}", "--detach-sign", "${artifact}"]
+
+builds:
+  - binary: kai
+    env:
+      - CGO_ENABLED=0
+    goos:
+      # windows not supported yet (due to jotframe)
+      # - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+    # Set the modified timestamp on the output binary to the git timestamp (to ensure a reproducible build)
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags: |
+      -w
+      -s
+      -extldflags '-static'
+      -X github.com/anchore/kai/internal/version.version={{.Version}}
+      -X github.com/anchore/kai/internal/version.gitCommit={{.Commit}}
+      -X github.com/anchore/kai/internal/version.buildDate={{.Date}}
+      -X github.com/anchore/kai/internal/version.gitTreeState={{.Env.BUILD_GIT_TREE_STATE}}
+
+nfpms:
+  - license: "Apache 2.0"
+    maintainer: "Anchore, Inc"
+    homepage: &website "https://github.com/anchore/kai"
+    description: &description "A vulnerability scanner for container images and filesystems"
+    formats:
+      - rpm
+      - deb
+
+brews:
+  - tap:
+      owner: anchore
+      name: homebrew-kai
+    homepage: *website
+    description: *description
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+
