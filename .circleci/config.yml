@@ -87,18 +87,9 @@ jobs:
           name: build hash key for integration test-fixtures blobs
           command: make integration-fingerprint
 
-      - restore_cache:
-          keys:
-            - integration-test-tar-cache-{{ checksum "test/integration/test-fixtures/tar-cache.fingerprint" }}
       - run:
           name: run integration tests
           command: make integration
-
-      - save_cache:
-          key: integration-test-tar-cache-{{ checksum "test/integration/test-fixtures/tar-cache.fingerprint" }}
-          paths:
-            - "test/integration/test-fixtures/tar-cache"
-
 workflows:
   "Static Analysis + Unit + Integration":
     jobs:

@@ -121,15 +121,6 @@ integration: ## Run integration tests
 	$(call title,Running integration tests)
 	go test -v -tags=integration ./test/integration
 
-# note: this is used by CI to determine if the integration test fixture cache (docker image tars) should be busted
-.PHONY: integration-fingerprint
-integration-fingerprint:
-	find test/integration/test-fixtures/image-* -type f -exec md5sum {} + | awk '{print $1}' | sort | md5sum | tee test/integration/test-fixtures/tar-cache.fingerprint
-
-.PHONY: clear-test-cache
-clear-test-cache: ## Delete all test cache (built docker image tars)
-	find . -type f -wholename "**/test-fixtures/tar-cache/*.tar" -delete
-
 .PHONY: check-pipeline
 check-pipeline: ## Run local CircleCI pipeline locally (sanity check)
 	$(call title,Check pipeline)

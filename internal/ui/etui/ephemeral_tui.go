@@ -74,16 +74,20 @@ func OutputToEphemeralTUI(workerErrs <-chan error, subscription *partybus.Subscr
 	ctx := context.Background()
 	kaiUIHandler := kaiUI.NewHandler()
 
-eventLoop:
+	var errResult error
 	for {
 		select {
-		case err := <-workerErrs:
+		case err, ok := <-workerErrs:
 			if err != nil {
 				return err
 			}
+			if !ok {
+				// worker completed
+				workerErrs = nil
+			}
 		case e, ok := <-events:
 			if !ok {
-				break eventLoop
+				events = nil
 			}
 			switch {
 			case kaiUIHandler.RespondsTo(e):
@@ -113,15 +117,17 @@ eventLoop:
 				}
 
 				// this is the last expected event
-				break eventLoop
+				events = nil
 			}
 		case <-ctx.Done():
 			if ctx.Err() != nil {
 				log.Errorf("cancelled (%+v)", err)
 			}
-			break eventLoop
+		}
+		if events == nil && workerErrs == nil {
+			break
 		}
 	}
 
-	return nil
+	return errResult
 }

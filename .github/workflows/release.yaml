@@ -34,15 +34,6 @@ jobs:
           checkName: "Build-Snapshot-Artifacts"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check inline comparison test results
-        uses: fountainhead/action-wait-for-check@v1.0.0
-        id: inline-compare
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the github action job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Inline-Compare"
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
       - name: Check static anaylysis, unit, and integration test results
         uses: fountainhead/action-wait-for-check@v1.0.0
         id: sa-unit-int

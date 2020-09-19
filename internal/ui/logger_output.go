@@ -9,17 +9,20 @@ import (
 
 func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription) error {
 	events := subscription.Events()
-eventLoop:
+	var errResult error
 	for {
 		select {
-		case err := <-workerErrs:
+		case err, ok := <-workerErrs:
 			if err != nil {
 				return err
+			}
+			if !ok {
+				workerErrs = nil
 			}
 		case e, ok := <-events:
 			if !ok {
 				// event bus closed...
-				break eventLoop
+				events = nil
 			}
 
 			// ignore all events except for the final event
@@ -30,10 +33,13 @@ eventLoop:
 				}
 
 				// this is the last expected event
-				break eventLoop
+				events = nil
 			}
+		}
+		if events == nil && workerErrs == nil {
+			break
 		}
 	}
 
-	return nil
+	return errResult
 }
