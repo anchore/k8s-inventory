@@ -4,8 +4,8 @@ import v1 "k8s.io/api/core/v1"
 
 // Represents a Namespace Images list result
 type Namespace struct {
-	Namespace string   `json:"namespace"`
-	Images    []string `json:"images"`
+	Namespace string   `json:"namespace,omitempty"`
+	Images    []string `json:"images,omitempty"`
 }
 
 func NewNamespace(pod v1.Pod) *Namespace {

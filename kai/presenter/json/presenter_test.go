@@ -90,3 +90,33 @@ func TestEmptyJsonPresenter(t *testing.T) {
 	}
 
 }
+
+func TestNoResultsJsonPresenter(t *testing.T) {
+	// Expected to have an empty JSON object back
+	var buffer bytes.Buffer
+
+	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
+	pres := NewPresenter(result.Result{
+		Timestamp: testTime.Format(time.RFC3339),
+		Results: []result.Namespace{},
+	})
+
+	// run presenter
+	err := pres.Present(&buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual := buffer.Bytes()
+	if *update {
+		testutils.UpdateGoldenFileContents(t, actual)
+	}
+
+	var expected = testutils.GetGoldenFileContents(t)
+
+	if !bytes.Equal(expected, actual) {
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(string(expected), string(actual), true)
+		t.Errorf("mismatched output:\n%s", dmp.DiffPrettyText(diffs))
+	}
+
+}
