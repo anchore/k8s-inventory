@@ -2,10 +2,11 @@ package kai
 
 import (
 	"fmt"
-	"github.com/anchore/kai/kai/event"
-	"github.com/anchore/kai/kai/presenter"
 	"sync"
 	"time"
+
+	"github.com/anchore/kai/kai/event"
+	"github.com/anchore/kai/kai/presenter"
 
 	"github.com/anchore/kai/internal/bus"
 	"github.com/anchore/kai/internal/config"
@@ -55,7 +56,7 @@ func GetImageResults(errs chan error, appConfig *config.Application) result.Resu
 	}
 	wg.Wait()
 	resolvedNamespaces := make([]result.Namespace, 0)
-	for i:=0; i<len(searchNamespaces); i++ {
+	for i := 0; i < len(searchNamespaces); i++ {
 		channelNamespaceMsg := <-namespaceChan
 		resolvedNamespaces = append(resolvedNamespaces, channelNamespaceMsg...)
 	}

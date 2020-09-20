@@ -6,8 +6,25 @@ Note: Can't point this to ./kai because there's already a subdirectory named kai
 
 `go build -o <localpath>/kai .`
 
+### Docker
+To build a docker image, you'll need to provide a kubeconfig. 
+
+Note: Docker build requires files to be within the docker build context
+```
+docker build -t localhost/kai:latest --build-arg KUBECONFIG=./kubeconfig .
+```
+
 ## Run
 `<localpath>/kai`
+
+### Docker
+```
+docker run -it --rm localhost/kai:latest --kubeconfig /kubeconfig
+```
+### Helm
+```
+helm install local-kai helm/kai
+```
 
 ## Configuration
 ```yaml

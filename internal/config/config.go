@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/anchore/kai/kai/mode"
 
 	"github.com/adrg/xdg"
@@ -53,7 +54,6 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("log.structured", false)
 	v.SetDefault("dev.profile-cpu", false)
 	v.SetDefault("check-for-app-update", true)
-	v.SetDefault("polling-interval-seconds", 300)
 }
 
 func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, error) {

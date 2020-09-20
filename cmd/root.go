@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/anchore/kai/kai/mode"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+
+	"github.com/anchore/kai/kai/mode"
 
 	"github.com/anchore/kai/internal"
 	"github.com/anchore/kai/internal/bus"
@@ -99,6 +100,13 @@ func init() {
 
 	opt = "mode"
 	rootCmd.Flags().StringP(opt, "m", mode.AdHoc.String(), fmt.Sprintf("execution mode, options=%v", mode.Modes))
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "polling-interval-seconds"
+	rootCmd.Flags().StringP(opt, "p", "300", "If mode is 'periodic', this specifies the interval")
 	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
