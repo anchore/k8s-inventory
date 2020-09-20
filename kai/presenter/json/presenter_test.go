@@ -98,7 +98,7 @@ func TestNoResultsJsonPresenter(t *testing.T) {
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
 	pres := NewPresenter(result.Result{
 		Timestamp: testTime.Format(time.RFC3339),
-		Results: []result.Namespace{},
+		Results:   []result.Namespace{},
 	})
 
 	// run presenter

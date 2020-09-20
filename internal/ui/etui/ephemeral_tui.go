@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/anchore/kai/internal/config"
-	"github.com/anchore/kai/kai/mode"
 	"os"
 	"sync"
+
+	"github.com/anchore/kai/internal/config"
+	"github.com/anchore/kai/kai/mode"
 
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/internal/logger"
@@ -121,11 +122,9 @@ func OutputToEphemeralTUI(workerErrs <-chan error, subscription *partybus.Subscr
 
 					// this is the last expected event (if we're not running periodically)
 					events = nil
-				} else {
+				} else if err := common.ImageResultsRetrievedHandler(e); err != nil {
 					// TODO: would be interesting to capture an interrupt and output any logs that were generated
-					if err := common.ImageResultsRetrievedHandler(e); err != nil {
-						log.Errorf("unable to show %s event: %+v", e.Type, err)
-					}
+					log.Errorf("unable to show %s event: %+v", e.Type, err)
 				}
 			}
 		case <-ctx.Done():
