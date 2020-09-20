@@ -2,6 +2,8 @@ package kai
 
 import (
 	"fmt"
+	"github.com/anchore/kai/kai/event"
+	"github.com/anchore/kai/kai/presenter"
 	"sync"
 	"time"
 
@@ -16,6 +18,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application) {
+	// Report one result right away
+	imagesResult := GetImageResults(errs, appConfig)
+	bus.Publish(partybus.Event{
+		Type:  event.ImageResultsRetrieved,
+		Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+	})
+
+	// Then fire off a ticker that reports according to a configurable polling interval
+	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
+	for range ticker.C {
+		imagesResult := GetImageResults(errs, appConfig)
+		bus.Publish(partybus.Event{
+			Type:  event.ImageResultsRetrieved,
+			Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+		})
+	}
+}
+
 func GetImageResults(errs chan error, appConfig *config.Application) result.Result {
 	searchNamespaces := resolveNamespaces(appConfig)
 	namespaceChan := make(chan []result.Namespace, len(searchNamespaces))
@@ -28,7 +49,7 @@ func GetImageResults(errs chan error, appConfig *config.Application) result.Resu
 			if err != nil {
 				errs <- fmt.Errorf("failed to List Pods: %w", err)
 			}
-			log.Debugf("There are %d pods in the cluster in namespace \"%s\"\n", len(pods.Items), searchNamespace)
+			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
 			namespaceChan <- parseNamespaceImages(pods)
 		}(searchNamespace, &wg)
 	}

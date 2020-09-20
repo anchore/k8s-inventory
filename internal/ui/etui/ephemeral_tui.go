@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/anchore/kai/internal/config"
+	"github.com/anchore/kai/kai/mode"
 	"os"
 	"sync"
 
@@ -35,7 +37,7 @@ func setupScreen(output *os.File) *frame.Frame {
 }
 
 // nolint:funlen,gocognit
-func OutputToEphemeralTUI(workerErrs <-chan error, subscription *partybus.Subscription) error {
+func OutputToEphemeralTUI(workerErrs <-chan error, subscription *partybus.Subscription, appConfig *config.Application) error {
 	output := os.Stderr
 
 	// prep the logger to not clobber the screen from now on (logrus only)
@@ -103,21 +105,28 @@ func OutputToEphemeralTUI(workerErrs <-chan error, subscription *partybus.Subscr
 			case e.Type == kaiEvent.ImageResultsRetrieved:
 				// we may have other background processes still displaying progress, wait for them to
 				// finish before discontinuing dynamic content and showing the final report
-				wg.Wait()
-				fr.Close()
-				// TODO: there is a race condition within frame.Close() that sometimes leads to an extra blank line being output
-				frame.Close()
-				isClosed = true
+				if appConfig.RunMode != mode.PeriodicPolling {
+					wg.Wait()
+					fr.Close()
+					// TODO: there is a race condition within frame.Close() that sometimes leads to an extra blank line being output
+					frame.Close()
+					isClosed = true
 
-				// flush any errors to the screen before the report
-				fmt.Fprint(output, logBuffer.String())
+					// flush any errors to the screen before the report
+					fmt.Fprint(output, logBuffer.String())
 
-				if err := common.ImageResultsRetrievedHandler(e); err != nil {
-					log.Errorf("unable to show %s event: %+v", e.Type, err)
+					if err := common.ImageResultsRetrievedHandler(e); err != nil {
+						log.Errorf("unable to show %s event: %+v", e.Type, err)
+					}
+
+					// this is the last expected event (if we're not running periodically)
+					events = nil
+				} else {
+					// TODO: would be interesting to capture an interrupt and output any logs that were generated
+					if err := common.ImageResultsRetrievedHandler(e); err != nil {
+						log.Errorf("unable to show %s event: %+v", e.Type, err)
+					}
 				}
-
-				// this is the last expected event
-				events = nil
 			}
 		case <-ctx.Done():
 			if ctx.Err() != nil {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/anchore/kai/kai/mode"
 
 	"github.com/adrg/xdg"
 	"github.com/anchore/kai/internal"
@@ -20,16 +21,19 @@ type CliOnlyOptions struct {
 }
 
 type Application struct {
-	ConfigPath        string
-	PresenterOpt      presenter.Option
-	Output            string  `mapstructure:"output"`
-	Quiet             bool    `mapstructure:"quiet"`
-	Log               Logging `mapstructure:"log"`
-	CliOptions        CliOnlyOptions
-	Dev               Development `mapstructure:"dev"`
-	CheckForAppUpdate bool        `mapstructure:"check-for-app-update"`
-	KubeConfig        string      `mapstructure:"kubeconfig"`
-	Namespaces        []string    `mapstructure:"namespaces"`
+	ConfigPath             string
+	PresenterOpt           presenter.Option
+	Output                 string  `mapstructure:"output"`
+	Quiet                  bool    `mapstructure:"quiet"`
+	Log                    Logging `mapstructure:"log"`
+	CliOptions             CliOnlyOptions
+	Dev                    Development `mapstructure:"dev"`
+	CheckForAppUpdate      bool        `mapstructure:"check-for-app-update"`
+	KubeConfig             string      `mapstructure:"kubeconfig"`
+	Namespaces             []string    `mapstructure:"namespaces"`
+	RunMode                mode.Mode
+	Mode                   string `mapstructure:"mode"`
+	PollingIntervalSeconds int    `mapstructure:"polling-interval-seconds"`
 }
 
 type Logging struct {
@@ -49,7 +53,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("log.structured", false)
 	v.SetDefault("dev.profile-cpu", false)
 	v.SetDefault("check-for-app-update", true)
-	v.SetDefault("namespaces", "all")
+	v.SetDefault("polling-interval-seconds", 300)
 }
 
 func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, error) {
@@ -85,6 +89,9 @@ func (cfg *Application) Build() error {
 		return fmt.Errorf("bad --output value '%s'", cfg.Output)
 	}
 	cfg.PresenterOpt = presenterOption
+
+	runMode := mode.ParseMode(cfg.Mode)
+	cfg.RunMode = runMode
 
 	if cfg.Quiet {
 		// TODO: this is bad: quiet option trumps all other logging options
