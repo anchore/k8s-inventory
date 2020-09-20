@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/anchore/kai/kai/mode"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -80,7 +81,7 @@ func init() {
 	}
 
 	opt = "namespaces"
-	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) Namespaces to search")
+	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
 	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		namespaces, err := kai.ListNamespaces(appConfig)
 		if err != nil {
@@ -95,6 +96,13 @@ func init() {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
 	}
+
+	opt = "mode"
+	rootCmd.Flags().StringP(opt, "m", mode.AdHoc.String(), fmt.Sprintf("execution mode, options=%v", mode.Modes))
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
 }
 
 func getImageResults() <-chan error {
@@ -104,12 +112,17 @@ func getImageResults() <-chan error {
 
 		checkForAppUpdateIfEnabled()
 
-		imagesResult := kai.GetImageResults(errs, appConfig)
+		switch appConfig.RunMode {
+		case mode.PeriodicPolling:
+			kai.PeriodicallyGetImageResults(errs, appConfig)
+		default:
+			imagesResult := kai.GetImageResults(errs, appConfig)
 
-		bus.Publish(partybus.Event{
-			Type:  event.ImageResultsRetrieved,
-			Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
-		})
+			bus.Publish(partybus.Event{
+				Type:  event.ImageResultsRetrieved,
+				Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+			})
+		}
 	}()
 	return errs
 }
@@ -117,7 +130,7 @@ func getImageResults() <-chan error {
 func runDefaultCmd() error {
 	errs := getImageResults()
 	ux := ui.Select(appConfig.CliOptions.Verbosity > 0, appConfig.Quiet)
-	return ux(errs, eventSubscription)
+	return ux(errs, eventSubscription, appConfig)
 }
 
 func homeDir() string {
