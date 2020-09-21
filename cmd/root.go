@@ -127,9 +127,9 @@ func getImageResults() <-chan error {
 			imagesResult := kai.GetImageResults(errs, appConfig)
 
 			bus.Publish(partybus.Event{
-				Type:  event.ImageResultsRetrieved,
+				Type:   event.ImageResultsRetrieved,
 				Source: imagesResult,
-				Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+				Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 			})
 		}
 	}()

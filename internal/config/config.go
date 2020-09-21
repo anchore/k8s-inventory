@@ -39,13 +39,19 @@ type Application struct {
 }
 
 type AnchoreInfo struct {
-	Url      string `mapstructure:"url"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
+	URL      string     `mapstructure:"url"`
+	User     string     `mapstructure:"user"`
+	Password string     `mapstructure:"password"`
+	HTTP     HTTPConfig `mapstructure:"http"`
+}
+
+type HTTPConfig struct {
+	Insecure       bool `mapstructure:"insecure"`
+	TimeoutSeconds int  `mapstructure:"timeoutSeconds"`
 }
 
 func (cfg *Application) HasAnchoreDetails() bool {
-	return cfg.AnchoreDetails.Url != "" &&
+	return cfg.AnchoreDetails.URL != "" &&
 		cfg.AnchoreDetails.User != "" &&
 		cfg.AnchoreDetails.Password != ""
 }
@@ -67,6 +73,8 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("log.structured", false)
 	v.SetDefault("dev.profile-cpu", false)
 	v.SetDefault("check-for-app-update", true)
+	v.SetDefault("anchore.http.insecure", false)
+	v.SetDefault("anchore.http.timeoutSeconds", 10)
 }
 
 func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, error) {

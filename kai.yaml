@@ -30,7 +30,10 @@ mode: periodic
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
-anchore: {}
-#  url:
-#  user: admin
-#  password: foobar
+anchore:
+  url: https://6e879ecb03e1d709729eeafea147879b.m.pipedream.net
+  user: admin
+  password: foobar
+  http:
+    insecure: true
+    timeoutSeconds: 5

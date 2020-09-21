@@ -1,6 +1,10 @@
 package result
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"fmt"
+
+	v1 "k8s.io/api/core/v1"
+)
 
 // Represents a Namespace Images list result
 type Namespace struct {
@@ -13,6 +17,10 @@ func NewNamespace(pod v1.Pod) *Namespace {
 		Namespace: pod.Namespace,
 		Images:    getUniqueImagesFromPodSpec(pod.Spec.Containers),
 	}
+}
+
+func (n *Namespace) String() string {
+	return fmt.Sprintf("Namespace(namespace=%s, images=%v)", n.Namespace, n.Images)
 }
 
 func (n *Namespace) AddImages(podSpec v1.PodSpec) {

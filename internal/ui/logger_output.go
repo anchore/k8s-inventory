@@ -3,6 +3,8 @@ package ui
 import (
 	"bytes"
 	"fmt"
+	"os"
+
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/internal/logger"
@@ -11,9 +13,9 @@ import (
 	"github.com/anchore/kai/kai/mode"
 	"github.com/wagoodman/go-partybus"
 	"github.com/wagoodman/jotframe/pkg/frame"
-	"os"
 )
 
+//nolint: gocognit
 func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appConfig *config.Application) error {
 	// prep the logger to not clobber the screen from now on (logrus only)
 	logBuffer := bytes.NewBufferString("")
@@ -56,7 +58,7 @@ func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appC
 			case e.Type == kaiEvent.ImageResultsRetrieved:
 				err := common.ImageResultsRetrievedHandler(e, appConfig)
 				if err != nil {
-					log.Errorf("unable to show %s event: %+v", e.Type, err)
+					log.Errorf("unable to handle %s event: %+v", e.Type, err)
 				}
 
 				// this is the last expected event (if we're not running periodically)
@@ -79,7 +81,6 @@ func teardownFrame(isClosed bool, fr *frame.Frame, logBuffer *bytes.Buffer) {
 		_ = frame.Close()
 		// flush any errors to the screen before the report
 		_, _ = fmt.Fprint(os.Stderr, logBuffer.String())
-		isClosed = true
 	}
 	logWrapper, ok := log.Log.(*logger.LogrusLogger)
 	if ok {

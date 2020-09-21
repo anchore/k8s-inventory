@@ -2,13 +2,14 @@ package common
 
 import (
 	"fmt"
+	"io"
+	"os"
+
 	"github.com/anchore/kai/internal"
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/kai/reporter"
 	"github.com/gookit/color"
 	"github.com/wagoodman/jotframe/pkg/frame"
-	"io"
-	"os"
 
 	kaiEventParsers "github.com/anchore/kai/kai/event/parsers"
 	"github.com/wagoodman/go-partybus"
@@ -22,9 +23,11 @@ func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Applic
 	}
 
 	if appConfig.HasAnchoreDetails() {
-		if err:= reporter.Report(imagesResult, appConfig.AnchoreDetails); err != nil {
-			return fmt.Errorf("Unable to report Images to Anchore: %w", err)
+		if err := reporter.Report(imagesResult, appConfig.AnchoreDetails); err != nil {
+			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
+	} else {
+		fmt.Println("Anchore details not specified, not reporting in-use image data")
 	}
 
 	if err := pres.Present(os.Stdout); err != nil {

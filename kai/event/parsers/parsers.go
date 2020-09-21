@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"fmt"
+
 	"github.com/anchore/kai/kai/result"
 
 	"github.com/anchore/kai/kai/event"

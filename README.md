@@ -28,11 +28,10 @@ helm install local-kai helm/kai
 
 ## Configuration
 ```yaml
-# same as -o ; the output format (options: table, json). 
-# Only respected if Kai is printing results to STDOUT
+# same as -o ; the output format (options: table, json)
 output: "json"
 
-# same as -q ; suppress all output (except for results)
+# same as -q ; suppress all output (except for the inventory results)
 quiet: false
 
 log:
@@ -40,7 +39,7 @@ log:
   structured: false
 
   # the log level; note: detailed logging suppress the ETUI
-  level: "debug"
+  level: "warn"
 
   # location to write the log file (default is not to have a log file)
   file: ""
@@ -57,7 +56,15 @@ namespaces:
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: periodic
 
-# Only respected if mode is periodic (defaults to 300)
-polling-interval-seconds: 60
+# Only respected if mode is periodic
+polling-interval-seconds: 300
+
+anchore: {}
+  # url: 
+  # user: admin
+  # password: foobar
+  # http:
+  #   insecure: false
+  #   timeoutSeconds: 10
 
 ```

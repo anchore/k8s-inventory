@@ -60,9 +60,9 @@ affinity: {}
 
 probes:
   liveness:
-    initialDelaySeconds: 15
+    initialDelaySeconds: 1
     timeoutSeconds: 10
-    periodSeconds: 15
+    periodSeconds: 5
     failureThreshold: 6
     successThreshold: 1
   readiness:
@@ -103,4 +103,12 @@ kai:
 
   # Only respected if mode is periodic
   pollingIntervalSeconds: 300
+
+  anchore: {}
+#    url:
+#    user: admin
+#    password: foobar
+#    http:
+#      insecure: false
+#      timeoutSeconds: 10
 

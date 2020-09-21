@@ -23,9 +23,9 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 	// Report one result right away
 	imagesResult := GetImageResults(errs, appConfig)
 	bus.Publish(partybus.Event{
-		Type:  event.ImageResultsRetrieved,
+		Type:   event.ImageResultsRetrieved,
 		Source: imagesResult,
-		Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+		Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 	})
 
 	// Then fire off a ticker that reports according to a configurable polling interval
@@ -33,9 +33,9 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 	for range ticker.C {
 		imagesResult := GetImageResults(errs, appConfig)
 		bus.Publish(partybus.Event{
-			Type:  event.ImageResultsRetrieved,
+			Type:   event.ImageResultsRetrieved,
 			Source: imagesResult,
-			Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+			Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 		})
 	}
 }
