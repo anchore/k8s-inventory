@@ -29,3 +29,8 @@ mode: periodic
 
 # Only respected if mode is periodic
 polling-interval-seconds: 300
+
+anchore: {}
+#  url:
+#  user: admin
+#  password: foobar

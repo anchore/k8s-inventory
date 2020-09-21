@@ -128,6 +128,7 @@ func getImageResults() <-chan error {
 
 			bus.Publish(partybus.Event{
 				Type:  event.ImageResultsRetrieved,
+				Source: imagesResult,
 				Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 			})
 		}
@@ -137,8 +138,7 @@ func getImageResults() <-chan error {
 
 func runDefaultCmd() error {
 	errs := getImageResults()
-	ux := ui.Select(appConfig.CliOptions.Verbosity > 0, appConfig.Quiet)
-	return ux(errs, eventSubscription, appConfig)
+	return ui.LoggerUI(errs, eventSubscription, appConfig)
 }
 
 func homeDir() string {

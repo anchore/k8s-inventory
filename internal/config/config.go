@@ -33,8 +33,21 @@ type Application struct {
 	KubeConfig             string      `mapstructure:"kubeconfig"`
 	Namespaces             []string    `mapstructure:"namespaces"`
 	RunMode                mode.Mode
-	Mode                   string `mapstructure:"mode"`
-	PollingIntervalSeconds int    `mapstructure:"polling-interval-seconds"`
+	Mode                   string      `mapstructure:"mode"`
+	PollingIntervalSeconds int         `mapstructure:"polling-interval-seconds"`
+	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
+}
+
+type AnchoreInfo struct {
+	Url      string `mapstructure:"url"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+}
+
+func (cfg *Application) HasAnchoreDetails() bool {
+	return cfg.AnchoreDetails.Url != "" &&
+		cfg.AnchoreDetails.User != "" &&
+		cfg.AnchoreDetails.Password != ""
 }
 
 type Logging struct {

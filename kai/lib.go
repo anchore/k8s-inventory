@@ -24,6 +24,7 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 	imagesResult := GetImageResults(errs, appConfig)
 	bus.Publish(partybus.Event{
 		Type:  event.ImageResultsRetrieved,
+		Source: imagesResult,
 		Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 	})
 
@@ -33,6 +34,7 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 		imagesResult := GetImageResults(errs, appConfig)
 		bus.Publish(partybus.Event{
 			Type:  event.ImageResultsRetrieved,
+			Source: imagesResult,
 			Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 		})
 	}
