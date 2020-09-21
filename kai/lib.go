@@ -1,3 +1,6 @@
+/*
+Retrieve Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the k8s go SDK
+*/
 package kai
 
 import (
@@ -19,12 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// According to configuration, periodically retrieve image results and report them to the Event Bus for printing/reporting
 func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application) {
 	// Report one result right away
 	imagesResult := GetImageResults(errs, appConfig)
 	bus.Publish(partybus.Event{
-		Type:  event.ImageResultsRetrieved,
-		Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+		Type:   event.ImageResultsRetrieved,
+		Source: imagesResult,
+		Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 	})
 
 	// Then fire off a ticker that reports according to a configurable polling interval
@@ -32,12 +37,14 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 	for range ticker.C {
 		imagesResult := GetImageResults(errs, appConfig)
 		bus.Publish(partybus.Event{
-			Type:  event.ImageResultsRetrieved,
-			Value: presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+			Type:   event.ImageResultsRetrieved,
+			Source: imagesResult,
+			Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 		})
 	}
 }
 
+// Atomic method for getting in-use image results, in parallel for multiple namespaces
 func GetImageResults(errs chan error, appConfig *config.Application) result.Result {
 	searchNamespaces := resolveNamespaces(appConfig)
 	namespaceChan := make(chan []result.Namespace, len(searchNamespaces))
@@ -68,6 +75,7 @@ func GetImageResults(errs chan error, appConfig *config.Application) result.Resu
 	}
 }
 
+// Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
 func ListNamespaces(appConfig *config.Application) ([]string, error) {
 	namespaces, err := client.GetClientSet(nil, appConfig).CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
@@ -81,6 +89,7 @@ func ListNamespaces(appConfig *config.Application) ([]string, error) {
 	return namespaceNameSlice, nil
 }
 
+// If the configured namespaces to search contains "all", we can execute a single request to get in-use image data.
 func resolveNamespaces(appConfig *config.Application) []string {
 	// If Namespaces contains "all", just search all namespaces
 	if len(appConfig.Namespaces) == 0 {
@@ -96,16 +105,17 @@ func resolveNamespaces(appConfig *config.Application) []string {
 	return namespaces
 }
 
+// Parse Pod List results into a list of Namespaces (each with unique Images)
 func parseNamespaceImages(pods *v1.PodList) []result.Namespace {
 	namespaceMap := make(map[string]*result.Namespace)
 	for _, pod := range pods.Items {
 		namespace := pod.ObjectMeta.Namespace
-		if namespace == "" || len(pod.Spec.Containers) == 0 {
+		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
 			continue
 		}
 
 		if value, ok := namespaceMap[namespace]; ok {
-			value.AddImages(pod.Spec)
+			value.AddImages(pod)
 		} else {
 			namespaceMap[namespace] = result.NewNamespace(pod)
 		}

@@ -1,3 +1,4 @@
+// These are the supported Presenters for outputting In-Use-Image results
 package presenter
 
 import "strings"
@@ -21,6 +22,7 @@ var Options = []Option{
 
 type Option int
 
+// Parse the Presenter option from a string
 func ParseOption(userStr string) Option {
 	switch strings.ToLower(userStr) {
 	case strings.ToLower(JSONPresenter.String()):
@@ -32,6 +34,7 @@ func ParseOption(userStr string) Option {
 	}
 }
 
+// Convert the Presenter option to a string
 func (o Option) String() string {
 	if int(o) >= len(optionStr) || o < 0 {
 		return optionStr[0]

@@ -83,22 +83,15 @@ jobs:
           name: run unit tests
           command: make unit
 
-      - run:
-          name: build hash key for integration test-fixtures blobs
-          command: make integration-fingerprint
-
-      - run:
-          name: run integration tests
-          command: make integration
 workflows:
-  "Static Analysis + Unit + Integration":
+  "Static Analysis + Unit":
     jobs:
       - run-static-analysis:
           name: "Static Analysis"
           version: "latest"
       - run-tests:
-          name: "Unit & Integration Tests (go-1.13)"
+          name: "Unit Tests (go-1.13)"
           version: "1.13"
       - run-tests:
-          name: "Unit & Integration Tests (go-latest)"
+          name: "Unit Tests (go-latest)"
           version: "latest"

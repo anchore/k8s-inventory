@@ -1,7 +1,10 @@
+// Handles event parsing for the EventHandlers in internal/ui/common
 package parsers
 
 import (
 	"fmt"
+
+	"github.com/anchore/kai/kai/result"
 
 	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
@@ -33,6 +36,7 @@ func checkEventType(actual, expected partybus.EventType) error {
 	return nil
 }
 
+// Parse the newVersion from the event value
 func ParseAppUpdateAvailable(e partybus.Event) (string, error) {
 	if err := checkEventType(e.Type, event.AppUpdateAvailable); err != nil {
 		return "", err
@@ -46,15 +50,21 @@ func ParseAppUpdateAvailable(e partybus.Event) (string, error) {
 	return newVersion, nil
 }
 
-func ParseImageResultsRetrieved(e partybus.Event) (presenter.Presenter, error) {
+// Parse the Presenter and the Images Result from the event value and source, respectively
+func ParseImageResultsRetrieved(e partybus.Event) (presenter.Presenter, result.Result, error) {
 	if err := checkEventType(e.Type, event.ImageResultsRetrieved); err != nil {
-		return nil, err
+		return nil, result.Result{}, err
 	}
 
 	pres, ok := e.Value.(presenter.Presenter)
 	if !ok {
-		return nil, newPayloadErr(e.Type, "Value", e.Value)
+		return nil, result.Result{}, newPayloadErr(e.Type, "Value", e.Value)
 	}
 
-	return pres, nil
+	imagesResult, ok := e.Source.(result.Result)
+	if !ok {
+		return nil, result.Result{}, newPayloadErr(e.Type, "Source", e.Source)
+	}
+
+	return pres, imagesResult, nil
 }

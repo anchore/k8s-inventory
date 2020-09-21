@@ -1,3 +1,4 @@
+// Kai's log wrapper
 package log
 
 import "github.com/anchore/kai/kai/logger"

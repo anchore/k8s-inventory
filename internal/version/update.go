@@ -18,6 +18,7 @@ var latestAppVersionURL = struct {
 	path: fmt.Sprintf("/%s/releases/latest/VERSION", internal.ApplicationName),
 }
 
+// Based on the current version, check if a new version is available from toolbox-data.anchore.io
 func IsUpdateAvailable() (bool, string, error) {
 	currentVersionStr := FromBuild().Version
 	currentVersion, err := hashiVersion.NewVersion(currentVersionStr)

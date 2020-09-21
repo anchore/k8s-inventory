@@ -1,3 +1,4 @@
+// If Output == "table" this presenter is used
 package table
 
 import (
@@ -25,11 +26,11 @@ func NewPresenter(result result.Result) *Presenter {
 func (pres *Presenter) Present(output io.Writer) error {
 	rows := make([][]string, 0)
 
-	columns := []string{"Namespace", "Image"}
+	columns := []string{"Namespace", "Image Tag", "Repo Digest"}
 	for _, n := range pres.result.Results {
 		namespace := n.Namespace
 		for _, image := range n.Images {
-			row := []string{namespace, image}
+			row := []string{namespace, image.Tag, image.RepoDigest}
 			rows = append(rows, row)
 		}
 	}

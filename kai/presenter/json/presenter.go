@@ -1,3 +1,4 @@
+// If Output == "json" this presenter is used
 package json
 
 import (

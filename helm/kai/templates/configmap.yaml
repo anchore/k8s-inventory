@@ -21,3 +21,10 @@ data:
       {{- toYaml .Values.kai.namespaces | nindent 6 }}
     mode: {{ .Values.kai.mode }}
     polling-interval-seconds: {{ .Values.kai.pollingIntervalSeconds }}
+    anchore:
+      url: {{ .Values.kai.anchore.url }}
+      user: {{ .Values.kai.anchore.user }}
+      password: {{ .Values.kai.anchore.password }}
+      http:
+        insecure: {{ .Values.kai.anchore.http.insecure }}
+        timeoutSeconds: {{ .Values.kai.anchore.http.timeoutSeconds }}

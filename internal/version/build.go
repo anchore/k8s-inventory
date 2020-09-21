@@ -1,3 +1,4 @@
+// Handles exposing and determining application version details
 package version
 
 import (
@@ -23,6 +24,7 @@ type Version struct {
 	Platform     string `json:"platform"`
 }
 
+// Return version object (created or not during build)
 func FromBuild() Version {
 	return Version{
 		Version:      version,
