@@ -1,3 +1,4 @@
+// Wraps some of the initialization details for the k8s clientset
 package client
 
 import (
@@ -12,6 +13,7 @@ import (
 
 const UseInCluster = "use-in-cluster"
 
+// Based on the application configuration, retrieve the k8s clientset
 func GetClientSet(errs chan error, appConfig *config.Application) *kubernetes.Clientset {
 	// use the current context in kubeconfig
 	kubeConfig, err := getKubeConfig(appConfig)

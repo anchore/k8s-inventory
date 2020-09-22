@@ -1,3 +1,4 @@
+// Defines the logging interface available to the application code
 package logger
 
 type Logger interface {

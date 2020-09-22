@@ -1,3 +1,4 @@
+// Once In-Use Image data has been gathered, this package reports the data to Anchore
 package reporter
 
 import (
@@ -14,6 +15,8 @@ import (
 	"github.com/anchore/kai/kai/result"
 )
 
+// This method does the actual Reporting (via HTTP) to Anchore
+//nolint:gosec
 func Report(result result.Result, anchoreDetails config.AnchoreInfo) error {
 	log.Debug("Reporting results to Anchore")
 	tr := &http.Transport{
@@ -21,7 +24,7 @@ func Report(result result.Result, anchoreDetails config.AnchoreInfo) error {
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout: time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
+		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
 	// 	TODO: update path once we have an endpoint to post to

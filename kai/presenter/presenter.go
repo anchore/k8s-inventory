@@ -1,3 +1,4 @@
+// This package represents the presenters used to print Image Results to STDOut
 package presenter
 
 import (

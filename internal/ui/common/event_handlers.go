@@ -1,9 +1,12 @@
+// Event Handlers (for events received from partybus)
 package common
 
 import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/anchore/kai/internal/log"
 
 	"github.com/anchore/kai/internal"
 	"github.com/anchore/kai/internal/config"
@@ -15,6 +18,7 @@ import (
 	"github.com/wagoodman/go-partybus"
 )
 
+// Log the Image Results to STDOUT and report to Anchore (if configured)
 func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Application) error {
 	// show the report to stdout
 	pres, imagesResult, err := kaiEventParsers.ParseImageResultsRetrieved(event)
@@ -27,7 +31,7 @@ func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Applic
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
 	} else {
-		fmt.Println("Anchore details not specified, not reporting in-use image data")
+		log.Debug("Anchore details not specified, not reporting in-use image data")
 	}
 
 	if err := pres.Present(os.Stdout); err != nil {
@@ -37,6 +41,7 @@ func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Applic
 	return nil
 }
 
+// Print if a new version is available for the app
 func AppUpdateAvailableHandler(fr *frame.Frame, event partybus.Event) error {
 	newVersion, err := kaiEventParsers.ParseAppUpdateAvailable(event)
 	if err != nil {

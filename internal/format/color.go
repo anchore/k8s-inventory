@@ -1,3 +1,4 @@
+// Utilities for formatting strings with colors and templates
 package format
 
 import "fmt"

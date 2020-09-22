@@ -84,7 +84,7 @@ kai:
     structured: false
 
     # the log level; note: detailed logging suppress the ETUI
-    level: "warn"
+    level: "debug"
 
     # location to write the log file (default is not to have a log file)
     file: ""
@@ -102,13 +102,13 @@ kai:
   mode: periodic
 
   # Only respected if mode is periodic
-  pollingIntervalSeconds: 300
+  pollingIntervalSeconds: 60
 
-  anchore: {}
-#    url:
-#    user: admin
-#    password: foobar
-#    http:
-#      insecure: false
-#      timeoutSeconds: 10
+  anchore:
+    url: https://6e879ecb03e1d709729eeafea147879b.m.pipedream.net
+    user: admin
+    password: foobar
+    http:
+      insecure: true
+      timeoutSeconds: 10
 

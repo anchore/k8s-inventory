@@ -1,3 +1,4 @@
+// The structs here define the result format which is parsed from K8s Client requests
 package result
 
 type Result struct {

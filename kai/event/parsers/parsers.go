@@ -1,3 +1,4 @@
+// Handles event parsing for the EventHandlers in internal/ui/common
 package parsers
 
 import (
@@ -35,6 +36,7 @@ func checkEventType(actual, expected partybus.EventType) error {
 	return nil
 }
 
+// Parse the newVersion from the event value
 func ParseAppUpdateAvailable(e partybus.Event) (string, error) {
 	if err := checkEventType(e.Type, event.AppUpdateAvailable); err != nil {
 		return "", err
@@ -48,6 +50,7 @@ func ParseAppUpdateAvailable(e partybus.Event) (string, error) {
 	return newVersion, nil
 }
 
+// Parse the Presenter and the Images Result from the event value and source, respectively
 func ParseImageResultsRetrieved(e partybus.Event) (presenter.Presenter, result.Result, error) {
 	if err := checkEventType(e.Type, event.ImageResultsRetrieved); err != nil {
 		return nil, result.Result{}, err

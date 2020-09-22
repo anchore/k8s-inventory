@@ -1,3 +1,4 @@
+// Handles the output of events received from main execution via logs
 package ui
 
 import (

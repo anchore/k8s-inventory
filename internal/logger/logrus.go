@@ -1,3 +1,4 @@
+// Kai's Logging implementation via Logrus
 package logger
 
 import (
@@ -10,6 +11,7 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
+// LogrusConfiguration for Kai
 type LogrusConfig struct {
 	EnableConsole bool
 	EnableFile    bool
@@ -18,15 +20,18 @@ type LogrusConfig struct {
 	FileLocation  string
 }
 
+// Wraps the internal Logrus implementation
 type LogrusLogger struct {
 	Config LogrusConfig
 	Logger *logrus.Logger
 }
 
+// Nested Logging
 type LogrusNestedLogger struct {
 	Logger *logrus.Entry
 }
 
+// Constructor for Logrus Logger (initialized in cmd)
 func NewLogrusLogger(cfg LogrusConfig) *LogrusLogger {
 	appLogger := logrus.New()
 

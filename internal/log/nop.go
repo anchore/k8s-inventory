@@ -1,5 +1,6 @@
 package log
 
+// No-Op logger
 type nopLogger struct{}
 
 func (l *nopLogger) Errorf(format string, args ...interface{}) {}

@@ -1,3 +1,13 @@
+/*
+The Config package handles the application configuration. Configurations can come from a variety of places, and
+are listed below in order of precedence:
+	- Command Line
+	- .kai.yaml
+	- .kai/config.yaml
+	- ~/.kai.yaml
+	- <XDG_CONFIG_HOME>/kai/config.yaml
+	- Environment Variables prefixed with KAI_
+*/
 package config
 
 import (
@@ -16,11 +26,13 @@ import (
 	"strings"
 )
 
+// Configuration options that may only be specified on the command line
 type CliOnlyOptions struct {
 	ConfigPath string
 	Verbosity  int
 }
 
+// All Application configurations
 type Application struct {
 	ConfigPath             string
 	PresenterOpt           presenter.Option
@@ -38,6 +50,7 @@ type Application struct {
 	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
 }
 
+// Information for posting in-use image details to Anchore (or any URL for that matter)
 type AnchoreInfo struct {
 	URL      string     `mapstructure:"url"`
 	User     string     `mapstructure:"user"`
@@ -45,17 +58,20 @@ type AnchoreInfo struct {
 	HTTP     HTTPConfig `mapstructure:"http"`
 }
 
+// Configurations for the HTTP Client itself (net/http)
 type HTTPConfig struct {
 	Insecure       bool `mapstructure:"insecure"`
 	TimeoutSeconds int  `mapstructure:"timeoutSeconds"`
 }
 
+// Return whether or not AnchoreDetails are specified
 func (cfg *Application) HasAnchoreDetails() bool {
 	return cfg.AnchoreDetails.URL != "" &&
 		cfg.AnchoreDetails.User != "" &&
 		cfg.AnchoreDetails.Password != ""
 }
 
+// Logging Configuration
 type Logging struct {
 	Structured   bool `mapstructure:"structured"`
 	LevelOpt     logrus.Level
@@ -63,6 +79,7 @@ type Logging struct {
 	FileLocation string `mapstructure:"file"`
 }
 
+// Development Configuration (only profile-cpu at the moment)
 type Development struct {
 	ProfileCPU bool `mapstructure:"profile-cpu"`
 }
@@ -77,6 +94,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
 }
 
+// Load the Application Configuration from the Viper specifications
 func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, error) {
 	// the user may not have a config, and this is OK, we can use the default config + default cobra cli values instead
 	setNonCliDefaultValues(v)
@@ -103,6 +121,7 @@ func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, 
 	return config, nil
 }
 
+// Build the configuration object (to be used as a singleton)
 func (cfg *Application) Build() error {
 	// set the presenter
 	presenterOption := presenter.ParseOption(cfg.Output)
