@@ -1,160 +1,144 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
-	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/anchore/kai/kai/mode"
+
+	"github.com/anchore/kai/internal"
+	"github.com/anchore/kai/internal/bus"
+	"github.com/anchore/kai/internal/ui"
+	"github.com/anchore/kai/internal/version"
+	"github.com/anchore/kai/kai"
+	"github.com/anchore/kai/kai/event"
+	"github.com/anchore/kai/kai/presenter"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wagoodman/go-partybus"
 )
-
-var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "kai",
-	Short: "KIA tells Anchore which images are in use in your Kubernetes Cluster",
-	Long: `KIA (Kubernetes Inventory Agent) can be configured to either poll or watch (using SharedInformers) a 
-    Kubernetes Cluster to tell Anchore which Images are currently in-use`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+	Short: "KAI tells Anchore which images are in use in your Kubernetes Cluster",
+	Long: `KAI (Kubernetes Automated Inventory) can poll 
+    Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
+	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		main()
+		if appConfig.Dev.ProfileCPU {
+			f, err := os.Create("cpu.profile")
+			if err != nil {
+				log.Errorf("unable to create CPU profile: %+v", err)
+			} else {
+				err := pprof.StartCPUProfile(f)
+				if err != nil {
+					log.Errorf("unable to start CPU profile: %+v", err)
+				}
+			}
+		}
+
+		if len(args) > 0 {
+			err := cmd.Help()
+			if err != nil {
+				log.Errorf(err.Error())
+				os.Exit(1)
+			}
+			os.Exit(1)
+		}
+		err := runDefaultCmd()
+
+		if appConfig.Dev.ProfileCPU {
+			pprof.StopCPUProfile()
+		}
+
+		if err != nil {
+			log.Errorf(err.Error())
+			os.Exit(1)
+		}
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+func init() {
+	// output & formatting options
+	opt := "output"
+	rootCmd.Flags().StringP(
+		opt, "o", presenter.JSONPresenter.String(),
+		fmt.Sprintf("report output formatter, options=%v", presenter.Options),
+	)
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "kubeconfig"
+	home := homeDir()
+	rootCmd.Flags().StringP(opt, "k", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "namespaces"
+	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
+	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		namespaces, err := kai.ListNamespaces(appConfig)
+		if err != nil {
+			return []string{"completion failed"}, cobra.ShellCompDirectiveError
+		}
+		return append(namespaces, "all"), cobra.ShellCompDirectiveDefault
+	})
+	if err != nil {
+		fmt.Printf("unable to register flag completion script for \"namespace\": %+v", err)
+	}
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "mode"
+	rootCmd.Flags().StringP(opt, "m", mode.AdHoc.String(), fmt.Sprintf("execution mode, options=%v", mode.Modes))
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "polling-interval-seconds"
+	rootCmd.Flags().StringP(opt, "p", "300", "If mode is 'periodic', this specifies the interval")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
 	}
 }
 
-func init() {
-	cobra.OnInitialize(initConfig)
+func getImageResults() <-chan error {
+	errs := make(chan error)
+	go func() {
+		defer close(errs)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+		checkForAppUpdateIfEnabled()
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kai.yaml)")
+		switch appConfig.RunMode {
+		case mode.PeriodicPolling:
+			kai.PeriodicallyGetImageResults(errs, appConfig)
+		default:
+			imagesResult := kai.GetImageResults(errs, appConfig)
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+			bus.Publish(partybus.Event{
+				Type:   event.ImageResultsRetrieved,
+				Source: imagesResult,
+				Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
+			})
+		}
+	}()
+	return errs
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".kai" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".kai")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
-}
-
-type AnchorePod struct {
-	Name      string   `json:"name,omitempty"`
-	Images    []string `json:"images"`
-	Namespace string   `json:"namespace"`
-}
-
-func NewAnchorePod(name string, images []string, namespace string) *AnchorePod {
-	ap := new(AnchorePod)
-	ap.Name = name
-	ap.Images = images
-	ap.Namespace = namespace
-	return ap
-}
-
-func main() {
-	var kubeconfig *string
-	if home := homeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
-	for idx, pod := range pods.Items {
-
-		if idx == 0 {
-			fullPodJson, _ := json.MarshalIndent(pod, "", "    ")
-			fmt.Printf(string(fullPodJson))
-		}
-		podName := pod.ObjectMeta.Name
-		namespace := pod.ObjectMeta.Namespace
-
-		imageMap := make(map[string]bool, 0)
-		for _, container := range pod.Spec.Containers {
-			imageMap[container.Image] = true
-		}
-		imageSlice := make([]string, 0, len(imageMap))
-		for k := range imageMap {
-			imageSlice = append(imageSlice, k)
-		}
-		anchorePod := NewAnchorePod(podName, imageSlice, namespace)
-		anchorePodJson, _ := json.MarshalIndent(anchorePod, "", "    ")
-		fmt.Printf(string(anchorePodJson))
-	}
+func runDefaultCmd() error {
+	errs := getImageResults()
+	return ui.LoggerUI(errs, eventSubscription, appConfig)
 }
 
 func homeDir() string {
@@ -162,4 +146,23 @@ func homeDir() string {
 		return h
 	}
 	return os.Getenv("USERPROFILE") // windows
+}
+
+func checkForAppUpdateIfEnabled() {
+	if appConfig.CheckForAppUpdate {
+		isAvailable, newVersion, err := version.IsUpdateAvailable()
+		if err != nil {
+			log.Errorf(err.Error())
+		}
+		if isAvailable {
+			log.Infof("New version of %s is available: %s", internal.ApplicationName, newVersion)
+
+			bus.Publish(partybus.Event{
+				Type:  event.AppUpdateAvailable,
+				Value: newVersion,
+			})
+		} else {
+			log.Debugf("No new %s update available", internal.ApplicationName)
+		}
+	}
 }

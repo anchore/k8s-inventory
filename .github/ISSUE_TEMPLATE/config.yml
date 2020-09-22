@@ -1,0 +1,11 @@
+contact_links:
+
+  - name: Help & Support Slack Channel ⛑️
+    # link to engine-help channel
+    url: https://anchorecommunity.slack.com/channels/engine-help
+    about: Ask a questions and get answers
+
+  - name: Developer Slack Channel 💬
+    # link to engine-dev channel
+    url: https://anchorecommunity.slack.com/channels/engine-dev
+    about: Participate in design discussions and feature development
