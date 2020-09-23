@@ -1,9 +1,9 @@
 package result
 
 import (
+	"github.com/go-test/deep"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	"testing"
 )
 
@@ -58,9 +58,7 @@ func TestConstructorFromPod(t *testing.T) {
 		t.Errorf("Namespaces do not match:\nexpected=%s\nactual=%s", expectedNamespace.Namespace, actualNamespace.Namespace)
 	}
 
-	if !reflect.DeepEqual(actualNamespace.Images, expectedNamespace.Images) {
-		t.Errorf("Image Lists do not match:\nexpected=%v\nactual=%v", expectedNamespace.Images, actualNamespace.Images)
-	}
+	compareImageSlices(expectedNamespace.Images, actualNamespace.Images, t)
 }
 
 func TestAddImages(t *testing.T) {
@@ -105,8 +103,34 @@ func TestAddImages(t *testing.T) {
 			},
 		},
 	})
+	compareImageSlices(expectedImages, namespace.Images, t)
+}
 
-	if !reflect.DeepEqual(expectedImages, namespace.Images) {
-		t.Errorf("Image Lists do not match:\nexpected=%v\nactual=%v", expectedImages, namespace.Images)
+func compareImageSlices(expectedImages []Image, actualImages []Image, t *testing.T) {
+	// Couldn't find something that did good equality comparisons on slices (regardless of order)
+	// So, load images expected into a map, and compare them one by one against actual images added
+	expectedImagesMap := make(map[string]Image)
+	for _, expectedImage := range expectedImages {
+		expectedImagesMap[expectedImage.Tag] = expectedImage
+	}
+
+	matches := 0
+	for _, actualImage := range actualImages {
+		expected, ok := expectedImagesMap[actualImage.Tag]
+		if !ok {
+			t.Errorf("Unexpected Image Tag added: %v", actualImage)
+			return
+		}
+		// Tags must have already matched
+		if expected.RepoDigest == actualImage.RepoDigest {
+			matches++
+		} else {
+			t.Errorf("Image Digests don't match:\nexpected=%s\nactual=%s", expected.RepoDigest, actualImage.RepoDigest)
+			return
+		}
+	}
+	if matches != len(expectedImages) {
+		diff := deep.Equal(expectedImages, actualImages)
+		t.Error(diff)
 	}
 }
