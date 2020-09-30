@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"github.com/anchore/kai/kai/result"
+	"k8s.io/apimachinery/pkg/version"
 	"testing"
 	"time"
 
@@ -82,6 +83,17 @@ func TestJsonPresenter(t *testing.T) {
 	var mockResult = result.Result{
 		Timestamp: testTime.Format(time.RFC3339),
 		Results:   []result.Namespace{namespace1, namespace2},
+		ServerVersionMetadata: &version.Info{
+			Major: "1",
+			Minor: "16+",
+			GitVersion: "v1.16.6-beta.0",
+			GitCommit: "e7f962ba86f4ce7033828210ca3556393c377bcc",
+			GitTreeState: "clean",
+			BuildDate: "2020-01-15T08:18:29Z",
+			GoVersion: "go1.13.5",
+			Compiler: "gc",
+			Platform: "linux/amd64",
+		},
 	}
 
 	pres := NewPresenter(mockResult)

@@ -61,5 +61,16 @@
     }
    ]
   }
- ]
+ ],
+ "serverVersionMetadata": {
+  "major": "1",
+  "minor": "16+",
+  "gitVersion": "v1.16.6-beta.0",
+  "gitCommit": "e7f962ba86f4ce7033828210ca3556393c377bcc",
+  "gitTreeState": "clean",
+  "buildDate": "2020-01-15T08:18:29Z",
+  "goVersion": "go1.13.5",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+ }
 }

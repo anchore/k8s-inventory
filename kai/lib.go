@@ -104,7 +104,8 @@ func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName strin
 		wg.Add(1)
 		go func(searchNamespace string, wg *sync.WaitGroup) {
 			defer wg.Done()
-			pods, err := client.GetClientSet(errs, kubeConfig).CoreV1().Pods(searchNamespace).List(metav1.ListOptions{})
+			clientSet := client.GetClientSet(errs, kubeConfig)
+			pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{})
 			if err != nil {
 				errs <- fmt.Errorf("failed to List Pods: %w", err)
 			}
@@ -120,9 +121,15 @@ func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName strin
 	}
 	close(namespaceChan)
 
+	serverVersion, err := client.GetClientSet(errs, kubeConfig).Discovery().ServerVersion()
+	if err != nil {
+		errs <- fmt.Errorf("failed to get Cluster Server Version: %w", err)
+	}
+
 	return result.Result{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Results:   resolvedNamespaces,
+		ServerVersionMetadata: serverVersion,
 	}
 }
 
