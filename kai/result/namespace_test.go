@@ -34,7 +34,7 @@ func TestConstructorFromPod(t *testing.T) {
 		},
 	}
 
-	actualNamespace := NewNamespace(mockPod)
+	actualNamespace := NewNamespace(mockPod, "docker-desktop")
 
 	expectedNamespace := Namespace{
 		Namespace: "default",
@@ -102,7 +102,7 @@ func TestAddImages(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, "docker-desktop")
 	compareImageSlices(expectedImages, namespace.Images, t)
 }
 

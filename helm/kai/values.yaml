@@ -75,7 +75,6 @@ kai:
   # same as -o ; the output format (options: table, json)
   output: "json"
 
-
   # same as -q ; suppress all output (except for the inventory results)
   quiet: false
 
@@ -105,7 +104,7 @@ kai:
   pollingIntervalSeconds: 60
 
   anchore:
-    url: https://6e879ecb03e1d709729eeafea147879b.m.pipedream.net
+    url:
     user: admin
     password: foobar
     http:

@@ -9,7 +9,8 @@ metadata:
     heritage: {{ .Release.Service }}
 data:
   .kai.yaml: |
-    kubeconfig: use-in-cluster
+    kubeconfig:
+      path: use-in-cluster
     output: {{ .Values.kai.output }}
     quiet: {{ .Values.kai.quiet }}
     log:

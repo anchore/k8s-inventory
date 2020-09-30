@@ -42,7 +42,7 @@ type Application struct {
 	CliOptions             CliOnlyOptions
 	Dev                    Development `mapstructure:"dev"`
 	CheckForAppUpdate      bool        `mapstructure:"check-for-app-update"`
-	KubeConfig             string      `mapstructure:"kubeconfig"`
+	KubeConfig             KubeConf    `mapstructure:"kubeconfig"`
 	Namespaces             []string    `mapstructure:"namespaces"`
 	RunMode                mode.Mode
 	Mode                   string      `mapstructure:"mode"`
@@ -55,20 +55,14 @@ type AnchoreInfo struct {
 	URL      string     `mapstructure:"url"`
 	User     string     `mapstructure:"user"`
 	Password string     `mapstructure:"password"`
+	Account  string     `mapstructure:"account"`
 	HTTP     HTTPConfig `mapstructure:"http"`
 }
 
 // Configurations for the HTTP Client itself (net/http)
 type HTTPConfig struct {
 	Insecure       bool `mapstructure:"insecure"`
-	TimeoutSeconds int  `mapstructure:"timeoutSeconds"`
-}
-
-// Return whether or not AnchoreDetails are specified
-func (cfg *Application) HasAnchoreDetails() bool {
-	return cfg.AnchoreDetails.URL != "" &&
-		cfg.AnchoreDetails.User != "" &&
-		cfg.AnchoreDetails.Password != ""
+	TimeoutSeconds int  `mapstructure:"timeout-seconds"`
 }
 
 // Logging Configuration
@@ -84,12 +78,21 @@ type Development struct {
 	ProfileCPU bool `mapstructure:"profile-cpu"`
 }
 
+// Return whether or not AnchoreDetails are specified
+func (anchore *AnchoreInfo) IsValid() bool {
+	return anchore.URL != "" &&
+		anchore.User != "" &&
+		anchore.Password != ""
+}
+
 func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("log.level", "")
 	v.SetDefault("log.file", "")
 	v.SetDefault("log.structured", false)
 	v.SetDefault("dev.profile-cpu", false)
 	v.SetDefault("check-for-app-update", true)
+	v.SetDefault("anchore.account", "admin")
+	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
 }
@@ -132,6 +135,10 @@ func (cfg *Application) Build() error {
 
 	runMode := mode.ParseMode(cfg.Mode)
 	cfg.RunMode = runMode
+
+	if cfg.KubeConfig.User != (KubeConfUser{}) {
+		cfg.KubeConfig.User.UserConfType = ParseUserConf(cfg.KubeConfig.User.UserConf)
+	}
 
 	if cfg.Quiet {
 		// TODO: this is bad: quiet option trumps all other logging options

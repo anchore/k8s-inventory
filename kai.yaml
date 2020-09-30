@@ -1,7 +1,6 @@
 # same as -o ; the output format (options: table, json)
 output: "json"
 
-
 # same as -q ; suppress all output (except for the inventory results)
 quiet: false
 
@@ -18,6 +17,24 @@ log:
 # enable/disable checking for application updates on startup
 check-for-app-update: true
 
+kubeconfig:
+  path:
+  anchore:
+    url:
+    user:
+    password:
+    http:
+      insecure:
+      timeoutSeconds: 10
+  cluster:
+  cluster-cert:
+  server:
+  user:
+    type:
+    client-cert:
+    private-key:
+    token:
+
 # Which namespaces to search (can just be a single element "all" or it can be multiple)
 namespaces:
   - default
@@ -30,8 +47,8 @@ mode: adhoc
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
-anchore: {}
-#  url: https://6e879ecb03e1d709729eeafea147879b.m.pipedream.net
+anchore:
+#  url:
 #  user: admin
 #  password: foobar
 #  http:

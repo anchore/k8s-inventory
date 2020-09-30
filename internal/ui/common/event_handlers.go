@@ -26,7 +26,7 @@ func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Applic
 		return fmt.Errorf("bad Kai event: %w", err)
 	}
 
-	if appConfig.HasAnchoreDetails() {
+	if appConfig.AnchoreDetails.IsValid() {
 		if err := reporter.Report(imagesResult, appConfig.AnchoreDetails); err != nil {
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}

@@ -15,6 +15,8 @@ import (
 	"github.com/anchore/kai/kai/result"
 )
 
+const ReportAPIPath = "v1/enterprise/images/inventory/kubernetes"
+
 // This method does the actual Reporting (via HTTP) to Anchore
 //nolint:gosec
 func Report(result result.Result, anchoreDetails config.AnchoreInfo) error {
@@ -27,7 +29,6 @@ func Report(result result.Result, anchoreDetails config.AnchoreInfo) error {
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
-	// 	TODO: update path once we have an endpoint to post to
 	anchoreURL, err := buildURL(anchoreDetails)
 	if err != nil {
 		return fmt.Errorf("failed to build url: %w", err)
@@ -43,11 +44,16 @@ func Report(result result.Result, anchoreDetails config.AnchoreInfo) error {
 		return fmt.Errorf("failed to build request to report data to Anchore: %w", err)
 	}
 	req.SetBasicAuth(anchoreDetails.User, anchoreDetails.Password)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-anchore-account", anchoreDetails.Account)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to report data to Anchore: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
+	}
 	log.Debug("Successfully reported results to Anchore")
 	return nil
 }
@@ -58,6 +64,7 @@ func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
 		return "", err
 	}
 
-	anchoreURL.Path += "foo"
+	anchoreURL.Path += ReportAPIPath
+
 	return anchoreURL.String(), nil
 }

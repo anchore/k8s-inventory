@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
 
@@ -23,9 +25,9 @@ import (
 )
 
 // According to configuration, periodically retrieve image results and report them to the Event Bus for printing/reporting
-func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application) {
+func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application, kubeConfig *rest.Config, clusterName string, namespaces []string) {
 	// Report one result right away
-	imagesResult := GetImageResults(errs, appConfig)
+	imagesResult := GetImageResults(errs, kubeConfig, clusterName, namespaces)
 	bus.Publish(partybus.Event{
 		Type:   event.ImageResultsRetrieved,
 		Source: imagesResult,
@@ -35,7 +37,7 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 	// Then fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
 	for range ticker.C {
-		imagesResult := GetImageResults(errs, appConfig)
+		imagesResult := GetImageResults(errs, kubeConfig, clusterName, namespaces)
 		bus.Publish(partybus.Event{
 			Type:   event.ImageResultsRetrieved,
 			Source: imagesResult,
@@ -45,20 +47,20 @@ func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application)
 }
 
 // Atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(errs chan error, appConfig *config.Application) result.Result {
-	searchNamespaces := resolveNamespaces(appConfig)
+func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName string, namespaces []string) result.Result {
+	searchNamespaces := resolveNamespaces(namespaces)
 	namespaceChan := make(chan []result.Namespace, len(searchNamespaces))
 	var wg sync.WaitGroup
 	for _, searchNamespace := range searchNamespaces {
 		wg.Add(1)
 		go func(searchNamespace string, wg *sync.WaitGroup) {
 			defer wg.Done()
-			pods, err := client.GetClientSet(errs, appConfig).CoreV1().Pods(searchNamespace).List(metav1.ListOptions{})
+			pods, err := client.GetClientSet(errs, kubeConfig).CoreV1().Pods(searchNamespace).List(metav1.ListOptions{})
 			if err != nil {
 				errs <- fmt.Errorf("failed to List Pods: %w", err)
 			}
 			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
-			namespaceChan <- parseNamespaceImages(pods)
+			namespaceChan <- parseNamespaceImages(pods, clusterName)
 		}(searchNamespace, &wg)
 	}
 	wg.Wait()
@@ -77,7 +79,11 @@ func GetImageResults(errs chan error, appConfig *config.Application) result.Resu
 
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
 func ListNamespaces(appConfig *config.Application) ([]string, error) {
-	namespaces, err := client.GetClientSet(nil, appConfig).CoreV1().Namespaces().List(metav1.ListOptions{})
+	kubeConfig, err := client.GetKubeConfig(appConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build kubeconfig from app config: %w", err)
+	}
+	namespaces, err := client.GetClientSet(nil, kubeConfig).CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -90,23 +96,23 @@ func ListNamespaces(appConfig *config.Application) ([]string, error) {
 }
 
 // If the configured namespaces to search contains "all", we can execute a single request to get in-use image data.
-func resolveNamespaces(appConfig *config.Application) []string {
+func resolveNamespaces(namespaces []string) []string {
 	// If Namespaces contains "all", just search all namespaces
-	if len(appConfig.Namespaces) == 0 {
+	if len(namespaces) == 0 {
 		return []string{""}
 	}
-	namespaces := make([]string, 0)
-	for _, namespaceStr := range appConfig.Namespaces {
+	resolvedNamespaces := make([]string, 0)
+	for _, namespaceStr := range namespaces {
 		if namespaceStr == "all" {
 			return []string{""}
 		}
-		namespaces = append(namespaces, namespaceStr)
+		resolvedNamespaces = append(resolvedNamespaces, namespaceStr)
 	}
-	return namespaces
+	return resolvedNamespaces
 }
 
 // Parse Pod List results into a list of Namespaces (each with unique Images)
-func parseNamespaceImages(pods *v1.PodList) []result.Namespace {
+func parseNamespaceImages(pods *v1.PodList, cluster string) []result.Namespace {
 	namespaceMap := make(map[string]*result.Namespace)
 	for _, pod := range pods.Items {
 		namespace := pod.ObjectMeta.Namespace
@@ -115,9 +121,9 @@ func parseNamespaceImages(pods *v1.PodList) []result.Namespace {
 		}
 
 		if value, ok := namespaceMap[namespace]; ok {
-			value.AddImages(pod)
+			value.AddImages(pod, cluster)
 		} else {
-			namespaceMap[namespace] = result.NewNamespace(pod)
+			namespaceMap[namespace] = result.NewNamespace(pod, cluster)
 		}
 	}
 

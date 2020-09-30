@@ -18,8 +18,6 @@ MAINTAINER Sam Dacanay <sam@anchore.com>
 # Copy our static executable.
 COPY --from=builder /kai /kai
 COPY --from=builder /kai-build/kai.yaml /.kai.yaml
-ARG KUBECONFIG
-ADD ${KUBECONFIG} /kubeconfig
 HEALTHCHECK --interval=1m --timeout=5s \
     CMD ["/kai", "version"]
 
