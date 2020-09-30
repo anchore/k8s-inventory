@@ -4,12 +4,6 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
-	"time"
-
-	"github.com/anchore/kai/internal/config"
-
-	"github.com/anchore/kai/kai/client"
-	"k8s.io/client-go/rest"
 
 	"github.com/anchore/kai/kai/mode"
 
@@ -124,65 +118,14 @@ func getImageResults() <-chan error {
 
 		checkForAppUpdateIfEnabled()
 
-		// In this case, there may be multiple Clusters to pull from
-		if appConfig.KubeConfig.IsKubeConfigFromAnchore() {
-			anchoreClusterConfigs := pollAnchoreForClusterConfigs(errs)
-			if anchoreClusterConfigs == nil {
-				log.Fatal("Failed to get Cluster Configs from Anchore")
-				return
-			}
-			for _, clusterConfig := range anchoreClusterConfigs {
-				kubeConfig, err := clusterConfig.ToKubeConfig()
-				if err != nil {
-					errs <- err
-					return
-				}
-				go getImageResultsAccordingToRunMode(errs, kubeConfig, clusterConfig.ClusterName, clusterConfig.Namespaces)
-			}
-			return
+		switch appConfig.RunMode {
+		case mode.PeriodicPolling:
+			kai.PeriodicallyGetImageResults(errs, appConfig)
+		default:
+			kai.GetAndPublishImageResults(errs, appConfig)
 		}
-
-		kubeConfig, err := client.GetKubeConfig(appConfig)
-		if err != nil {
-			errs <- err
-			return
-		}
-		getImageResultsAccordingToRunMode(errs, kubeConfig, appConfig.KubeConfig.Cluster, appConfig.Namespaces)
 	}()
 	return errs
-}
-
-func pollAnchoreForClusterConfigs(errs chan error) []config.AnchoreClusterConfig {
-	ticker := time.NewTicker(5 * time.Second)
-	for range ticker.C {
-		anchoreClusterConfigs, err := appConfig.KubeConfig.GetClusterConfigsFromAnchore()
-		if err != nil {
-			errs <- err
-			break
-		} else {
-			if len(anchoreClusterConfigs) == 0 {
-				log.Warn("no cluster configurations found from Anchore")
-			} else {
-				return anchoreClusterConfigs
-			}
-		}
-	}
-	return nil
-}
-
-func getImageResultsAccordingToRunMode(errs chan error, kubeConfig *rest.Config, clusterName string, namespaces []string) {
-	switch appConfig.RunMode {
-	case mode.PeriodicPolling:
-		kai.PeriodicallyGetImageResults(errs, appConfig, kubeConfig, clusterName, namespaces)
-	default:
-		imagesResult := kai.GetImageResults(errs, kubeConfig, clusterName, namespaces)
-
-		bus.Publish(partybus.Event{
-			Type:   event.ImageResultsRetrieved,
-			Source: imagesResult,
-			Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
-		})
-	}
 }
 
 func runDefaultCmd() error {

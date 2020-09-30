@@ -25,24 +25,73 @@ import (
 )
 
 // According to configuration, periodically retrieve image results and report them to the Event Bus for printing/reporting
-func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application, kubeConfig *rest.Config, clusterName string, namespaces []string) {
+func PeriodicallyGetImageResults(errs chan error, appConfig *config.Application) {
 	// Report one result right away
+	GetAndPublishImageResults(errs, appConfig)
+
+	// Then fire off a ticker that reports according to a configurable polling interval
+	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
+	for range ticker.C {
+		GetAndPublishImageResults(errs, appConfig)
+	}
+}
+
+// According to configuration, retrieve image results and publish them to the Event Bus
+// If the config comes from Anchore, there may be multiple clusters (which is not supported from direct configuration)
+func GetAndPublishImageResults(errs chan error, appConfig *config.Application) {
+	if appConfig.KubeConfig.IsKubeConfigFromAnchore() {
+		anchoreClusterConfigs := pollAnchoreForClusterConfigs(errs, appConfig)
+		for _, clusterConfig := range anchoreClusterConfigs {
+			kubeConfig, err := clusterConfig.ToKubeConfig()
+			if err != nil {
+				errs <- err
+				continue
+			}
+			go PublishImageResults(errs, appConfig, kubeConfig, clusterConfig.ClusterName, clusterConfig.Namespaces)
+		}
+	} else {
+		kubeConfig, err := client.GetKubeConfig(appConfig)
+		if err != nil {
+			errs <- err
+		} else {
+			PublishImageResults(errs, appConfig, kubeConfig, appConfig.KubeConfig.Cluster, appConfig.Namespaces)
+		}
+	}
+}
+
+// Wrapper function for getting and publishing image results
+func PublishImageResults(errs chan error, appConfig *config.Application, kubeConfig *rest.Config, clusterName string, namespaces []string) {
 	imagesResult := GetImageResults(errs, kubeConfig, clusterName, namespaces)
 	bus.Publish(partybus.Event{
 		Type:   event.ImageResultsRetrieved,
 		Source: imagesResult,
 		Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
 	})
+}
 
-	// Then fire off a ticker that reports according to a configurable polling interval
-	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
-	for range ticker.C {
-		imagesResult := GetImageResults(errs, kubeConfig, clusterName, namespaces)
-		bus.Publish(partybus.Event{
-			Type:   event.ImageResultsRetrieved,
-			Source: imagesResult,
-			Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
-		})
+// This is a helper method for downloading the cluster configs. If no
+func pollAnchoreForClusterConfigs(errs chan error, appConfig *config.Application) []config.AnchoreClusterConfig {
+	intervalSec := 5
+	timeout := time.After(time.Duration(appConfig.PollingIntervalSeconds-intervalSec) * time.Second)
+	tick := time.NewTicker(time.Duration(intervalSec) * time.Second).C
+	for {
+		select {
+		case <-timeout:
+			errs <- fmt.Errorf("timed out polling anchore for cluster configs")
+			return nil
+		case <-tick:
+			anchoreClusterConfigs, err := appConfig.KubeConfig.GetClusterConfigsFromAnchore()
+			if err != nil {
+				errs <- err
+				return nil
+			}
+
+			if len(anchoreClusterConfigs) == 0 {
+				log.Warnf("no cluster configurations found from Anchore")
+			} else {
+				return anchoreClusterConfigs
+			}
+		}
 	}
 }
 
