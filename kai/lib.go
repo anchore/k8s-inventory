@@ -5,10 +5,11 @@ package kai
 
 import (
 	"fmt"
-	"github.com/anchore/kai/kai/event"
-	"github.com/anchore/kai/kai/presenter"
 	"sync"
 	"time"
+
+	"github.com/anchore/kai/kai/event"
+	"github.com/anchore/kai/kai/presenter"
 
 	"k8s.io/client-go/rest"
 
@@ -83,8 +84,8 @@ func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName strin
 	}
 
 	return result.Result{
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Results:   resolvedNamespaces,
+		Timestamp:             time.Now().UTC().Format(time.RFC3339),
+		Results:               resolvedNamespaces,
 		ServerVersionMetadata: serverVersion,
 	}
 }

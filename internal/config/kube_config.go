@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -10,11 +11,11 @@ import (
 
 // Defines how the Kubernetes Client should be configured. Note: Doesn't seem to work well with Env vars
 type KubeConf struct {
-	Path           string       `mapstructure:"path"`
-	Cluster        string       `mapstructure:"cluster"`
-	ClusterCert    string       `mapstructure:"cluster-cert"`
-	Server         string       `mapstructure:"server"`
-	User           KubeConfUser `mapstructure:"user"`
+	Path        string       `mapstructure:"path"`
+	Cluster     string       `mapstructure:"cluster"`
+	ClusterCert string       `mapstructure:"cluster-cert"`
+	Server      string       `mapstructure:"server"`
+	User        KubeConfUser `mapstructure:"user"`
 }
 
 // If we are explicitly providing authentication information (not from a kubeconfig file), we need this info
