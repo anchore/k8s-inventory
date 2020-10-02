@@ -49,11 +49,11 @@ define title
 endef
 
 .PHONY: all
-all: clean static-analysis test ## Run all checks (linting, license check, unit, integration, and linux acceptance tests tests)
+all: clean static-analysis test ## Run all checks (linting, license check, unit, integration)
 	@printf '$(SUCCESS)All checks pass!$(RESET)\n'
 
 .PHONY: test
-test: unit integration acceptance-linux ## Run all tests (unit, integration, and linux acceptance tests )
+test: unit integration ## Run all tests (unit, integration )
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BOLD)$(CYAN)%-25s$(RESET)%s\n", $$1, $$2}'
@@ -138,9 +138,6 @@ $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 	# build release snapshots
 	BUILD_GIT_TREE_STATE=$(GITTREESTATE) \
 	$(TEMPDIR)/goreleaser release --skip-publish --rm-dist --snapshot --config $(TEMPDIR)/goreleaser.yaml
-
-.PHONY: acceptance-linux
-acceptance-linux: $(SNAPSHOTDIR) ## Run acceptance tests on build snapshot binaries and packages (Linux)
 
 .PHONY: release
 release: clean-dist ## Build and publish final binaries and packages

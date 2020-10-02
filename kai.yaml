@@ -12,7 +12,7 @@ log:
   level: "debug"
 
   # location to write the log file (default is not to have a log file)
-  file: ""
+  file: "./kai.log"
 
 # enable/disable checking for application updates on startup
 check-for-app-update: true
