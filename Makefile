@@ -129,6 +129,16 @@ check-pipeline: ## Run local CircleCI pipeline locally (sanity check)
 .PHONY: build
 build: $(SNAPSHOTDIR) ## Build release snapshot binaries and packages
 
+.PHONY: linux-binary
+linux-binary: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
+.PHONY: mac-binary
+mac-binary: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
 $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 	$(call title,Building snapshot artifacts)
 	# create a config with the dist dir overridden
