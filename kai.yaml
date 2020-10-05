@@ -19,18 +19,11 @@ check-for-app-update: true
 
 kubeconfig:
   path:
-  anchore:
-    url:
-    user:
-    password:
-    http:
-      insecure:
-      timeoutSeconds: 10
-  cluster:
+  cluster: docker-desktop
   cluster-cert:
-  server:
+  server:  # ex. https://kubernetes.docker.internal:6443
   user:
-    type:
+    type:  # valid: [private_key, token]
     client-cert:
     private-key:
     token:
