@@ -7,16 +7,11 @@ import (
 
 	"github.com/anchore/kai/kai/mode"
 
-	"github.com/anchore/kai/internal"
-	"github.com/anchore/kai/internal/bus"
 	"github.com/anchore/kai/internal/ui"
-	"github.com/anchore/kai/internal/version"
 	"github.com/anchore/kai/kai"
-	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wagoodman/go-partybus"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -116,8 +111,6 @@ func getImageResults() <-chan error {
 	go func() {
 		defer close(errs)
 
-		checkForAppUpdateIfEnabled()
-
 		switch appConfig.RunMode {
 		case mode.PeriodicPolling:
 			kai.PeriodicallyGetImageResults(errs, appConfig)
@@ -131,23 +124,4 @@ func getImageResults() <-chan error {
 func runDefaultCmd() error {
 	errs := getImageResults()
 	return ui.LoggerUI(errs, eventSubscription, appConfig)
-}
-
-func checkForAppUpdateIfEnabled() {
-	if appConfig.CheckForAppUpdate {
-		isAvailable, newVersion, err := version.IsUpdateAvailable()
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-		if isAvailable {
-			log.Infof("New version of %s is available: %s", internal.ApplicationName, newVersion)
-
-			bus.Publish(partybus.Event{
-				Type:  event.AppUpdateAvailable,
-				Value: newVersion,
-			})
-		} else {
-			log.Debugf("No new %s update available", internal.ApplicationName)
-		}
-	}
 }

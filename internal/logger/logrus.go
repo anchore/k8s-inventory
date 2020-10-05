@@ -38,7 +38,7 @@ func NewLogrusLogger(cfg LogrusConfig) *LogrusLogger {
 	var output io.Writer
 	switch {
 	case cfg.EnableConsole && cfg.EnableFile:
-		logFile, err := os.OpenFile(cfg.FileLocation, os.O_WRONLY|os.O_CREATE, 0755)
+		logFile, err := os.OpenFile(cfg.FileLocation, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 		if err != nil {
 			panic(fmt.Errorf("unable to setup log file: %w", err))
 		}
@@ -46,7 +46,7 @@ func NewLogrusLogger(cfg LogrusConfig) *LogrusLogger {
 	case cfg.EnableConsole:
 		output = os.Stderr
 	case cfg.EnableFile:
-		logFile, err := os.OpenFile(cfg.FileLocation, os.O_WRONLY|os.O_CREATE, 0755)
+		logFile, err := os.OpenFile(cfg.FileLocation, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 		if err != nil {
 			panic(fmt.Errorf("unable to setup log file: %w", err))
 		}
@@ -68,8 +68,6 @@ func NewLogrusLogger(cfg LogrusConfig) *LogrusLogger {
 	} else {
 		appLogger.SetFormatter(&prefixed.TextFormatter{
 			TimestampFormat: "2006-01-02 15:04:05",
-			ForceColors:     true,
-			ForceFormatting: true,
 		})
 	}
 

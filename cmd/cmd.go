@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/anchore/kai/internal/config"
-	"github.com/anchore/kai/internal/format"
 	"github.com/anchore/kai/internal/logger"
 	"github.com/anchore/kai/kai"
 	"github.com/sirupsen/logrus"
@@ -85,7 +84,7 @@ func logAppConfig() {
 	if err != nil {
 		log.Debugf("Could not display application config: %+v", err)
 	} else {
-		log.Debugf("Application config:\n%+v", format.Magenta.Format(string(appCfgStr)))
+		log.Debugf("Application config:\n%+v", string(appCfgStr))
 	}
 }
 
