@@ -14,15 +14,14 @@ type Namespace struct {
 }
 
 type Image struct {
-	Tag         string `json:"tag,omitempty"`
-	RepoDigest  string `json:"repoDigest,omitempty"`
-	ClusterName string `json:"clusterName"`
+	Tag        string `json:"tag,omitempty"`
+	RepoDigest string `json:"repoDigest,omitempty"`
 }
 
-func NewNamespace(pod v1.Pod, clusterName string) *Namespace {
+func NewNamespace(pod v1.Pod) *Namespace {
 	return &Namespace{
 		Namespace: pod.Namespace,
-		Images:    getUniqueImagesFromPodStatus(pod, clusterName),
+		Images:    getUniqueImagesFromPodStatus(pod),
 	}
 }
 
@@ -32,9 +31,9 @@ func (n *Namespace) String() string {
 }
 
 // Adds an Image to the Namespace struct (if it doesn't exist there already)
-func (n *Namespace) AddImages(pod v1.Pod, clusterName string) {
+func (n *Namespace) AddImages(pod v1.Pod) {
 	if len(n.Images) == 0 {
-		n.Images = getUniqueImagesFromPodStatus(pod, clusterName)
+		n.Images = getUniqueImagesFromPodStatus(pod)
 	} else {
 		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
 		imageSet := make(map[string]Image)
@@ -43,7 +42,7 @@ func (n *Namespace) AddImages(pod v1.Pod, clusterName string) {
 			imageSet[image.Tag] = image
 		}
 		// If the image isn't in the set already, append it to the list
-		for _, image := range getUniqueImagesFromPodStatus(pod, clusterName) {
+		for _, image := range getUniqueImagesFromPodStatus(pod) {
 			if _, ok := imageSet[image.Tag]; !ok {
 				n.Images = append(n.Images, image)
 			}
@@ -51,7 +50,7 @@ func (n *Namespace) AddImages(pod v1.Pod, clusterName string) {
 	}
 }
 
-func getUniqueImagesFromPodStatus(pod v1.Pod, clusterName string) []Image {
+func getUniqueImagesFromPodStatus(pod v1.Pod) []Image {
 	imageMap := make(map[string]Image)
 	for _, container := range pod.Status.ContainerStatuses {
 		repoDigest := ""
@@ -60,9 +59,8 @@ func getUniqueImagesFromPodStatus(pod v1.Pod, clusterName string) []Image {
 			repoDigest = strings.Split(container.ImageID, "@")[1]
 		}
 		imageMap[container.Image] = Image{
-			Tag:         container.Image,
-			RepoDigest:  repoDigest,
-			ClusterName: clusterName,
+			Tag:        container.Image,
+			RepoDigest: repoDigest,
 		}
 	}
 	imageSlice := make([]Image, 0, len(imageMap))

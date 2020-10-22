@@ -10,7 +10,6 @@ import (
 	"github.com/wagoodman/go-partybus"
 )
 
-//nolint: gocognit
 func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appConfig *config.Application) error {
 	events := subscription.Events()
 	var errResult error
@@ -30,8 +29,7 @@ func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appC
 				events = nil
 			}
 
-			switch {
-			case e.Type == kaiEvent.ImageResultsRetrieved:
+			if e.Type == kaiEvent.ImageResultsRetrieved {
 				err := common.ImageResultsRetrievedHandler(e, appConfig)
 				if err != nil {
 					log.Errorf("unable to handle %s event: %+v", e.Type, err)

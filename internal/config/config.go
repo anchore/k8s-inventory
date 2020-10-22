@@ -41,7 +41,6 @@ type Application struct {
 	Log                    Logging `mapstructure:"log"`
 	CliOptions             CliOnlyOptions
 	Dev                    Development `mapstructure:"dev"`
-	CheckForAppUpdate      bool        `mapstructure:"check-for-app-update"`
 	KubeConfig             KubeConf    `mapstructure:"kubeconfig"`
 	Namespaces             []string    `mapstructure:"namespaces"`
 	RunMode                mode.Mode
@@ -90,7 +89,6 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("log.file", "")
 	v.SetDefault("log.structured", false)
 	v.SetDefault("dev.profile-cpu", false)
-	v.SetDefault("check-for-app-update", true)
 	v.SetDefault("anchore.account", "admin")
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)

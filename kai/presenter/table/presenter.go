@@ -26,11 +26,11 @@ func NewPresenter(result result.Result) *Presenter {
 func (pres *Presenter) Present(output io.Writer) error {
 	rows := make([][]string, 0)
 
-	columns := []string{"Image Tag", "Repo Digest", "Namespace", "Cluster"}
+	columns := []string{"Image Tag", "Repo Digest", "Namespace"}
 	for _, n := range pres.result.Results {
 		namespace := n.Namespace
 		for _, image := range n.Images {
-			row := []string{image.Tag, image.RepoDigest, namespace, image.ClusterName}
+			row := []string{image.Tag, image.RepoDigest, namespace}
 			rows = append(rows, row)
 		}
 	}

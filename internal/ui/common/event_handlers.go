@@ -22,7 +22,7 @@ func ImageResultsRetrievedHandler(event partybus.Event, appConfig *config.Applic
 	}
 
 	if appConfig.AnchoreDetails.IsValid() {
-		if err := reporter.Report(imagesResult, appConfig.AnchoreDetails); err != nil {
+		if err := reporter.Report(imagesResult, appConfig.AnchoreDetails, appConfig); err != nil {
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
 	} else {

@@ -10,14 +10,14 @@ metadata:
 data:
   .kai.yaml: |
     kubeconfig:
-      path: use-in-cluster
+      path: {{ .Values.kai.kubeconfig.path }}
+      cluster: {{ .Values.kai.kubeconfig.cluster }}
     output: {{ .Values.kai.output }}
     quiet: {{ .Values.kai.quiet }}
     log:
       structured: {{ .Values.kai.log.structured }}
       level: {{ .Values.kai.log.level }}
       file: {{ .Values.kai.log.file }}
-    check-for-app-update: {{ .Values.kai.checkForAppUpdate }}
     namespaces:
       {{- toYaml .Values.kai.namespaces | nindent 6 }}
     mode: {{ .Values.kai.mode }}
