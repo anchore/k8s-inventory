@@ -43,7 +43,7 @@ func GetAndPublishImageResults(errs chan error, appConfig *config.Application) {
 	if err != nil {
 		errs <- err
 	} else {
-		imagesResult := GetImageResults(errs, kubeConfig, appConfig.KubeConfig.Cluster, appConfig.Namespaces)
+		imagesResult := GetImageResults(errs, kubeConfig, appConfig.Namespaces)
 		bus.Publish(partybus.Event{
 			Type:   event.ImageResultsRetrieved,
 			Source: imagesResult,
@@ -53,7 +53,7 @@ func GetAndPublishImageResults(errs chan error, appConfig *config.Application) {
 }
 
 // Atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName string, namespaces []string) result.Result {
+func GetImageResults(errs chan error, kubeConfig *rest.Config, namespaces []string) result.Result {
 	searchNamespaces := resolveNamespaces(namespaces)
 	namespaceChan := make(chan []result.Namespace, len(searchNamespaces))
 	var wg sync.WaitGroup
@@ -67,7 +67,7 @@ func GetImageResults(errs chan error, kubeConfig *rest.Config, clusterName strin
 				errs <- fmt.Errorf("failed to List Pods: %w", err)
 			}
 			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
-			namespaceChan <- parseNamespaceImages(pods, clusterName)
+			namespaceChan <- parseNamespaceImages(pods)
 		}(searchNamespace, &wg)
 	}
 	wg.Wait()
@@ -125,7 +125,7 @@ func resolveNamespaces(namespaces []string) []string {
 }
 
 // Parse Pod List results into a list of Namespaces (each with unique Images)
-func parseNamespaceImages(pods *v1.PodList, cluster string) []result.Namespace {
+func parseNamespaceImages(pods *v1.PodList) []result.Namespace {
 	namespaceMap := make(map[string]*result.Namespace)
 	for _, pod := range pods.Items {
 		namespace := pod.ObjectMeta.Namespace
@@ -134,9 +134,9 @@ func parseNamespaceImages(pods *v1.PodList, cluster string) []result.Namespace {
 		}
 
 		if value, ok := namespaceMap[namespace]; ok {
-			value.AddImages(pod, cluster)
+			value.AddImages(pod)
 		} else {
-			namespaceMap[namespace] = result.NewNamespace(pod, cluster)
+			namespaceMap[namespace] = result.NewNamespace(pod)
 		}
 	}
 

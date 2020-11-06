@@ -88,14 +88,14 @@ kai:
     # location to write the log file (default is not to have a log file)
     file: ""
 
-  # enable/disable checking for application updates on startup
-  checkForAppUpdate: true
+  # Path should not be changed, cluster value is used to tell Anchore which cluster this inventory is coming from
+  kubeconfig:
+    path: use-in-cluster
+    cluster: docker-desktop
 
   # Which namespaces to search (can just be a single element "all" or it can be multiple)
   namespaces:
-    - default
-    - docker
-    - kube-system
+    - all
 
   # Can be one of adhoc, periodic (defaults to adhoc)
   mode: periodic
