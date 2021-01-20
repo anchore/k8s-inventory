@@ -163,9 +163,6 @@ release: clean-dist ## Build and publish final binaries and packages
 	# verify checksum signatures
 	.github/scripts/verify-signature.sh "$(DISTDIR)"
 
-	# upload the version file that supports the application version update check (excluding pre-releases)
-	.github/scripts/update-version-file.sh "$(DISTDIR)" "$(VERSION)"
-
 .PHONY: clean
 clean: clean-dist clean-snapshot  ## Remove previous builds and result reports
 	rm -rf $(RESULTSDIR)/*
