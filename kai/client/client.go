@@ -17,14 +17,14 @@ import (
 const UseInCluster = "use-in-cluster"
 
 // Based on the application configuration, retrieve the k8s clientset
-func GetClientSet(errs chan error, kubeConfig *rest.Config) *kubernetes.Clientset {
+func GetClientSet(kubeConfig *rest.Config) (*kubernetes.Clientset, error) {
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		errs <- fmt.Errorf("failed to build kube clientset: %w", err)
+		return nil, fmt.Errorf("failed to build kube clientset: %w", err)
 	}
 
-	return clientset
+	return clientset, nil
 }
 
 func GetKubeConfig(appConfig *config.Application) (*rest.Config, error) {

@@ -10,7 +10,7 @@ import (
 // Represents a Namespace Images list result
 type Namespace struct {
 	Namespace string  `json:"namespace,omitempty"`
-	Images    []Image `json:"images,omitempty"`
+	Images    []Image `json:"images"`
 }
 
 type Image struct {
@@ -18,10 +18,17 @@ type Image struct {
 	RepoDigest string `json:"repoDigest,omitempty"`
 }
 
-func NewNamespace(pod v1.Pod) *Namespace {
+func NewFromPod(pod v1.Pod) *Namespace {
 	return &Namespace{
 		Namespace: pod.Namespace,
 		Images:    getUniqueImagesFromPodStatus(pod),
+	}
+}
+
+func New(namespace string) *Namespace {
+	return &Namespace{
+		Namespace: namespace,
+		Images:    []Image{},
 	}
 }
 
