@@ -34,7 +34,7 @@ func TestConstructorFromPod(t *testing.T) {
 		},
 	}
 
-	actualNamespace := NewNamespace(mockPod)
+	actualNamespace := NewFromPod(mockPod)
 
 	expectedNamespace := Namespace{
 		Namespace: "default",
