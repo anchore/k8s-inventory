@@ -55,6 +55,29 @@ docker run -it --rm localhost/kai:latest
 
 **Helm Chart:**
 
+KAI creates a kubernetes secret for the Anchore Password (so it can authenticate requests to report the inventory to Anchore) based on the values file you use, Ex.:
+```
+kai:
+    anchore:
+        password: foobar
+```
+It will set the following environment variable based on this: `KAI_ANCHORE_PASSWORD=foobar`.
+
+If you don't want to store your Anchore password in the values file, you can create your own secret to do this:
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kai-anchore-password
+type: Opaque
+stringData:
+  KAI_ANCHORE_PASSWORD: foobar
+```
+and then provide it to the helm chart via the values file:
+```
+kai:
+    existingSecret: kai-anchore-password
+```
 KAI has a helm chart as part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
 ```
 helm repo add anchore https://charts.anchore.io
