@@ -48,9 +48,8 @@ $ kai
 
 **Docker Image:**
 ```shell script
-cp ~/.kube/config ./kubeconfig
-docker build -t localhost/kai:latest --build-arg KUBECONFIG=./kubeconfig
-docker run -it --rm localhost/kai:latest --kubeconfig /kubeconfig
+docker build -t localhost/kai:latest .
+docker run -it --rm localhost/kai:latest
 ...
 ```
 

@@ -32,3 +32,11 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+
+dockers:
+  - image_templates:
+      - "anchore/kai:{{ .Tag }}"
+      - "anchore/kai:latest"
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
