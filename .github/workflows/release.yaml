@@ -98,8 +98,8 @@ jobs:
         run: |
           echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
         env:
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+          DOCKER_USER: ${{ secrets.TOOLBOX_DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.TOOLBOX_DOCKER_PASS }}
 
       - name: Build snapshot artifacts
         run: make release
