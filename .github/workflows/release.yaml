@@ -104,7 +104,7 @@ jobs:
       - name: Build snapshot artifacts
         run: make release
         env:
-          GITHUB_TOKEN: ${{ secrets.CI_WRITE_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
           PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
           SIGNING_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
