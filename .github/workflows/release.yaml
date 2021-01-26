@@ -93,6 +93,14 @@ jobs:
           echo "name:        ${{ steps.import_gpg.outputs.name }}"
           echo "email:       ${{ steps.import_gpg.outputs.email }}"
 
+      - name: Login to Docker Hub
+        id: docker-login
+        run: |
+          echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+
       - name: Build snapshot artifacts
         run: make release
         env:
