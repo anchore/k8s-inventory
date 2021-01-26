@@ -7,16 +7,14 @@ KAI polls the Kubernetes API on an interval to retrieve which Docker images are 
 It can be run inside a cluster (under a Service Account) or outside (via any provided Kubeconfig)
 
 ## Getting Started
-[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/dakaneye/kai)
-
-With the binary, you may retrieve the running images in each namespace with the following command:
+[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/kai)
 
 ## Installation
 Kai can be run as a CLI, Docker Container, or Helm Chart
 
-By default, Kai will look for a Kubeconfig in the home directory.
+By default, Kai will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI). 
 
-**CLI**:
+### CLI
 ```shell script
 $ kai
 {
@@ -29,33 +27,42 @@ $ kai
     "docker/kube-compose-api-server:v0.4.25-alpha1"
    ]
   },
-  {
-   "namespace": "kube-system",
-   "images": [
-    "k8s.gcr.io/coredns:1.6.2",
-    "k8s.gcr.io/etcd:3.3.15-0",
-    "k8s.gcr.io/kube-apiserver:v1.16.5",
-    "k8s.gcr.io/kube-controller-manager:v1.16.5",
-    "k8s.gcr.io/kube-proxy:v1.16.5",
-    "k8s.gcr.io/kube-scheduler:v1.16.5",
-    "docker/desktop-storage-provisioner:v1.1",
-    "docker/desktop-vpnkit-controller:v1.0"
-   ]
-  }
- ]
-}
+...
 ```
+### Container
 
-**Docker Image:**
-```shell script
-docker build -t localhost/kai:latest .
-docker run -it --rm localhost/kai:latest
+In order to run kai as a container, it needs a kubeconfig
+```
+~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.1.0
+{
+ "timestamp": "2021-01-26T22:22:03Z",
+ "results": [
+  {
+   "namespace": "kube-node-lease",
+   "images": []
+  },
+  {
+   "namespace": "kube-public",
+   "images": []
+  },
+  {
+   "namespace": "default",
+   "images": [
+    {
+     "tag": "anchore/kai:v0.1.0",
+     "repoDigest": "sha256:668cd005062d5a5b04dcf822556c02da50cbc08db079d2a0fe4ea45a396e0ac1"
+    },
 ...
 ```
 
-**Helm Chart:**
+### Helm Chart
 
-KAI creates a kubernetes secret for the Anchore Password (so it can authenticate requests to report the inventory to Anchore) based on the values file you use, Ex.:
+KAI is the foundation of Anchore Enterprise's Runtime Inventory feature. Running KAI via Helm is a great way to retrieve your Kubernetes Image inventory without providing Cluster Credentials to Anchore.
+
+KAI runs as a read-only service account in the cluster it's deployed to. 
+
+In order to report the inventory to Anchore, KAI does require authentication material for your Anchore Enterprise deployment.
+KAI's helm chart automatically creates a kubernetes secret for the Anchore Password based on the values file you use, Ex.:
 ```
 kai:
     anchore:
@@ -78,11 +85,12 @@ and then provide it to the helm chart via the values file:
 kai:
     existingSecret: kai-anchore-password
 ```
-KAI has a helm chart as part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
+KAI's helm chart is part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
 ```
 helm repo add anchore https://charts.anchore.io
 helm install <release-name> -f <values.yaml> anchore/kai
 ``` 
+A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/master/stable/kai/values.yaml)
 
 ## Configuration
 ```yaml
