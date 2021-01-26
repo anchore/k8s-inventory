@@ -55,10 +55,10 @@ docker run -it --rm localhost/kai:latest
 
 **Helm Chart:**
 
-Kai will use the in-cluster config in order to connect to the K8s API, and is governed by the [defined Service Account](./helm/kai/templates/serviceaccount.yaml)
-The [values.yaml](./helm/kai/values.yaml) can be [customized](#configuration) as needed.
+KAI has a helm chart as part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
 ```
-helm install local-kai helm/kai
+helm repo add anchore https://charts.anchore.io
+helm install <release-name> -f <values.yaml> anchore/kai
 ``` 
 
 ## Configuration
