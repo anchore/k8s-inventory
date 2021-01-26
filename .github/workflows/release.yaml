@@ -34,7 +34,7 @@ jobs:
           checkName: "Build-Snapshot-Artifacts"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check static anaylysis, unit, and integration test results
+      - name: Check static anaylysis, and unit test results
         uses: fountainhead/action-wait-for-check@v1.0.0
         id: sa-unit
         with:
@@ -96,12 +96,10 @@ jobs:
       - name: Build snapshot artifacts
         run: make release
         env:
-          GITHUB_TOKEN: ${{ secrets.ANCHORE_GIT_READ_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CI_WRITE_GITHUB_TOKEN }}
           GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
           PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
           SIGNING_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.TOOLBOX_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.TOOLBOX_AWS_SECRET_ACCESS_KEY }}
 
       - uses: actions/upload-artifact@v2
         with:
