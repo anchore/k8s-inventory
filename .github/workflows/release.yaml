@@ -48,7 +48,6 @@ jobs:
         run: |
           echo "Static/Unit/Integration Status : ${{ steps.sa-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"
-          echo "Inline Compare Status: ${{ steps.inline-compare.outputs.conclusion }}"
           false
 
   release:
