@@ -33,3 +33,7 @@ archives:
       - goos: windows
         format: zip
 
+dockers:
+  - image_templates:
+      - anchore/kai
+    dockerfile: Dockerfile
