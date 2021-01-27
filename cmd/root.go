@@ -5,6 +5,8 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/anchore/kai/internal/errors"
+
 	"github.com/anchore/kai/kai/client"
 
 	"github.com/anchore/kai/kai/mode"
@@ -51,7 +53,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		if err != nil {
-			log.Errorf(err.Error())
+			log.Error(err)
 			os.Exit(1)
 		}
 	},
@@ -83,7 +85,7 @@ func init() {
 		if err != nil {
 			return []string{"failed to build kubeconfig from app config"}, cobra.ShellCompDirectiveError
 		}
-		namespaces, err := kai.GetAllNamespaces(kubeConfig)
+		namespaces, err := kai.GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
 		if err != nil {
 			return []string{"completion failed"}, cobra.ShellCompDirectiveError
 		}
@@ -112,8 +114,8 @@ func init() {
 	}
 }
 
-func getImageResults() <-chan error {
-	errs := make(chan error)
+func getImageResults() <-chan *errors.KaiError {
+	errs := make(chan *errors.KaiError)
 	go func() {
 		defer close(errs)
 

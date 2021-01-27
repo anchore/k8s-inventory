@@ -3,6 +3,7 @@ package ui
 
 import (
 	"github.com/anchore/kai/internal/config"
+	"github.com/anchore/kai/internal/errors"
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/internal/ui/common"
 	kaiEvent "github.com/anchore/kai/kai/event"
@@ -10,7 +11,7 @@ import (
 	"github.com/wagoodman/go-partybus"
 )
 
-func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appConfig *config.Application) error {
+func LoggerUI(workerErrs <-chan *errors.KaiError, subscription *partybus.Subscription, appConfig *config.Application) error {
 	events := subscription.Events()
 	var errResult error
 
@@ -18,7 +19,8 @@ func LoggerUI(workerErrs <-chan error, subscription *partybus.Subscription, appC
 		select {
 		case err, ok := <-workerErrs:
 			if err != nil {
-				return err
+				errResult = err.ToError()
+				return errResult
 			}
 			if !ok {
 				workerErrs = nil
