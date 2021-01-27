@@ -34,19 +34,20 @@ type CliOnlyOptions struct {
 
 // All Application configurations
 type Application struct {
-	ConfigPath             string
-	PresenterOpt           presenter.Option
-	Output                 string  `mapstructure:"output"`
-	Quiet                  bool    `mapstructure:"quiet"`
-	Log                    Logging `mapstructure:"log"`
-	CliOptions             CliOnlyOptions
-	Dev                    Development `mapstructure:"dev"`
-	KubeConfig             KubeConf    `mapstructure:"kubeconfig"`
-	Namespaces             []string    `mapstructure:"namespaces"`
-	RunMode                mode.Mode
-	Mode                   string      `mapstructure:"mode"`
-	PollingIntervalSeconds int         `mapstructure:"polling-interval-seconds"`
-	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
+	ConfigPath                      string
+	PresenterOpt                    presenter.Option
+	Output                          string  `mapstructure:"output"`
+	Quiet                           bool    `mapstructure:"quiet"`
+	Log                             Logging `mapstructure:"log"`
+	CliOptions                      CliOnlyOptions
+	Dev                             Development `mapstructure:"dev"`
+	KubeConfig                      KubeConf    `mapstructure:"kubeconfig"`
+	KubernetesRequestTimeoutSeconds int64       `mapstructure:"kubernetes-request-timeout-seconds"`
+	Namespaces                      []string    `mapstructure:"namespaces"`
+	RunMode                         mode.Mode
+	Mode                            string      `mapstructure:"mode"`
+	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
+	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)
@@ -93,6 +94,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
+	v.SetDefault("kubernetes-request-timeout-seconds", 10)
 }
 
 // Load the Application Configuration from the Viper specifications
