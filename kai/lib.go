@@ -90,13 +90,10 @@ func GetImageResults(errs chan *errors.KaiError, kubeConfig *rest.Config, namesp
 	}
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for i := 0; i < len(searchNamespaces); i++ {
-		log.Debugf("Waiting for results from %s", searchNamespaces[i])
 		select {
 		case channelNamespaceMsg := <-namespaceChan:
-			log.Debugf("Got result from %s", searchNamespaces[i])
 			resolvedNamespaces = append(resolvedNamespaces, channelNamespaceMsg...)
 		case <-time.After(time.Second * time.Duration(timeoutSeconds)):
-			log.Debugf("Timed out waiting for results from namespace: '%s'", searchNamespaces[i])
 			return result.Result{}, fmt.Errorf("timed out waiting for results from namespace '%s'", searchNamespaces[i])
 		}
 	}
