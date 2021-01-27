@@ -106,43 +106,22 @@ func GetImageResults(errs chan error, kubeConfig *rest.Config, namespaces []stri
 	}, nil
 }
 
-// Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func ListNamespaces(appConfig *config.Application) ([]string, error) {
-	kubeConfig, err := client.GetKubeConfig(appConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build kubeconfig from app config: %w", err)
-	}
-	clientSet, err := client.GetClientSet(kubeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get k8s clientset: %w", err)
-	}
-	namespaces, err := clientSet.CoreV1().Namespaces().List(metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list namespaces: %w", err)
-	}
-	namespaceNameSlice := make([]string, len(namespaces.Items))
-	for _, namespace := range namespaces.Items {
-		namespaceNameSlice = append(namespaceNameSlice, namespace.ObjectMeta.Name)
-	}
-
-	return namespaceNameSlice, nil
-}
-
 func resolveNamespaces(kubeConfig *rest.Config, namespaces []string) ([]string, error) {
 	if len(namespaces) == 0 {
-		return getAllNamespaces(kubeConfig)
+		return GetAllNamespaces(kubeConfig)
 	}
 	resolvedNamespaces := make([]string, 0)
 	for _, namespaceStr := range namespaces {
 		if namespaceStr == "all" {
-			return getAllNamespaces(kubeConfig)
+			return GetAllNamespaces(kubeConfig)
 		}
 		resolvedNamespaces = append(resolvedNamespaces, namespaceStr)
 	}
 	return resolvedNamespaces, nil
 }
 
-func getAllNamespaces(kubeConfig *rest.Config) ([]string, error) {
+// Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
+func GetAllNamespaces(kubeConfig *rest.Config) ([]string, error) {
 	clientSet, err := client.GetClientSet(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get k8s client set: %w", err)
