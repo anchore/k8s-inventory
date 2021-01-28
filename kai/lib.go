@@ -5,67 +5,96 @@ package kai
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/anchore/kai/internal/errors"
-	"github.com/anchore/kai/internal/util"
-
-	"github.com/anchore/kai/kai/event"
 	"github.com/anchore/kai/kai/presenter"
+	"github.com/anchore/kai/kai/reporter"
+
+	"github.com/anchore/kai/internal/util"
 
 	"k8s.io/client-go/rest"
 
-	"github.com/anchore/kai/internal/bus"
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
 	"github.com/anchore/kai/kai/client"
 	"github.com/anchore/kai/kai/logger"
 	"github.com/anchore/kai/kai/result"
-	"github.com/wagoodman/go-partybus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// According to configuration, periodically retrieve image results and report them to the Event Bus for printing/reporting
-func PeriodicallyGetImageResults(errs chan *errors.KaiError, appConfig *config.Application) {
+func HandleResults(imageResult result.Result, appConfig *config.Application) error {
+	if appConfig.AnchoreDetails.IsValid() {
+		if err := reporter.Report(imageResult, appConfig.AnchoreDetails, appConfig); err != nil {
+			return fmt.Errorf("unable to report Images to Anchore: %w", err)
+		}
+	} else {
+		log.Debug("Anchore details not specified, not reporting in-use image data")
+	}
+
+	if err := presenter.GetPresenter(appConfig.PresenterOpt, imageResult).Present(os.Stdout); err != nil {
+		return fmt.Errorf("unable to show Kai results: %w", err)
+	}
+	return nil
+}
+
+// According to configuration, periodically retrieve image results and report/output them.
+// Note: Errors do not cause the function to exit, since this is periodically running
+func PeriodicallyGetImageResults(appConfig *config.Application) {
 	// Report one result right away
-	GetAndPublishImageResults(errs, appConfig)
+	imageResult, err := GetAndPublishImageResults(appConfig)
+	if err != nil {
+		log.Errorf("Failed to get Image Results: %w", err)
+	} else {
+		err := HandleResults(imageResult, appConfig)
+		if err != nil {
+			log.Errorf("Failed to handle Image Results: %w", err)
+		}
+	}
 
 	// Then fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
 	for range ticker.C {
-		GetAndPublishImageResults(errs, appConfig)
+		imageResult, err := GetAndPublishImageResults(appConfig)
+		if err != nil {
+			log.Errorf("Failed to get Image Results: %w", err)
+		} else {
+			err := HandleResults(imageResult, appConfig)
+			if err != nil {
+				log.Errorf("Failed to handle Image Results: %w", err)
+			}
+		}
 	}
 }
 
-// According to configuration, retrieve image results and publish them to the Event Bus
+// According to configuration, retrieve image results and return them
 // If the config comes from Anchore, there may be multiple clusters (which is not supported from direct configuration)
-func GetAndPublishImageResults(errs chan *errors.KaiError, appConfig *config.Application) {
+func GetAndPublishImageResults(appConfig *config.Application) (result.Result, error) {
 	kubeConfig, err := client.GetKubeConfig(appConfig)
 	if err != nil {
-		errs <- errors.NewFromError(err, "failed to get kubeconfig")
-		return
+		return result.Result{}, err
 	}
-	imagesResult, err := GetImageResults(errs, kubeConfig, appConfig.Namespaces, appConfig.KubernetesRequestTimeoutSeconds)
+	imagesResult, err := GetImageResults(kubeConfig, appConfig.Namespaces, appConfig.KubernetesRequestTimeoutSeconds)
 	if err != nil {
-		errs <- errors.NewFromError(err, "failed to get image results")
-		return
+		return result.Result{}, err
 	}
-	bus.Publish(partybus.Event{
-		Type:   event.ImageResultsRetrieved,
-		Source: imagesResult,
-		Value:  presenter.GetPresenter(appConfig.PresenterOpt, imagesResult),
-	})
+	return imagesResult, nil
+}
+
+type ImageResult struct {
+	Namespaces []result.Namespace
+	Err        error
 }
 
 // Atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(errs chan *errors.KaiError, kubeConfig *rest.Config, namespaces []string, timeoutSeconds int64) (result.Result, error) {
+func GetImageResults(kubeConfig *rest.Config, namespaces []string, timeoutSeconds int64) (result.Result, error) {
 	searchNamespaces, err := resolveNamespaces(kubeConfig, namespaces, timeoutSeconds)
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to resolve namespaces: %w", err)
 	}
-	namespaceChan := make(chan []result.Namespace, len(searchNamespaces))
+	results := make(chan ImageResult, len(searchNamespaces))
 	var wg sync.WaitGroup
 	for _, searchNamespace := range searchNamespaces {
 		wg.Add(1)
@@ -73,16 +102,20 @@ func GetImageResults(errs chan *errors.KaiError, kubeConfig *rest.Config, namesp
 			defer wg.Done()
 			clientSet, err := client.GetClientSet(kubeConfig)
 			if err != nil {
-				errs <- errors.NewFromError(err, "failed to get k8s clientset")
+				results <- ImageResult{
+					Err: err,
+				}
 				return
 			}
 			pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &timeoutSeconds})
 			if err != nil {
-				errs <- errors.NewFromError(err, "failed to List Pods")
+				results <- ImageResult{
+					Err: err,
+				}
 				return
 			}
 			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
-			namespaceChan <- parseNamespaceImages(pods, searchNamespace)
+			results <- parseNamespaceImages(pods, searchNamespace)
 		}(searchNamespace, &wg)
 	}
 	if util.WaitTimeout(&wg, time.Second*time.Duration(timeoutSeconds)) {
@@ -91,13 +124,16 @@ func GetImageResults(errs chan *errors.KaiError, kubeConfig *rest.Config, namesp
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for i := 0; i < len(searchNamespaces); i++ {
 		select {
-		case channelNamespaceMsg := <-namespaceChan:
-			resolvedNamespaces = append(resolvedNamespaces, channelNamespaceMsg...)
+		case imageResult := <-results:
+			if imageResult.Err != nil {
+				return result.Result{}, imageResult.Err
+			}
+			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
 		case <-time.After(time.Second * time.Duration(timeoutSeconds)):
 			return result.Result{}, fmt.Errorf("timed out waiting for results from namespace '%s'", searchNamespaces[i])
 		}
 	}
-	close(namespaceChan)
+	close(results)
 
 	clientSet, err := client.GetClientSet(kubeConfig)
 	if err != nil {
@@ -147,11 +183,14 @@ func GetAllNamespaces(kubeConfig *rest.Config, timeoutSeconds int64) ([]string, 
 }
 
 // Parse Pod List results into a list of Namespaces (each with unique Images)
-func parseNamespaceImages(pods *v1.PodList, namespace string) []result.Namespace {
+func parseNamespaceImages(pods *v1.PodList, namespace string) ImageResult {
 	namespaces := make([]result.Namespace, 0)
 	if len(pods.Items) < 1 {
 		namespaces = append(namespaces, *result.New(namespace))
-		return namespaces
+		return ImageResult{
+			Namespaces: namespaces,
+			Err:        nil,
+		}
 	}
 
 	namespaceMap := make(map[string]*result.Namespace)
@@ -171,13 +210,12 @@ func parseNamespaceImages(pods *v1.PodList, namespace string) []result.Namespace
 	for _, value := range namespaceMap {
 		namespaces = append(namespaces, *value)
 	}
-	return namespaces
+	return ImageResult{
+		Namespaces: namespaces,
+		Err:        nil,
+	}
 }
 
 func SetLogger(logger logger.Logger) {
 	log.Log = logger
-}
-
-func SetBus(b *partybus.Bus) {
-	bus.SetPublisher(b)
 }
