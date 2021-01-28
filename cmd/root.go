@@ -5,13 +5,10 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/anchore/kai/internal/errors"
-
 	"github.com/anchore/kai/kai/client"
 
 	"github.com/anchore/kai/kai/mode"
 
-	"github.com/anchore/kai/internal/ui"
 	"github.com/anchore/kai/kai"
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/spf13/cobra"
@@ -46,15 +43,25 @@ var rootCmd = &cobra.Command{
 			}
 			os.Exit(1)
 		}
-		err := runDefaultCmd()
 
-		if appConfig.Dev.ProfileCPU {
-			pprof.StopCPUProfile()
-		}
-
-		if err != nil {
-			log.Error(err)
-			os.Exit(1)
+		switch appConfig.RunMode {
+		case mode.PeriodicPolling:
+			kai.PeriodicallyGetImageResults(appConfig)
+		default:
+			imagesResult, err := kai.GetAndPublishImageResults(appConfig)
+			if appConfig.Dev.ProfileCPU {
+				pprof.StopCPUProfile()
+			}
+			if err != nil {
+				log.Errorf("Failed to get Image Results: %+v", err)
+				os.Exit(1)
+			} else {
+				err := kai.HandleResults(imagesResult, appConfig)
+				if err != nil {
+					log.Errorf("Failed to handle Image Results: %+v", err)
+					os.Exit(1)
+				}
+			}
 		}
 	},
 }
@@ -112,24 +119,4 @@ func init() {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
 	}
-}
-
-func getImageResults() <-chan *errors.KaiError {
-	errs := make(chan *errors.KaiError)
-	go func() {
-		defer close(errs)
-
-		switch appConfig.RunMode {
-		case mode.PeriodicPolling:
-			kai.PeriodicallyGetImageResults(errs, appConfig)
-		default:
-			kai.GetAndPublishImageResults(errs, appConfig)
-		}
-	}()
-	return errs
-}
-
-func runDefaultCmd() error {
-	errs := getImageResults()
-	return ui.LoggerUI(errs, eventSubscription, appConfig)
 }

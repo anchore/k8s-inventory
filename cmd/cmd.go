@@ -10,15 +10,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wagoodman/go-partybus"
 	"gopkg.in/yaml.v2"
 )
 
 var appConfig *config.Application
 var log *logrus.Logger
 var cliOnlyOpts config.CliOnlyOptions
-var eventBus *partybus.Bus
-var eventSubscription *partybus.Subscription
 
 func init() {
 	setGlobalCliOptions()
@@ -27,7 +24,6 @@ func init() {
 		initAppConfig,
 		initLogging,
 		logAppConfig,
-		initEventBus,
 	)
 }
 
@@ -86,11 +82,4 @@ func logAppConfig() {
 	} else {
 		log.Debugf("Application config:\n%+v", string(appCfgStr))
 	}
-}
-
-func initEventBus() {
-	eventBus = partybus.NewBus()
-	eventSubscription = eventBus.Subscribe()
-
-	kai.SetBus(eventBus)
 }
