@@ -6,13 +6,10 @@ package kai
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/anchore/kai/kai/reporter"
-
-	"github.com/anchore/kai/internal/util"
 
 	"k8s.io/client-go/rest"
 
@@ -44,7 +41,7 @@ func HandleResults(imageResult result.Result, appConfig *config.Application) err
 // Note: Errors do not cause the function to exit, since this is periodically running
 func PeriodicallyGetImageResults(appConfig *config.Application) {
 	// Report one result right away
-	imageResult, err := GetAndPublishImageResults(appConfig)
+	imageResult, err := GetImageResults(appConfig)
 	if err != nil {
 		log.Errorf("Failed to get Image Results: %w", err)
 	} else {
@@ -57,7 +54,7 @@ func PeriodicallyGetImageResults(appConfig *config.Application) {
 	// Then fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
 	for range ticker.C {
-		imageResult, err := GetAndPublishImageResults(appConfig)
+		imageResult, err := GetImageResults(appConfig)
 		if err != nil {
 			log.Errorf("Failed to get Image Results: %w", err)
 		} else {
@@ -69,37 +66,24 @@ func PeriodicallyGetImageResults(appConfig *config.Application) {
 	}
 }
 
-// According to configuration, retrieve image results and return them
-// If the config comes from Anchore, there may be multiple clusters (which is not supported from direct configuration)
-func GetAndPublishImageResults(appConfig *config.Application) (result.Result, error) {
-	kubeConfig, err := client.GetKubeConfig(appConfig)
-	if err != nil {
-		return result.Result{}, err
-	}
-	imagesResult, err := GetImageResults(kubeConfig, appConfig.Namespaces, appConfig.KubernetesRequestTimeoutSeconds)
-	if err != nil {
-		return result.Result{}, err
-	}
-	return imagesResult, nil
-}
-
 type ImageResult struct {
 	Namespaces []result.Namespace
 	Err        error
 }
 
 // Atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(kubeConfig *rest.Config, namespaces []string, timeoutSeconds int64) (result.Result, error) {
-	searchNamespaces, err := resolveNamespaces(kubeConfig, namespaces, timeoutSeconds)
+func GetImageResults(appConfig *config.Application) (result.Result, error) {
+	kubeConfig, err := client.GetKubeConfig(appConfig)
+	if err != nil {
+		return result.Result{}, err
+	}
+	searchNamespaces, err := resolveNamespaces(kubeConfig, appConfig)
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to resolve namespaces: %w", err)
 	}
-	results := make(chan ImageResult, len(searchNamespaces))
-	var wg sync.WaitGroup
+	results := make(chan ImageResult)
 	for _, searchNamespace := range searchNamespaces {
-		wg.Add(1)
-		go func(searchNamespace string, wg *sync.WaitGroup) {
-			defer wg.Done()
+		go func(searchNamespace string) {
 			clientSet, err := client.GetClientSet(kubeConfig)
 			if err != nil {
 				results <- ImageResult{
@@ -107,7 +91,7 @@ func GetImageResults(kubeConfig *rest.Config, namespaces []string, timeoutSecond
 				}
 				return
 			}
-			pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &timeoutSeconds})
+			pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.KubernetesRequestTimeoutSeconds})
 			if err != nil {
 				results <- ImageResult{
 					Err: err,
@@ -116,21 +100,18 @@ func GetImageResults(kubeConfig *rest.Config, namespaces []string, timeoutSecond
 			}
 			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
 			results <- parseNamespaceImages(pods, searchNamespace)
-		}(searchNamespace, &wg)
-	}
-	if util.WaitTimeout(&wg, time.Second*time.Duration(timeoutSeconds)) {
-		return result.Result{}, fmt.Errorf("timed out waiting for results")
+		}(searchNamespace)
 	}
 	resolvedNamespaces := make([]result.Namespace, 0)
-	for i := 0; i < len(searchNamespaces); i++ {
+	for len(resolvedNamespaces) < len(searchNamespaces) {
 		select {
 		case imageResult := <-results:
 			if imageResult.Err != nil {
 				return result.Result{}, imageResult.Err
 			}
 			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
-		case <-time.After(time.Second * time.Duration(timeoutSeconds)):
-			return result.Result{}, fmt.Errorf("timed out waiting for results from namespace '%s'", searchNamespaces[i])
+		case <-time.After(time.Second * time.Duration(appConfig.KubernetesRequestTimeoutSeconds)):
+			return result.Result{}, fmt.Errorf("timed out waiting for results")
 		}
 	}
 	close(results)
@@ -151,14 +132,14 @@ func GetImageResults(kubeConfig *rest.Config, namespaces []string, timeoutSecond
 	}, nil
 }
 
-func resolveNamespaces(kubeConfig *rest.Config, namespaces []string, timeoutSeconds int64) ([]string, error) {
-	if len(namespaces) == 0 {
-		return GetAllNamespaces(kubeConfig, timeoutSeconds)
+func resolveNamespaces(kubeConfig *rest.Config, appConfig *config.Application) ([]string, error) {
+	if len(appConfig.Namespaces) == 0 {
+		return GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
 	}
 	resolvedNamespaces := make([]string, 0)
-	for _, namespaceStr := range namespaces {
+	for _, namespaceStr := range appConfig.Namespaces {
 		if namespaceStr == "all" {
-			return GetAllNamespaces(kubeConfig, timeoutSeconds)
+			return GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
 		}
 		resolvedNamespaces = append(resolvedNamespaces, namespaceStr)
 	}

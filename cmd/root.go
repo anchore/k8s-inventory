@@ -48,7 +48,7 @@ var rootCmd = &cobra.Command{
 		case mode.PeriodicPolling:
 			kai.PeriodicallyGetImageResults(appConfig)
 		default:
-			imagesResult, err := kai.GetAndPublishImageResults(appConfig)
+			imagesResult, err := kai.GetImageResults(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
