@@ -83,24 +83,8 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	}
 	results := make(chan ImageResult)
 	for _, searchNamespace := range searchNamespaces {
-		go func(searchNamespace string) {
-			clientSet, err := client.GetClientSet(kubeConfig)
-			if err != nil {
-				results <- ImageResult{
-					Err: err,
-				}
-				return
-			}
-			pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.KubernetesRequestTimeoutSeconds})
-			if err != nil {
-				results <- ImageResult{
-					Err: err,
-				}
-				return
-			}
-			log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
-			results <- parseNamespaceImages(pods, searchNamespace)
-		}(searchNamespace)
+		// Does a "get pods" for the specified namespace and returns the unique set of images to the results channel
+		go getNamespaceImages(kubeConfig, appConfig, searchNamespace, results)
 	}
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for len(resolvedNamespaces) < len(searchNamespaces) {
@@ -130,6 +114,26 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 		Results:               resolvedNamespaces,
 		ServerVersionMetadata: serverVersion,
 	}, nil
+}
+
+// Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
+func getNamespaceImages(kubeConfig *rest.Config, appConfig *config.Application, searchNamespace string, results chan ImageResult) {
+	clientSet, err := client.GetClientSet(kubeConfig)
+	if err != nil {
+		results <- ImageResult{
+			Err: err,
+		}
+		return
+	}
+	pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.KubernetesRequestTimeoutSeconds})
+	if err != nil {
+		results <- ImageResult{
+			Err: err,
+		}
+		return
+	}
+	log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
+	results <- parseNamespaceImages(pods, searchNamespace)
 }
 
 func resolveNamespaces(kubeConfig *rest.Config, appConfig *config.Application) ([]string, error) {
