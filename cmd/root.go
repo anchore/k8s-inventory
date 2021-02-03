@@ -5,6 +5,8 @@ import (
 	"os"
 	"runtime/pprof"
 
+	"github.com/anchore/kai/kai/client"
+
 	"github.com/anchore/kai/kai/mode"
 
 	"github.com/anchore/kai/internal/ui"
@@ -77,7 +79,11 @@ func init() {
 	opt = "namespaces"
 	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
 	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		namespaces, err := kai.ListNamespaces(appConfig)
+		kubeConfig, err := client.GetKubeConfig(appConfig)
+		if err != nil {
+			return []string{"failed to build kubeconfig from app config"}, cobra.ShellCompDirectiveError
+		}
+		namespaces, err := kai.GetAllNamespaces(kubeConfig)
 		if err != nil {
 			return []string{"completion failed"}, cobra.ShellCompDirectiveError
 		}

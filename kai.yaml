@@ -43,7 +43,7 @@ polling-interval-seconds: 300
 anchore:
 #  url:
 #  user: admin
-#  password: foobar
+  password: $KAI_ANCHORE_PASSWORD
 #  http:
 #    insecure: true
 #    timeoutSeconds: 5
