@@ -1,0 +1,5 @@
+
+image:
+  repository: anchore/kai
+  pullPolicy: IfNotPresent
+  tag: "latest"

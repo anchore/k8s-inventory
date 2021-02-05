@@ -5,6 +5,7 @@ COVER_REPORT = $(RESULTSDIR)/cover.report
 COVER_TOTAL = $(RESULTSDIR)/cover.total
 LICENSES_REPORT = $(RESULTSDIR)/licenses.json
 LINTCMD = $(TEMPDIR)/golangci-lint run --tests=false --config .golangci.yaml
+ACC_DIR = ./test/acceptance
 BOLD := $(shell tput -T linux bold)
 PURPLE := $(shell tput -T linux setaf 5)
 GREEN := $(shell tput -T linux setaf 2)
@@ -115,6 +116,11 @@ unit: ## Run unit tests (with coverage)
 integration: ## Run integration tests
 	$(call title,Running integration tests)
 	go test -v -tags=integration ./test/integration
+
+.PHONY: acceptance-helm
+acceptance-helm:  ## Verify that the latest helm chart for kai works w/ the latest code (depends on anchore/kai:latest image existing)
+	$(call title,Running acceptance test: Run on Mac)
+	$(ACC_DIR)/helm-chart.sh \
 
 .PHONY: check-pipeline
 check-pipeline: ## Run local CircleCI pipeline locally (sanity check)

@@ -63,3 +63,29 @@ jobs:
         with:
           name: artifacts
           path: snapshot/**/*
+  # Note: changing this job name requires making the same update in the .github/workflows/release.yaml pipeline
+  Acceptance-Helm:
+    needs: [ Build-Snapshot-Artifacts ]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kubernetesVersion: [ "v1.13.12", "v1.18.0" ]
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: artifacts
+          path: snapshot
+
+      - name: Install kind
+        uses: helm/kind-action@v1.0.0
+        with:
+          node_image: "kindest/node:${{ matrix.kubernetesVersion }}"
+          config: kind-config.yaml
+          install_local_path_provisioner: true
+
+      - name: Run Acceptance Tests (Helm)
+        run: make acceptance-helm
