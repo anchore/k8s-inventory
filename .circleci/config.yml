@@ -34,7 +34,7 @@ jobs:
           name: run static analysis
           command: make static-analysis
 
-  run-tests:
+  unit-test:
     parameters:
       version:
         type: string
@@ -63,35 +63,53 @@ jobs:
             - "/go/pkg/mod"
             - ".tmp"
 
-      - setup_remote_docker:
-          version: 18.06.0-ce
-
-      - run:
-          name: enable docker client
-          command: |
-              # all of this to enable "circleci local execute ..." cli commands for /var/run/docker.sock
-              mkdir -p ${HOME}/.local/bin
-              cat \<< EOF > ${HOME}/.local/bin/docker
-              #!/bin/bash
-              set -xue
-              sudo -E ${HOME}/.local/bin/docker.bin \$@
-              EOF
-              sudo mv /usr/bin/docker ${HOME}/.local/bin/docker.bin
-              chmod 755 ${HOME}/.local/bin/docker
-
       - run:
           name: run unit tests
           command: make unit
 
+  integration-test:
+    parameters:
+      version:
+        type: string
+    # Couldn't get this test to run in docker due to Circle's constraints with docker networking (not that it's impossible, just couldn't get it working)
+    # This image uses go version: 1.15.7
+    machine:
+      image: ubuntu-1604:202101-01
+    # 2CPU / 4GB RAM
+    resource_class: medium
+    steps:
+
+      - checkout
+
+      - restore_cache:
+          keys:
+            - go-<< parameters.version >>-{{ checksum "go.sum" }}-{{ checksum "Makefile" }}
+
+      - run: make ci-bootstrap
+
+      - save_cache:
+          key: go-<< parameters.version >>-{{ checksum "go.sum" }}-{{ checksum "Makefile" }}
+          paths:
+            - "/go/pkg/mod"
+            - ".tmp"
+
+      - run:
+          name: Start Kind Cluster
+          command: make cluster-up
+
+      - run:
+          name: run integration tests
+          command: make integration
+
 workflows:
-  "Static Analysis + Unit":
+  "Static Analysis + Unit + Integration":
     jobs:
       - run-static-analysis:
           name: "Static Analysis"
-          version: "latest"
-      - run-tests:
-          name: "Unit Tests (go-1.13)"
-          version: "1.13"
-      - run-tests:
-          name: "Unit Tests (go-latest)"
-          version: "latest"
+          version: "1.14"
+      - unit-test:
+          name: "Unit Tests"
+          version: "1.14"
+      - integration-test:
+          name: "Integration Tests"
+          version: "1.14"
