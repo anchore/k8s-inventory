@@ -34,13 +34,13 @@ jobs:
           checkName: "Build-Snapshot-Artifacts"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check static anaylysis, and unit test results
+      - name: Check static anaylysis, unit, and integration test results
         uses: fountainhead/action-wait-for-check@v1.0.0
-        id: sa-unit
+        id: sa-unit-int
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # This check name is defined as the circle-ci workflow name (in .circleci/config.yaml)
-          checkName: "Static Analysis + Unit"
+          checkName: "Static Analysis + Unit + Integration"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check acceptance test results (helm)
@@ -53,9 +53,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Quality gate
-        if: steps.sa-unit.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm.outputs.conclusion != 'success'
+        if: steps.sa-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm.outputs.conclusion != 'success'
         run: |
-          echo "Static/Unit Status : ${{ steps.sa-unit.outputs.conclusion }}"
+          echo "Static-Analysis/Unit/Integration Status : ${{ steps.sa-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"
           echo "Acceptance Test (Helm) Status: ${{ steps.acceptance-helm.outputs.conclusion }}"
           false
