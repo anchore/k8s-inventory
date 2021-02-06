@@ -21,7 +21,7 @@ func init() {
 	setGlobalCliOptions()
 
 	cobra.OnInitialize(
-		initAppConfig,
+		InitAppConfig,
 		initLogging,
 		logAppConfig,
 	)
@@ -51,13 +51,17 @@ func Execute() {
 	}
 }
 
-func initAppConfig() {
+func InitAppConfig() {
 	cfg, err := config.LoadConfigFromFile(viper.GetViper(), &cliOnlyOpts)
 	if err != nil {
 		fmt.Printf("failed to load application config: \n\t%+v\n", err)
 		os.Exit(1)
 	}
 	appConfig = cfg
+}
+
+func GetAppConfig() *config.Application {
+	return appConfig
 }
 
 func initLogging() {

@@ -4,7 +4,7 @@ RESULTSDIR = $(TEMPDIR)/results
 COVER_REPORT = $(RESULTSDIR)/cover.report
 COVER_TOTAL = $(RESULTSDIR)/cover.total
 LICENSES_REPORT = $(RESULTSDIR)/licenses.json
-LINTCMD = $(TEMPDIR)/golangci-lint run --tests=false --config .golangci.yaml
+LINTCMD = $(TEMPDIR)/golangci-lint run --config .golangci.yaml
 ACC_DIR = ./test/acceptance
 BOLD := $(shell tput -T linux bold)
 PURPLE := $(shell tput -T linux setaf 5)
@@ -16,6 +16,8 @@ TITLE := $(BOLD)$(PURPLE)
 SUCCESS := $(BOLD)$(GREEN)
 # the quality gate lower threshold for unit test total % coverage (by function statements)
 COVERAGE_THRESHOLD := 60
+
+CLUSTER_NAME=kai-testing
 
 ## Build variables
 DISTDIR=./dist
@@ -50,11 +52,11 @@ define title
 endef
 
 .PHONY: all
-all: clean static-analysis test ## Run all checks (linting, license check, unit, integration)
+all: clean static-analysis unit ## Run all checks (linting, license check, unit tests)
 	@printf '$(SUCCESS)All checks pass!$(RESET)\n'
 
 .PHONY: test
-test: unit integration ## Run all tests (unit, integration )
+test: unit integration acceptance-helm ## Run all tests (unit, integration, acceptance-helm )
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BOLD)$(CYAN)%-25s$(RESET)%s\n", $$1, $$2}'
@@ -62,13 +64,14 @@ help:
 ci-bootstrap: bootstrap
 	sudo apt update && sudo apt install -y bc jq
 
-.PHONY: boostrap
+.PHONY: bootstrap
 bootstrap: ## Download and install all go dependencies (+ prep tooling in the ./tmp dir)
 	$(call title,Boostrapping dependencies)
 	@pwd
 	# prep temp dirs
 	mkdir -p $(TEMPDIR)
 	mkdir -p $(RESULTSDIR)
+	go version || ./scripts/install-go.sh
 	# install go dependencies
 	go mod download
 	# install utilities
@@ -107,19 +110,30 @@ check-licenses:
 unit: ## Run unit tests (with coverage)
 	$(call title,Running unit tests)
 	mkdir -p $(RESULTSDIR)
-	go test -coverprofile $(COVER_REPORT) ./...
+	go test -coverprofile $(COVER_REPORT) `go list ./... | grep -v test`
 	@go tool cover -func $(COVER_REPORT) | grep total |  awk '{print substr($$3, 1, length($$3)-1)}' > $(COVER_TOTAL)
 	@echo "Coverage: $$(cat $(COVER_TOTAL))"
 	@if [ $$(echo "$$(cat $(COVER_TOTAL)) >= $(COVERAGE_THRESHOLD)" | bc -l) -ne 1 ]; then echo "$(RED)$(BOLD)Failed coverage quality gate (> $(COVERAGE_THRESHOLD)%)$(RESET)" && false; fi
 
+.PHONY: cluster-up
+cluster-up: ## Bring up a kind cluster
+	$(call title,Starting Kind Cluster)
+	./scripts/cluster-up.sh $(CLUSTER_NAME)
+
+.PHONY: cluster-down
+cluster-down: ## Stop and delete kind cluster
+	$(call title,Tearing Down Kind Cluster)
+	./scripts/cluster-down.sh $(CLUSTER_NAME)
+
 .PHONY: integration
 integration: ## Run integration tests
 	$(call title,Running integration tests)
-	go test -v -tags=integration ./test/integration
+	./test/integration/test-integration.sh $(CLUSTER_NAME)
 
 .PHONY: acceptance-helm
-acceptance-helm:  ## Verify that the latest helm chart for kai works w/ the latest code (depends on anchore/kai:latest image existing)
-	$(call title,Running acceptance test: Run on Mac)
+acceptance-helm: install-cluster-deps ## Verify that the latest helm chart for kai works w/ the latest code (depends on anchore/kai:latest image existing)
+	$(call title,Running acceptance test: Helm)
+	@$(MAKE) install-cluster-deps
 	$(ACC_DIR)/helm-chart.sh \
 
 .PHONY: check-pipeline

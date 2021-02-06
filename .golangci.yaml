@@ -1,3 +1,10 @@
+run:
+  timeout: 2m
+  tests: false
+  skip-dirs:
+    - .circleci
+    - .github
+    - scripts
 linters-settings:
   funlen:
     lines: 65
