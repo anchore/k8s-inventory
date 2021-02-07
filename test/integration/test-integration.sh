@@ -14,9 +14,6 @@ function cleanup () {
 
   echo "Tearing down Kubernetes namespace: $NAMESPACE"
   ./kubectl delete namespace "$NAMESPACE"
-
-  echo "Tearing down kind cluster: $CLUSTER_NAME" && \
-  ./kind delete cluster --name "${CLUSTER_NAME}"
 }
 trap cleanup EXIT
 

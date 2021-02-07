@@ -34,5 +34,3 @@ coverage.txt
 # Kubeconfigs contain sensitive information and are specific to someone's environment
 # Ignore it in case anyone puts it in the dir
 kubeconfig
-
-.venv

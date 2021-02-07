@@ -5,7 +5,6 @@ set -eux
 K8S_VERSION=1.19.0
 KIND_VERSION=v0.9.0
 HELM_VERSION=v3.2.0
-# Note: Changing this requires updates to kai/scripts/cluster-down.sh and kai/test/integration/test-integration.sh
 CLUSTER_NAME=$1
 CLUSTER_CONFIG=./test/integration/fixtures/kind-config.yaml
 
