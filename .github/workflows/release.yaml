@@ -45,15 +45,24 @@ jobs:
 
       - name: Check acceptance test results (helm)
         uses: fountainhead/action-wait-for-check@v1.0.0
-        id: acceptance-helm
+        id: acceptance-helm-1-13-12
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the github action job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Acceptance-Helm"
+          # This check name is defined as the github action job name + the kubernetes version (see below) (in .github/workflows/acceptance-test.yaml)
+          checkName: "Acceptance-Helm (v1.13.12)"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check acceptance test results (helm)
+        uses: fountainhead/action-wait-for-check@v1.0.0
+        id: acceptance-helm-1-18-0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # This check name is defined as the github action job name + the kubernetes version (see below) (in .github/workflows/acceptance-test.yaml)
+          checkName: "Acceptance-Helm (v1.18.0)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Quality gate
-        if: steps.sa-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm.outputs.conclusion != 'success'
+        if: steps.sa-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm-1-13-12.outputs.conclusion != 'success' || steps.acceptance-helm-1-18-0.outputs.conclusion != 'success'
         run: |
           echo "Static-Analysis/Unit/Integration Status : ${{ steps.sa-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"

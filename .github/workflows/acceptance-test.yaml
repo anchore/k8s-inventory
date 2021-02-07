@@ -70,6 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Note: if this is changed, a corresponding change needs to be made in .github/workflows/release.yaml pipeline
         kubernetesVersion: [ "v1.13.12", "v1.18.0" ]
     steps:
 
