@@ -85,7 +85,9 @@ jobs:
           keys:
             - go-<< parameters.version >>-{{ checksum "go.sum" }}-{{ checksum "Makefile" }}
 
-      - run: make ci-bootstrap
+      - run:
+          name: Bootstrap Dependencies
+          command: make ci-bootstrap
 
       - save_cache:
           key: go-<< parameters.version >>-{{ checksum "go.sum" }}-{{ checksum "Makefile" }}
@@ -98,7 +100,7 @@ jobs:
           command: make cluster-up
 
       - run:
-          name: run integration tests
+          name: Run Integration Tests
           command: make integration
 
 workflows:
@@ -106,10 +108,10 @@ workflows:
     jobs:
       - run-static-analysis:
           name: "Static Analysis"
-          version: "1.14"
+          version: "1.15.7"
       - unit-test:
           name: "Unit Tests"
-          version: "1.14"
+          version: "1.15.7"
       - integration-test:
           name: "Integration Tests"
-          version: "1.14"
+          version: "1.15.7"
