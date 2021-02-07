@@ -6,7 +6,7 @@ K8S_VERSION=1.19.0
 KIND_VERSION=v0.9.0
 HELM_VERSION=v3.2.0
 CLUSTER_NAME=$1
-CLUSTER_CONFIG=./test/integration/fixtures/kind-config.yaml
+CLUSTER_CONFIG=./kind-config.yaml
 
 echo "Installing dependencies to run local k8s cluster."
 ARCH=$(uname | tr '[:upper:]' '[:lower:]')
