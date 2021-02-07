@@ -6,7 +6,7 @@
 
 KAI polls the Kubernetes API on an interval to retrieve which Docker images are currently in use.
 
-It can be run inside a cluster (under a Service Account) or outside (via any provided Kubeconfig)
+It can be run inside a cluster (under a Service Account) or outside (via any provided Kubeconfig).
 
 ## Getting Started
 [Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/kai)
