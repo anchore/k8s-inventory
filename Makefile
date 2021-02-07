@@ -131,9 +131,8 @@ integration: ## Run integration tests
 	./test/integration/test-integration.sh $(CLUSTER_NAME)
 
 .PHONY: acceptance-helm
-acceptance-helm: install-cluster-deps ## Verify that the latest helm chart for kai works w/ the latest code (depends on anchore/kai:latest image existing)
+acceptance-helm: ## Verify that the latest helm chart for kai works w/ the latest code (depends on anchore/kai:latest image existing)
 	$(call title,Running acceptance test: Helm)
-	@$(MAKE) install-cluster-deps
 	$(ACC_DIR)/helm-chart.sh \
 
 .PHONY: check-pipeline
