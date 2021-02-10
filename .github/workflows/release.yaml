@@ -43,7 +43,7 @@ jobs:
           checkName: "Static Analysis + Unit + Integration"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check acceptance test results (helm)
+      - name: Check acceptance test results (helm v1.13.12)
         uses: fountainhead/action-wait-for-check@v1.0.0
         id: acceptance-helm-1-13-12
         with:
@@ -52,7 +52,7 @@ jobs:
           checkName: "Acceptance-Helm (v1.13.12)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check acceptance test results (helm)
+      - name: Check acceptance test results (helm v1.18.0)
         uses: fountainhead/action-wait-for-check@v1.0.0
         id: acceptance-helm-1-18-0
         with:
