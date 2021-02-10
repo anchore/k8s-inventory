@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/anchore/kai/internal/util"
+
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/logger"
 	"github.com/anchore/kai/kai"
@@ -84,6 +86,6 @@ func logAppConfig() {
 	if err != nil {
 		log.Debugf("Could not display application config: %+v", err)
 	} else {
-		log.Debugf("Application config:\n%+v", string(appCfgStr))
+		log.Debugf("Application config:\n%+v", util.ObfuscateSensitiveString(string(appCfgStr)))
 	}
 }
