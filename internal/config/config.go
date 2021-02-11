@@ -13,6 +13,8 @@ package config
 import (
 	"fmt"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/anchore/kai/kai/mode"
 
 	"github.com/adrg/xdg"
@@ -25,6 +27,8 @@ import (
 	"path"
 	"strings"
 )
+
+const Redacted = "******"
 
 // Configuration options that may only be specified on the command line
 type CliOnlyOptions struct {
@@ -227,4 +231,30 @@ func readConfig(v *viper.Viper, configPath string) error {
 	}
 
 	return fmt.Errorf("application config not found")
+}
+
+func (cfg Application) String() string {
+	// redact sensitive information
+	// Note: If the configuration grows to have more redacted fields it would be good to refactor this into something that
+	// is more dynamic based on a property or list of "sensitive" fields
+	if cfg.AnchoreDetails.Password != "" {
+		cfg.AnchoreDetails.Password = Redacted
+	}
+
+	if cfg.KubeConfig.User.PrivateKey != "" {
+		cfg.KubeConfig.User.PrivateKey = Redacted
+	}
+
+	if cfg.KubeConfig.User.Token != "" {
+		cfg.KubeConfig.User.Token = Redacted
+	}
+
+	// yaml is pretty human friendly (at least when compared to json)
+	appCfgStr, err := yaml.Marshal(&cfg)
+
+	if err != nil {
+		return err.Error()
+	}
+
+	return string(appCfgStr)
 }
