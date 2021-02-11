@@ -1,0 +1,38 @@
+configpath: ""
+presenteropt: 0
+output: ""
+quiet: false
+log:
+  structured: false
+  levelopt: panic
+  level: ""
+  filelocation: ""
+clioptions:
+  configpath: ""
+  verbosity: 0
+dev:
+  profilecpu: false
+kubeconfig:
+  path: ""
+  cluster: ""
+  clustercert: ""
+  server: ""
+  user:
+    userconftype: 0
+    userconf: ""
+    clientcert: ""
+    privatekey: ""
+    token: ""
+kubernetesrequesttimeoutseconds: 0
+namespaces: []
+runmode: 0
+mode: ""
+pollingintervalseconds: 0
+anchoredetails:
+  url: ""
+  user: ""
+  password: ""
+  account: ""
+  http:
+    insecure: false
+    timeoutseconds: 0

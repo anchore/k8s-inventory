@@ -4,15 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/anchore/kai/internal/util"
-
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/logger"
 	"github.com/anchore/kai/kai"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
 )
 
 var appConfig *config.Application
@@ -81,11 +78,5 @@ func initLogging() {
 }
 
 func logAppConfig() {
-	appCfgStr, err := yaml.Marshal(&appConfig)
-
-	if err != nil {
-		log.Debugf("Could not display application config: %+v", err)
-	} else {
-		log.Debugf("Application config:\n%+v", util.ObfuscateSensitiveString(string(appCfgStr)))
-	}
+	log.Debugf("Application config:\n%+v", appConfig.String())
 }

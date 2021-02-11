@@ -1,0 +1,39 @@
+configpath: ../../kai.yaml
+presenteropt: 1
+output: json
+quiet: false
+log:
+  structured: false
+  levelopt: debug
+  level: debug
+  filelocation: ./kai.log
+clioptions:
+  configpath: ../../kai.yaml
+  verbosity: 0
+dev:
+  profilecpu: false
+kubeconfig:
+  path: ""
+  cluster: docker-desktop
+  clustercert: ""
+  server: ""
+  user:
+    userconftype: 0
+    userconf: ""
+    clientcert: ""
+    privatekey: ""
+    token: ""
+kubernetesrequesttimeoutseconds: 10
+namespaces:
+- all
+runmode: 0
+mode: adhoc
+pollingintervalseconds: 300
+anchoredetails:
+  url: ""
+  user: ""
+  password: '******'
+  account: admin
+  http:
+    insecure: false
+    timeoutseconds: 0
