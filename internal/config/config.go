@@ -28,7 +28,7 @@ import (
 	"strings"
 )
 
-const Redacted = "******"
+const redacted = "******"
 
 // Configuration options that may only be specified on the command line
 type CliOnlyOptions struct {
@@ -238,15 +238,15 @@ func (cfg Application) String() string {
 	// Note: If the configuration grows to have more redacted fields it would be good to refactor this into something that
 	// is more dynamic based on a property or list of "sensitive" fields
 	if cfg.AnchoreDetails.Password != "" {
-		cfg.AnchoreDetails.Password = Redacted
+		cfg.AnchoreDetails.Password = redacted
 	}
 
 	if cfg.KubeConfig.User.PrivateKey != "" {
-		cfg.KubeConfig.User.PrivateKey = Redacted
+		cfg.KubeConfig.User.PrivateKey = redacted
 	}
 
 	if cfg.KubeConfig.User.Token != "" {
-		cfg.KubeConfig.User.Token = Redacted
+		cfg.KubeConfig.User.Token = redacted
 	}
 
 	// yaml is pretty human friendly (at least when compared to json)
