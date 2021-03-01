@@ -98,7 +98,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
-	v.SetDefault("kubernetes-request-timeout-seconds", 10)
+	v.SetDefault("kubernetes-request-timeout-seconds", 60)
 }
 
 // Load the Application Configuration from the Viper specifications

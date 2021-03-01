@@ -15,7 +15,7 @@ func TestGetImageResults(t *testing.T) {
 	cmd.InitAppConfig()
 	imagesResult, err := kai.GetImageResults(cmd.GetAppConfig())
 	if err != nil {
-		t.Fatalf("failed to get image results")
+		t.Fatalf("failed to get image results: %v", err)
 	}
 
 	if imagesResult.ServerVersionMetadata == nil {
