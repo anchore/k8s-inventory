@@ -79,6 +79,10 @@ bootstrap: ## Download and install all go dependencies (+ prep tooling in the ./
 	[ -f "$(TEMPDIR)/bouncer" ] || curl -sSfL https://raw.githubusercontent.com/wagoodman/go-bouncer/master/bouncer.sh | sh -s -- -b $(TEMPDIR)/ v0.2.0
 	[ -f "$(TEMPDIR)/goreleaser" ] || curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh -s -- -b $(TEMPDIR)/ v0.140.0
 
+.PHONY: install-cluster-deps
+install-cluster-deps: ## Install Helm and Kubectl
+	./scripts/install-cluster-deps.sh
+
 .PHONY: static-analysis
 static-analysis: lint check-licenses
 
