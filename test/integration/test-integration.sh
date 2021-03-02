@@ -20,6 +20,6 @@ trap cleanup EXIT
 ## Install a basic nginx container
 ./helm install "$RELEASE" --create-namespace --namespace "$NAMESPACE" ./test/integration/fixtures/hello-world
 
-sleep 5
+./kubectl wait --for=condition=available "deployment/$RELEASE-hello-world" --timeout=-1s --namespace "$NAMESPACE"
 
 go test -v -tags=integration ./test/integration
