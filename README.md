@@ -156,3 +156,10 @@ Kai comes with shell completion for specifying namespaces, it can be enabled as 
 ```
 kai completion <zsh|bash|fish>
 ```
+
+## Known Limitations
+
+### Unknown/Empty Digest
+kai uses the Kubernetes GO SDK to fetch pods and parse out the image information in each namespace. This works well but has a known limitation around discovering an image's digest.
+In Kubernetes, when a pod is deployed, kubernetes will automatically try to pull the image from the remote registry. If this download happens, we are able to retrieve a digest, because the image ID field has a prefix 'docker-pullable'. 
+In some cases, like local development, the image already exists on the kubernetes node (this is common in development situations where kubernetes is running on a workstation in docker-desktop or kind). Since kubernetes is NOT pulling the image from a remote location, it sets the image ID field to the image ID locally, which is NOT the same as the image digest. Therefore, kai cannot retrieve this information and will report the value as an empty string.  
