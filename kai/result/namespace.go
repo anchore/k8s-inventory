@@ -60,11 +60,7 @@ func (n *Namespace) AddImages(pod v1.Pod) {
 func getUniqueImagesFromPodStatus(pod v1.Pod) []Image {
 	imageMap := make(map[string]Image)
 	for _, container := range pod.Status.ContainerStatuses {
-		repoDigest := ""
-		// If the image ID has this prefix, it corresponds to the repo digest. If not, it's not a digest
-		if strings.HasPrefix(container.ImageID, "docker-pullable") {
-			repoDigest = strings.Split(container.ImageID, "@")[1]
-		}
+		repoDigest := getImageDigest(container.ImageID)
 		imageMap[container.Image] = Image{
 			Tag:        container.Image,
 			RepoDigest: repoDigest,
@@ -75,4 +71,13 @@ func getUniqueImagesFromPodStatus(pod v1.Pod) []Image {
 		imageSlice = append(imageSlice, v)
 	}
 	return imageSlice
+}
+
+func getImageDigest(imageID string) string {
+	var imageDigest = ""
+	// If the image ID contains "sha", it corresponds to the repo digest. If not, it's not a digest
+	if strings.Contains(imageID, "sha") {
+		imageDigest = "sha" + strings.Split(imageID, "sha")[1]
+	}
+	return imageDigest
 }
