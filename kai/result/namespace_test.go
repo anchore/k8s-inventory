@@ -2,6 +2,7 @@ package result
 
 import (
 	"github.com/go-test/deep"
+	"github.com/magiconair/properties/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
@@ -49,7 +50,7 @@ func TestConstructorFromPod(t *testing.T) {
 			},
 			{
 				Tag:        "localhost/samtest:latest",
-				RepoDigest: "",
+				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
 			},
 		},
 	}
@@ -73,7 +74,7 @@ func TestAddImages(t *testing.T) {
 		},
 		{
 			Tag:        "localhost/samtest:latest",
-			RepoDigest: "",
+			RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
 		},
 	}
 
@@ -132,5 +133,41 @@ func compareImageSlices(expectedImages []Image, actualImages []Image, t *testing
 	if matches != len(expectedImages) {
 		diff := deep.Equal(expectedImages, actualImages)
 		t.Error(diff)
+	}
+}
+
+func TestGetImageDigest(t *testing.T) {
+	cases := []struct {
+		name     string
+		imageID  string
+		expected string
+	}{
+		{
+			name:     "common sha256",
+			imageID:  "docker.io/anchore/test_images@sha256:f3026e3f808e38c86ffb64e4fc5b49516d0783df2d94f06f959cf8f23c197495",
+			expected: "sha256:f3026e3f808e38c86ffb64e4fc5b49516d0783df2d94f06f959cf8f23c197495",
+		},
+		{
+			name:     "common sha512",
+			imageID:  "docker.io/anchore/test_images@sha512:72e59bea07d815ee05114b487d9d60594c9b3fc20fa055bff9c09a46ec8c9ff2",
+			expected: "sha512:72e59bea07d815ee05114b487d9d60594c9b3fc20fa055bff9c09a46ec8c9ff2",
+		},
+		{
+			name:     "docker-pullable",
+			imageID:  "docker-pullable://dakaneye/test@sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
+			expected: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
+		},
+		{
+			name:     "docker",
+			imageID:  "docker://sha256:ea65104b4b40b5d23eb4b2ebd4f62adf24f714a2fdaff19060de207d1f3c2111",
+			expected: "sha256:ea65104b4b40b5d23eb4b2ebd4f62adf24f714a2fdaff19060de207d1f3c2111",
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			actual := getImageDigest(test.imageID)
+			assert.Equal(t, test.expected, actual)
+		})
 	}
 }
