@@ -1,3 +1,5 @@
+**WARNING: This is a fork version modified to work with the oss version of anchore engine.**
+
 # KAI (Kubernetes Automated Inventory)
 [![CircleCI](https://circleci.com/gh/anchore/kai.svg?style=svg&circle-token=6f6ffa17b0630e6af622e162d594e2312c136d94)](https://circleci.com/gh/anchore/kai)
 [![Go Report Card](https://goreportcard.com/badge/github.com/anchore/kai)](https://goreportcard.com/report/github.com/anchore/kai)
