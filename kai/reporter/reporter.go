@@ -31,7 +31,7 @@ type Digest struct {
 	Timestamp  string `json:"creation_timestamp_override"`
 }
 
-func stripTagName(tag string) string {
+func stripTag(tag string) string {
 	for i, v := range tag {
 		if v == ':' || v == '@' {
 			return tag[:i]
@@ -41,13 +41,12 @@ func stripTagName(tag string) string {
 }
 
 func newPullString(tag, digest string) string {
-	return fmt.Sprintf("docker.io/%s@%s", stripTagName(tag), digest)
+	return stripTag(tag) + "@" + digest
 }
 
 func NewImageReport(result result.Result) (report []ImageReport) {
 	for _, namespace := range result.Results {
 		for _, image := range namespace.Images {
-			// TODO: handle docker.io tags
 			report = append(report, ImageReport{
 				Source: Source{
 					Digest: Digest{

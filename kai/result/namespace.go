@@ -62,7 +62,7 @@ func getUniqueImagesFromPodStatus(pod v1.Pod) []Image {
 	for _, container := range pod.Status.ContainerStatuses {
 		repoDigest := getImageDigest(container.ImageID)
 		imageMap[container.Image] = Image{
-			Tag:        container.Image,
+			Tag:        getImageName(container.Image),
 			RepoDigest: repoDigest,
 		}
 	}
@@ -80,4 +80,17 @@ func getImageDigest(imageID string) string {
 		imageDigest = "sha" + strings.Split(imageID, "sha")[1]
 	}
 	return imageDigest
+}
+
+func getImageName(name string) string {
+	for _, v := range name {
+		if v == ':' {
+			break
+		} else if v == '.' {
+			return name
+		} else if v == '/' {
+			return "docker.io/" + name
+		}
+	}
+	return "docker.io/library/" + name
 }
