@@ -71,6 +71,7 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	if err != nil {
 		return result.Result{}, err
 	}
+
 	searchNamespaces, err := resolveNamespaces(kubeConfig, appConfig)
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to resolve namespaces: %w", err)
@@ -144,20 +145,44 @@ func resolveNamespaces(kubeConfig *rest.Config, appConfig *config.Application) (
 	return resolvedNamespaces, nil
 }
 
+// GetAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func GetAllNamespaces(kubeConfig *rest.Config, timeoutSeconds int64) ([]string, error) {
-	clientSet, err := client.GetClientSet(kubeConfig)
+func GetAllNamespaces(kubeConfig *rest.Config, timeout int64) ([]string, error) {
+
+	var namespaces []string
+	var limit int64 = 2
+	cont := ""
+
+	clientset, err := client.GetClientSet(kubeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
-	namespaceList, err := clientSet.CoreV1().Namespaces().List(metav1.ListOptions{TimeoutSeconds: &timeoutSeconds})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all namespaces: %w", err)
+
+	for {
+		listOptions := metav1.ListOptions{
+			Limit:          limit,
+			Continue:       cont,
+			TimeoutSeconds: &timeout,
+		}
+
+		nsList, err := clientset.CoreV1().Namespaces().List(listOptions)
+		if err != nil {
+			// TODO: Handle HTTP 410
+			return nil, fmt.Errorf("failed to list namespaces: %w", err)
+		}
+
+		for _, ns := range nsList.Items {
+			namespaces = append(namespaces, ns.ObjectMeta.Name)
+		}
+
+		cont = nsList.GetListMeta().GetContinue()
+
+		if cont == "" {
+			break
+		}
 	}
-	namespaces := make([]string, 0, len(namespaceList.Items))
-	for _, namespace := range namespaceList.Items {
-		namespaces = append(namespaces, namespace.ObjectMeta.Name)
-	}
+
+	log.Infof("Found %d namespaces", len(namespaces))
 	return namespaces, nil
 }
 
