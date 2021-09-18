@@ -22,6 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ImageResult struct {
+	Namespaces []result.Namespace
+	Err        error
+}
+
 func HandleResults(imageResult result.Result, appConfig *config.Application) error {
 	if appConfig.AnchoreDetails.IsValid() {
 		if err := reporter.Report(imageResult, appConfig.AnchoreDetails, appConfig); err != nil {
@@ -37,23 +42,14 @@ func HandleResults(imageResult result.Result, appConfig *config.Application) err
 	return nil
 }
 
-// According to configuration, periodically retrieve image results and report/output them.
+// PeriodicallyGetImageResults periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
 func PeriodicallyGetImageResults(appConfig *config.Application) {
-	// Report one result right away
-	imageResult, err := GetImageResults(appConfig)
-	if err != nil {
-		log.Errorf("Failed to get Image Results: %w", err)
-	} else {
-		err := HandleResults(imageResult, appConfig)
-		if err != nil {
-			log.Errorf("Failed to handle Image Results: %w", err)
-		}
-	}
 
-	// Then fire off a ticker that reports according to a configurable polling interval
+	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
-	for range ticker.C {
+
+	for {
 		imageResult, err := GetImageResults(appConfig)
 		if err != nil {
 			log.Errorf("Failed to get Image Results: %w", err)
@@ -63,12 +59,10 @@ func PeriodicallyGetImageResults(appConfig *config.Application) {
 				log.Errorf("Failed to handle Image Results: %w", err)
 			}
 		}
-	}
-}
 
-type ImageResult struct {
-	Namespaces []result.Namespace
-	Err        error
+		// Wait at least as long as the ticker
+		log.Debugf("Start new gather: %s", <-ticker.C)
+	}
 }
 
 // Atomic method for getting in-use image results, in parallel for multiple namespaces
