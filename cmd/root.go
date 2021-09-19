@@ -19,7 +19,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "kai",
 	Short: "KAI tells Anchore which images are in use in your Kubernetes Cluster",
-	Long: `KAI (Kubernetes Automated Inventory) can poll 
+	Long: `KAI (Kubernetes Automated Inventory) can poll
     Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -92,7 +92,7 @@ func init() {
 		if err != nil {
 			return []string{"failed to build kubeconfig from app config"}, cobra.ShellCompDirectiveError
 		}
-		namespaces, err := kai.GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
+		namespaces, err := kai.GetAllNamespaces(kubeConfig, appConfig.Kubernetes)
 		if err != nil {
 			return []string{"completion failed"}, cobra.ShellCompDirectiveError
 		}

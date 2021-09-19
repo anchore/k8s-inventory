@@ -76,11 +76,13 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to resolve namespaces: %w", err)
 	}
+
 	results := make(chan ImageResult)
 	for _, searchNamespace := range searchNamespaces {
 		// Does a "get pods" for the specified namespace and returns the unique set of images to the results channel
 		go getNamespaceImages(kubeConfig, appConfig, searchNamespace, results)
 	}
+
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for len(resolvedNamespaces) < len(searchNamespaces) {
 		select {
@@ -89,7 +91,7 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 				return result.Result{}, imageResult.Err
 			}
 			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
-		case <-time.After(time.Second * time.Duration(appConfig.KubernetesRequestTimeoutSeconds)):
+		case <-time.After(time.Second * time.Duration(appConfig.Kubernetes.RequestTimeoutSeconds)):
 			return result.Result{}, fmt.Errorf("timed out waiting for results")
 		}
 	}
@@ -99,6 +101,7 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
+
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
@@ -120,7 +123,7 @@ func getNamespaceImages(kubeConfig *rest.Config, appConfig *config.Application, 
 		}
 		return
 	}
-	pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.KubernetesRequestTimeoutSeconds})
+	pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.Kubernetes.RequestTimeoutSeconds})
 	if err != nil {
 		results <- ImageResult{
 			Err: err,
@@ -132,25 +135,27 @@ func getNamespaceImages(kubeConfig *rest.Config, appConfig *config.Application, 
 }
 
 func resolveNamespaces(kubeConfig *rest.Config, appConfig *config.Application) ([]string, error) {
-	if len(appConfig.Namespaces) == 0 {
-		return GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
-	}
-	resolvedNamespaces := make([]string, 0)
-	for _, namespaceStr := range appConfig.Namespaces {
-		if namespaceStr == "all" {
-			return GetAllNamespaces(kubeConfig, appConfig.KubernetesRequestTimeoutSeconds)
+
+	getAll := false
+	for _, ns := range appConfig.Namespaces {
+		if ns == "all" {
+			getAll = true
+			break
 		}
-		resolvedNamespaces = append(resolvedNamespaces, namespaceStr)
 	}
-	return resolvedNamespaces, nil
+
+	if len(appConfig.Namespaces) == 0 || getAll {
+		return GetAllNamespaces(kubeConfig, appConfig.Kubernetes)
+	}
+
+	return appConfig.Namespaces, nil
 }
 
 // GetAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func GetAllNamespaces(kubeConfig *rest.Config, timeout int64) ([]string, error) {
+func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI) ([]string, error) {
 
 	var namespaces []string
-	var limit int64 = 2
 	cont := ""
 
 	clientset, err := client.GetClientSet(kubeConfig)
@@ -160,14 +165,14 @@ func GetAllNamespaces(kubeConfig *rest.Config, timeout int64) ([]string, error) 
 
 	for {
 		listOptions := metav1.ListOptions{
-			Limit:          limit,
+			Limit:          kubernetes.ListLimit,
 			Continue:       cont,
-			TimeoutSeconds: &timeout,
+			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
 
 		nsList, err := clientset.CoreV1().Namespaces().List(listOptions)
 		if err != nil {
-			// TODO: Handle HTTP 410
+			// TODO: Handle HTTP 410 and recover
 			return nil, fmt.Errorf("failed to list namespaces: %w", err)
 		}
 
