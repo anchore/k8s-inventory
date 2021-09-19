@@ -104,7 +104,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
-	v.SetDefault("kubernetes.batch-limit", 100)
+	v.SetDefault("kubernetes.list-limit", 100)
 }
 
 // Load the Application Configuration from the Viper specifications

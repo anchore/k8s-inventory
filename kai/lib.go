@@ -84,12 +84,13 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	total := 0
 	for ns := range nsCh {
 		if ns.Err != nil {
-			// TODO: Check behavior of Anchore Enterprise is namespace is missing
-			log.Errorf("failed to resolve namespace: %w", err)
+			// TODO: Check behavior of Anchore Enterprise is namespace is missing, should
+			// TODO: this not result in a hard fail and give Anchore a partial report
+			return result.Result{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
 
 		} else {
 			// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
-			go getNamespaceImages(kubeConfig, appConfig, ns.String, resultCh)
+			go getNamespaceImages(kubeConfig, appConfig.Kubernetes, ns.String, resultCh)
 			total++
 		}
 	}
@@ -165,38 +166,40 @@ func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, 
 
 	cont := ""
 	for {
-		listOptions := metav1.ListOptions{
+		opts := metav1.ListOptions{
 			Limit:          kubernetes.ListLimit,
 			Continue:       cont,
 			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
 
-		nsList, err := clientset.CoreV1().Namespaces().List(listOptions)
+		list, err := clientset.CoreV1().Namespaces().List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
 			nsCh <- StringError{
 				String: "",
 				Err:    fmt.Errorf("failed to list namespaces: %w", err),
 			}
+			return
 		}
 
-		for _, ns := range nsList.Items {
+		for _, ns := range list.Items {
 			nsCh <- StringError{
 				String: ns.ObjectMeta.Name,
 				Err:    nil,
 			}
 		}
 
-		cont = nsList.GetListMeta().GetContinue()
+		cont = list.GetListMeta().GetContinue()
 
 		if cont == "" {
 			break
 		}
+		time.Sleep(15 * time.Minute)
 	}
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func getNamespaceImages(kubeConfig *rest.Config, appConfig *config.Application, searchNamespace string, resultCh chan ImageResult) {
+func getNamespaceImages(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, ns string, resultCh chan ImageResult) {
 	clientSet, err := client.GetClientSet(kubeConfig)
 	if err != nil {
 		resultCh <- ImageResult{
@@ -204,21 +207,42 @@ func getNamespaceImages(kubeConfig *rest.Config, appConfig *config.Application, 
 		}
 		return
 	}
-	pods, err := clientSet.CoreV1().Pods(searchNamespace).List(metav1.ListOptions{TimeoutSeconds: &appConfig.Kubernetes.RequestTimeoutSeconds})
-	if err != nil {
-		resultCh <- ImageResult{
-			Err: err,
+
+	pods := make([]v1.Pod, 0)
+	cont := ""
+	for {
+		opts := metav1.ListOptions{
+			Limit:          kubernetes.ListLimit,
+			Continue:       cont,
+			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
-		return
+
+		list, err := clientSet.CoreV1().Pods(ns).List(opts)
+		if err != nil {
+			// TODO: Handle HTTP 410 and recover
+			resultCh <- ImageResult{
+				Err: err,
+			}
+			return
+		}
+
+		pods = append(pods, list.Items...)
+
+		cont = list.GetListMeta().GetContinue()
+
+		if cont == "" {
+			break
+		}
 	}
-	log.Debugf("There are %d pods in the cluster in namespace \"%s\"", len(pods.Items), searchNamespace)
-	resultCh <- parseNamespaceImages(pods, searchNamespace)
+
+	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
+	resultCh <- parseNamespaceImages(pods, ns)
 }
 
 // Parse Pod List results into a list of Namespaces (each with unique Images)
-func parseNamespaceImages(pods *v1.PodList, namespace string) ImageResult {
+func parseNamespaceImages(pods []v1.Pod, namespace string) ImageResult {
 	namespaces := make([]result.Namespace, 0)
-	if len(pods.Items) < 1 {
+	if len(pods) < 1 {
 		namespaces = append(namespaces, *result.New(namespace))
 		return ImageResult{
 			Namespaces: namespaces,
@@ -227,7 +251,7 @@ func parseNamespaceImages(pods *v1.PodList, namespace string) ImageResult {
 	}
 
 	namespaceMap := make(map[string]*result.Namespace)
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		namespace := pod.ObjectMeta.Namespace
 		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
 			continue
