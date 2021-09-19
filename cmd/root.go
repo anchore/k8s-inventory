@@ -92,10 +92,17 @@ func init() {
 		if err != nil {
 			return []string{"failed to build kubeconfig from app config"}, cobra.ShellCompDirectiveError
 		}
-		namespaces, err := kai.GetAllNamespaces(kubeConfig, appConfig.Kubernetes)
-		if err != nil {
-			return []string{"completion failed"}, cobra.ShellCompDirectiveError
+		nsCh := make(chan kai.StringError)
+		namespaces := make([]string, 0)
+		go kai.GetAllNamespaces(kubeConfig, appConfig.Kubernetes, nsCh)
+
+		for ns := range nsCh {
+			if ns.Err != nil {
+				return []string{"completion failed"}, cobra.ShellCompDirectiveError
+			}
+			namespaces = append(namespaces, ns.String)
 		}
+
 		return append(namespaces, "all"), cobra.ShellCompDirectiveDefault
 	})
 	if err != nil {
