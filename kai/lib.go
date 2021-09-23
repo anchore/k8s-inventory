@@ -194,7 +194,6 @@ func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, 
 		if cont == "" {
 			break
 		}
-		time.Sleep(15 * time.Minute)
 	}
 }
 
