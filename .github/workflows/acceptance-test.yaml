@@ -82,9 +82,8 @@ jobs:
           path: snapshot
 
       - name: Install kind
-        uses: helm/kind-action@v1.0.0
+        uses: helm/kind-action@v1.2.0
         with:
-          node_image: "kindest/node:${{ matrix.kubernetesVersion }}"
           config: ./kind-config.yaml
           install_local_path_provisioner: true
 
