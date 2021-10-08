@@ -2,12 +2,12 @@ name: 'Acceptance'
 on:
   workflow_dispatch:
   push:
-    # ... only act on pushes to main
-    branches:
-      - main
-    # ... do not act on release tags
-    tags-ignore:
-      - v*
+#    # ... only act on pushes to main
+#    branches:
+#      - main
+#    # ... do not act on release tags
+#    tags-ignore:
+#      - v*
 
 env:
   GO_VERSION: "1.16.7"
