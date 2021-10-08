@@ -34,13 +34,22 @@ jobs:
           checkName: "Build-Snapshot-Artifacts"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check static anaylysis, unit, and integration test results
+      - name: Check static analysis
         uses: fountainhead/action-wait-for-check@v1.0.0
-        id: sa-unit-int
+        id: static-analysis
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the circle-ci workflow name (in .circleci/config.yaml)
-          checkName: "Static Analysis + Unit + Integration"
+          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
+          checkName: "Static-Analysis (1.x, ubuntu-latest)"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check unit, and integration test results
+        uses: fountainhead/action-wait-for-check@v1.0.0
+        id: tests-unit-int
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
+          checkName: "Tests (1.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check acceptance test results (helm v1.13.12)
@@ -62,11 +71,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Quality gate
-        if: steps.sa-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm-1-13-12.outputs.conclusion != 'success' || steps.acceptance-helm-1-18-0.outputs.conclusion != 'success'
+        if: steps.static-analysis.outputs.conclusion != 'success' || steps.tests-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm-1-13-12.outputs.conclusion != 'success' || steps.acceptance-helm-1-18-0.outputs.conclusion != 'success'
         run: |
-          echo "Static-Analysis/Unit/Integration Status : ${{ steps.sa-unit-int.outputs.conclusion }}"
+          echo "Static-Analysis Status : ${{ steps.static-analysis.outputs.conclusion }}"
+          echo "Unit/Integration Status : ${{ steps.tests-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"
-          echo "Acceptance Test (Helm) Status: ${{ steps.acceptance-helm.outputs.conclusion }}"
+          echo "Acceptance Test (Helm v1.13.12) Status: ${{ steps.acceptance-helm-1-13-12.outputs.conclusion }}"
+          echo "Acceptance Test (Helm v1.18.0) Status: ${{ steps.acceptance-helm-1-18-0.outputs.conclusion }}"
           false
 
   release:
