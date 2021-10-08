@@ -1,12 +1,12 @@
 name: 'Release'
 on:
   push:
-    # take no actions on push to any branch...
-    branches-ignore:
-      - '**'
+#    # take no actions on push to any branch...
+#    branches-ignore:
+#      - '**'
     # ... only act on release tags
-    tags:
-      - 'v*'
+#    tags:
+#      - 'v*'
 
 env:
   GO_VERSION: "1.16.7"
@@ -19,11 +19,11 @@ jobs:
       - uses: actions/checkout@v2
 
       # we don't want to release commits that have been pushed and tagged, but not necessarily merged onto main
-      - name: Ensure tagged commit is on main
-        run: |
-          echo "Tag: ${GITHUB_REF##*/}"
-          git fetch origin main
-          git merge-base --is-ancestor ${GITHUB_REF##*/} origin/main && echo "${GITHUB_REF##*/} is a commit on main!"
+#      - name: Ensure tagged commit is on main
+#        run: |
+#          echo "Tag: ${GITHUB_REF##*/}"
+#          git fetch origin main
+#          git merge-base --is-ancestor ${GITHUB_REF##*/} origin/main && echo "${GITHUB_REF##*/} is a commit on main!"
 
       - name: Build snapshot artifacts
         uses: fountainhead/action-wait-for-check@v1.0.0
@@ -36,20 +36,20 @@ jobs:
 
       - name: Check static analysis
         uses: fountainhead/action-wait-for-check@v1.0.0
-        id: sa-unit-int
+        id: static-analysis
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Static-Analysis"
+          checkName: "Static-Analysis (1.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check unit, and integration test results
         uses: fountainhead/action-wait-for-check@v1.0.0
-        id: sa-unit-int
+        id: tests-unit-int
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Tests"
+          checkName: "Tests (1.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check acceptance test results (helm v1.13.12)
@@ -71,73 +71,74 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Quality gate
-        if: steps.sa-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm-1-13-12.outputs.conclusion != 'success' || steps.acceptance-helm-1-18-0.outputs.conclusion != 'success'
+        if: steps.static-analysis.outputs.conclusion != 'success' || steps.tests-unit-int.outputs.conclusion != 'success' || steps.snapshot.outputs.conclusion != 'success' || steps.acceptance-helm-1-13-12.outputs.conclusion != 'success' || steps.acceptance-helm-1-18-0.outputs.conclusion != 'success'
         run: |
-          echo "Static-Analysis/Unit/Integration Status : ${{ steps.sa-unit-int.outputs.conclusion }}"
+          echo "Static-Analysis Status : ${{ steps.static-analysis.outputs.conclusion }}"
+          echo "Unit/Integration Status : ${{ steps.tests-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"
           echo "Acceptance Test (Helm) Status: ${{ steps.acceptance-helm.outputs.conclusion }}"
           false
 
-  release:
-    needs: [ wait-for-checks ]
-    runs-on: ubuntu-latest
-    steps:
+#  release:
+#    needs: [ wait-for-checks ]
+#    runs-on: ubuntu-latest
+#    steps:
+#
+#      - uses: actions/setup-go@v2
+#        with:
+#          go-version: ${{ env.GO_VERSION }}
+#
+#      - uses: actions/checkout@v2
+#        with:
+#          fetch-depth: 0
+#
+#      - name: Restore bootstrap cache
+#        id: cache
+#        uses: actions/cache@v2
+#        with:
+#          path: |
+#            ~/go/pkg/mod
+#            ${{ github.workspace }}/.tmp
+#          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('Makefile') }}-${{ hashFiles('**/go.sum') }}
+#          restore-keys: |
+#            ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('Makefile') }}-
+#            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+#
+#      - name: Bootstrap dependencies
+#        if: steps.cache.outputs.cache-hit != 'true'
+#        run: make ci-bootstrap
+#
+#      - name: Import GPG key
+#        id: import_gpg
+#        uses: crazy-max/ghaction-import-gpg@v2
+#        env:
+#          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
+#          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
+#
+#      - name: GPG signing info
+#        run: |
+#          echo "fingerprint: ${{ steps.import_gpg.outputs.fingerprint }}"
+#          echo "keyid:       ${{ steps.import_gpg.outputs.keyid }}"
+#          echo "name:        ${{ steps.import_gpg.outputs.name }}"
+#          echo "email:       ${{ steps.import_gpg.outputs.email }}"
 
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ env.GO_VERSION }}
+#      - name: Login to Docker Hub
+#        id: docker-login
+#        run: |
+#          echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+#        env:
+#          DOCKER_USER: ${{ secrets.TOOLBOX_DOCKER_USER }}
+#          DOCKER_PASS: ${{ secrets.TOOLBOX_DOCKER_PASS }}
 
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Restore bootstrap cache
-        id: cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/go/pkg/mod
-            ${{ github.workspace }}/.tmp
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('Makefile') }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('Makefile') }}-
-            ${{ runner.os }}-go-${{ env.GO_VERSION }}-
-
-      - name: Bootstrap dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: make ci-bootstrap
-
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v2
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
-
-      - name: GPG signing info
-        run: |
-          echo "fingerprint: ${{ steps.import_gpg.outputs.fingerprint }}"
-          echo "keyid:       ${{ steps.import_gpg.outputs.keyid }}"
-          echo "name:        ${{ steps.import_gpg.outputs.name }}"
-          echo "email:       ${{ steps.import_gpg.outputs.email }}"
-
-      - name: Login to Docker Hub
-        id: docker-login
-        run: |
-          echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-        env:
-          DOCKER_USER: ${{ secrets.TOOLBOX_DOCKER_USER }}
-          DOCKER_PASS: ${{ secrets.TOOLBOX_DOCKER_PASS }}
-
-      - name: Build snapshot artifacts
-        run: make release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
-          SIGNING_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: artifacts
-          path: dist/**/*
+#      - name: Build snapshot artifacts
+#        run: make release
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
+#          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
+#          SIGNING_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+#
+#      - uses: actions/upload-artifact@v2
+#        with:
+#          name: artifacts
+#          path: dist/**/*
