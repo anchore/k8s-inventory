@@ -76,7 +76,8 @@ jobs:
           echo "Static-Analysis Status : ${{ steps.static-analysis.outputs.conclusion }}"
           echo "Unit/Integration Status : ${{ steps.tests-unit-int.outputs.conclusion }}"
           echo "Build Snapshot Artifacts Status: ${{ steps.snapshot.outputs.conclusion }}"
-          echo "Acceptance Test (Helm) Status: ${{ steps.acceptance-helm.outputs.conclusion }}"
+          echo "Acceptance Test (Helm v1.13.12) Status: ${{ steps.acceptance-helm-1-13-12.outputs.conclusion }}"
+          echo "Acceptance Test (Helm v1.18.0) Status: ${{ steps.acceptance-helm-1-18-0.outputs.conclusion }}"
           false
 
   release:
