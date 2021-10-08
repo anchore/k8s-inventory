@@ -34,13 +34,22 @@ jobs:
           checkName: "Build-Snapshot-Artifacts"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Check static anaylysis, unit, and integration test results
+      - name: Check static analysis
         uses: fountainhead/action-wait-for-check@v1.0.0
         id: sa-unit-int
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the circle-ci workflow name (in .circleci/config.yaml)
-          checkName: "Static Analysis + Unit + Integration"
+          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
+          checkName: "Static-Analysis"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check unit, and integration test results
+        uses: fountainhead/action-wait-for-check@v1.0.0
+        id: sa-unit-int
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
+          checkName: "Tests"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check acceptance test results (helm v1.13.12)
