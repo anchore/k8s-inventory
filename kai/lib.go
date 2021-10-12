@@ -87,13 +87,13 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 			// TODO: Check behavior of Anchore Enterprise is namespace is missing, should
 			// TODO: this not result in a hard fail and give Anchore a partial report
 			return result.Result{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
-
-		} else {
-			// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
-			go getNamespaceImages(kubeConfig, appConfig.Kubernetes, ns.String, resultCh)
-			total++
 		}
+
+		// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
+		go getNamespaceImages(kubeConfig, appConfig.Kubernetes, ns.String, resultCh)
+		total++
 	}
+	close(nsCh)
 
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for len(resolvedNamespaces) < total {
