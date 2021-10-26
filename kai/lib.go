@@ -27,21 +27,21 @@ type ImageResult struct {
 	Err        error
 }
 
-type StringError struct {
-	String string
-	Err    error
+type K8sNamespace struct {
+	Name string
+	Err  error
 }
 
-func HandleResults(imageResult result.Result, appConfig *config.Application) error {
-	if appConfig.AnchoreDetails.IsValid() {
-		if err := reporter.Report(imageResult, appConfig.AnchoreDetails, appConfig); err != nil {
+func HandleResults(imageResult result.Result, cfg *config.Application) error {
+	if cfg.AnchoreDetails.IsValid() {
+		if err := reporter.Report(imageResult, cfg.AnchoreDetails, cfg); err != nil {
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
 	} else {
 		log.Debug("Anchore details not specified, not reporting in-use image data")
 	}
 
-	if err := presenter.GetPresenter(appConfig.PresenterOpt, imageResult).Present(os.Stdout); err != nil {
+	if err := presenter.GetPresenter(cfg.PresenterOpt, imageResult).Present(os.Stdout); err != nil {
 		return fmt.Errorf("unable to show Kai results: %w", err)
 	}
 	return nil
@@ -49,17 +49,17 @@ func HandleResults(imageResult result.Result, appConfig *config.Application) err
 
 // PeriodicallyGetImageResults periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
-func PeriodicallyGetImageResults(appConfig *config.Application) {
+func PeriodicallyGetImageResults(cfg *config.Application) {
 
 	// Fire off a ticker that reports according to a configurable polling interval
-	ticker := time.NewTicker(time.Duration(appConfig.PollingIntervalSeconds) * time.Second)
+	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
-		imageResult, err := GetImageResults(appConfig)
+		imageResult, err := GetImageResults(cfg)
 		if err != nil {
 			log.Errorf("Failed to get Image Results: %w", err)
 		} else {
-			err := HandleResults(imageResult, appConfig)
+			err := HandleResults(imageResult, cfg)
 			if err != nil {
 				log.Errorf("Failed to handle Image Results: %w", err)
 			}
@@ -71,29 +71,26 @@ func PeriodicallyGetImageResults(appConfig *config.Application) {
 }
 
 // GetImageResults is an atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(appConfig *config.Application) (result.Result, error) {
-	kubeConfig, err := client.GetKubeConfig(appConfig)
+func GetImageResults(cfg *config.Application) (result.Result, error) {
+	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
 		return result.Result{}, err
 	}
 
-	nsCh := make(chan StringError)
+	nsCh := make(chan K8sNamespace)
 	resultCh := make(chan ImageResult)
-	go resolveNamespaceList(kubeConfig, appConfig, nsCh)
+	go resolveNamespaceList(kubeconfig, cfg, nsCh)
 
 	total := 0
 	for ns := range nsCh {
 		if ns.Err != nil {
-			// TODO: Check behavior of Anchore Enterprise is namespace is missing, should
-			// TODO: this not result in a hard fail and give Anchore a partial report
 			return result.Result{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
 		}
 
 		// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
-		go getNamespaceImages(kubeConfig, appConfig.Kubernetes, ns.String, resultCh)
+		go getNamespaceImages(kubeconfig, cfg.Kubernetes, ns.Name, resultCh)
 		total++
 	}
-	close(nsCh)
 
 	resolvedNamespaces := make([]result.Namespace, 0)
 	for len(resolvedNamespaces) < total {
@@ -104,13 +101,13 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 			}
 			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
 
-		case <-time.After(time.Second * time.Duration(appConfig.Kubernetes.RequestTimeoutSeconds)):
+		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
 			return result.Result{}, fmt.Errorf("timed out waiting for results")
 		}
 	}
 	close(resultCh)
 
-	clientSet, err := client.GetClientSet(kubeConfig)
+	clientSet, err := client.GetClientSet(kubeconfig)
 	if err != nil {
 		return result.Result{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
@@ -127,24 +124,24 @@ func GetImageResults(appConfig *config.Application) (result.Result, error) {
 	}, nil
 }
 
-func resolveNamespaceList(kubeConfig *rest.Config, appConfig *config.Application, nsCh chan StringError) {
+func resolveNamespaceList(kubeconfig *rest.Config, cfg *config.Application, nsCh chan K8sNamespace) {
 
 	getAll := false
-	for _, ns := range appConfig.Namespaces {
+	for _, ns := range cfg.Namespaces {
 		if ns == "all" {
 			getAll = true
 			break
 		}
 	}
 
-	if len(appConfig.Namespaces) == 0 || getAll {
-		GetAllNamespaces(kubeConfig, appConfig.Kubernetes, nsCh)
+	if len(cfg.Namespaces) == 0 || getAll {
+		GetAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
 
 	} else {
-		for _, ns := range appConfig.Namespaces {
-			nsCh <- StringError{
-				String: ns,
-				Err:    nil,
+		for _, ns := range cfg.Namespaces {
+			nsCh <- K8sNamespace{
+				Name: ns,
+				Err:  nil,
 			}
 		}
 	}
@@ -153,13 +150,13 @@ func resolveNamespaceList(kubeConfig *rest.Config, appConfig *config.Application
 
 // GetAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan StringError) {
+func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan K8sNamespace) {
 
-	clientset, err := client.GetClientSet(kubeConfig)
+	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		nsCh <- StringError{
-			String: "",
-			Err:    fmt.Errorf("failed to get k8s client set: %w", err),
+		nsCh <- K8sNamespace{
+			Name: "",
+			Err:  fmt.Errorf("failed to get k8s client set: %w", err),
 		}
 		return
 	}
@@ -175,17 +172,17 @@ func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, 
 		list, err := clientset.CoreV1().Namespaces().List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
-			nsCh <- StringError{
-				String: "",
-				Err:    fmt.Errorf("failed to list namespaces: %w", err),
+			nsCh <- K8sNamespace{
+				Name: "",
+				Err:  fmt.Errorf("failed to list namespaces: %w", err),
 			}
 			return
 		}
 
 		for _, ns := range list.Items {
-			nsCh <- StringError{
-				String: ns.ObjectMeta.Name,
-				Err:    nil,
+			nsCh <- K8sNamespace{
+				Name: ns.ObjectMeta.Name,
+				Err:  nil,
 			}
 		}
 
@@ -198,8 +195,8 @@ func GetAllNamespaces(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, 
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func getNamespaceImages(kubeConfig *rest.Config, kubernetes config.KubernetesAPI, ns string, resultCh chan ImageResult) {
-	clientSet, err := client.GetClientSet(kubeConfig)
+func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, ns string, resultCh chan ImageResult) {
+	clientSet, err := client.GetClientSet(kubeconfig)
 	if err != nil {
 		resultCh <- ImageResult{
 			Err: err,
