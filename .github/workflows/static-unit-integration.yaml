@@ -75,11 +75,9 @@ jobs:
         run: make unit
 
       - name: Install kind
-        uses: helm/kind-action@v1.0.0
+        uses: helm/kind-action@v1.2.0
         with:
-          node_image: "kindest/node:v1.18.0"
           config: kind-config.yaml
-          install_local_path_provisioner: true
 
       - name: Install Cluster Dependencies (Helm & Kubectl)
         run: make install-cluster-deps
