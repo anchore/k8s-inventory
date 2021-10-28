@@ -20,7 +20,7 @@ func TestJsonPresenter(t *testing.T) {
 
 	var namespace1 = inventory.ReportItem{
 		Namespace: "docker",
-		Images: []inventory.Image{
+		Images: []inventory.ReportImage{
 			{
 				Tag:        "docker/kube-compose-controller:v0.4.25-alpha1",
 				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
@@ -34,7 +34,7 @@ func TestJsonPresenter(t *testing.T) {
 
 	var namespace2 = inventory.ReportItem{
 		Namespace: "kube-system",
-		Images: []inventory.Image{
+		Images: []inventory.ReportImage{
 			{
 				Tag:        "k8s.gcr.io/coredns:1.6.2",
 				RepoDigest: "sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5",
