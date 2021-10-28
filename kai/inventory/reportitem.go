@@ -32,6 +32,25 @@ func New(namespace string) *ReportItem {
 	}
 }
 
+// NewReportItem parses a list of pods into a ReportItem full of unique images
+func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
+
+	reportItem := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+
+	for _, pod := range pods {
+		namespace := pod.ObjectMeta.Namespace
+		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
+			continue
+		}
+		reportItem.AddImages(pod)
+	}
+
+	return reportItem
+}
+
 // Represent the namespace as a string
 func (n *ReportItem) String() string {
 	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", n.Namespace, n.Images)

@@ -22,14 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type ImageResult struct {
-	Namespaces []inventory.ReportItem
-	Err        error
-}
-
 type k8sNamespace struct {
 	Name string
 	Err  error
+}
+
+type channels struct {
+	reportItem chan inventory.ReportItem
+	errors     chan error
 }
 
 func HandleResults(report inventory.Report, cfg *config.Application) error {
@@ -78,7 +78,12 @@ func GetImageResults(cfg *config.Application) (inventory.Report, error) {
 	}
 
 	nsCh := make(chan k8sNamespace)
-	resultCh := make(chan ImageResult)
+	// resultCh := make(chan inventory.ReportItem)
+	// errorCh := make(chan error)
+	ch := channels{
+		reportItem: make(chan inventory.ReportItem),
+		errors:     make(chan error),
+	}
 	go fetchNamespaces(kubeconfig, cfg, nsCh)
 
 	total := 0
@@ -88,24 +93,25 @@ func GetImageResults(cfg *config.Application) (inventory.Report, error) {
 		}
 
 		// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
-		go getNamespaceImages(kubeconfig, cfg.Kubernetes, ns.Name, resultCh)
+		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns.Name, ch)
 		total++
 	}
 
 	resolvedNamespaces := make([]inventory.ReportItem, 0)
 	for len(resolvedNamespaces) < total {
 		select {
-		case imageResult := <-resultCh:
-			if imageResult.Err != nil {
-				return inventory.Report{}, imageResult.Err
-			}
-			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
+		case item := <-ch.reportItem:
+			resolvedNamespaces = append(resolvedNamespaces, item)
+
+		case err := <-ch.errors:
+			return inventory.Report{}, err
 
 		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
 			return inventory.Report{}, fmt.Errorf("timed out waiting for results")
 		}
 	}
-	close(resultCh)
+	close(ch.reportItem)
+	close(ch.errors)
 
 	clientSet, err := client.GetClientSet(kubeconfig)
 	if err != nil {
@@ -199,12 +205,10 @@ func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, ns string, resultCh chan ImageResult) {
+func fetchPodsInNamespace(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, ns string, ch channels) {
 	clientSet, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		resultCh <- ImageResult{
-			Err: err,
-		}
+		ch.errors <- err
 		return
 	}
 
@@ -220,9 +224,7 @@ func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 		list, err := clientSet.CoreV1().Pods(ns).List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
-			resultCh <- ImageResult{
-				Err: err,
-			}
+			ch.errors <- err
 			return
 		}
 
@@ -236,41 +238,7 @@ func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 	}
 
 	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
-	resultCh <- parseNamespaceImages(pods, ns)
-}
-
-// Parse Pod List results into a list of Namespaces (each with unique Images)
-func parseNamespaceImages(pods []v1.Pod, namespace string) ImageResult {
-	namespaces := make([]inventory.ReportItem, 0)
-	if len(pods) < 1 {
-		namespaces = append(namespaces, *inventory.New(namespace))
-		return ImageResult{
-			Namespaces: namespaces,
-			Err:        nil,
-		}
-	}
-
-	namespaceMap := make(map[string]*inventory.ReportItem)
-	for _, pod := range pods {
-		namespace := pod.ObjectMeta.Namespace
-		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
-			continue
-		}
-
-		if value, ok := namespaceMap[namespace]; ok {
-			value.AddImages(pod)
-		} else {
-			namespaceMap[namespace] = inventory.NewFromPod(pod)
-		}
-	}
-
-	for _, value := range namespaceMap {
-		namespaces = append(namespaces, *value)
-	}
-	return ImageResult{
-		Namespaces: namespaces,
-		Err:        nil,
-	}
+	ch.reportItem <- inventory.NewReportItem(pods, ns)
 }
 
 func SetLogger(logger logger.Logger) {
