@@ -50,7 +50,6 @@ func HandleResults(imageResult result.Result, cfg *config.Application) error {
 // PeriodicallyGetImageResults periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
 func PeriodicallyGetImageResults(cfg *config.Application) {
-
 	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
@@ -128,7 +127,6 @@ func GetImageResults(cfg *config.Application) (result.Result, error) {
 // either return the namespaces detailed in the configuration OR if "all" is specified then it will
 // call fetchAllNamespaces to return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan k8sNamespace) {
-
 	getAll := false
 	for _, ns := range cfg.Namespaces {
 		if ns == "all" {
@@ -153,7 +151,6 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan
 // fetchAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
 func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan k8sNamespace) {
-
 	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
 		nsCh <- k8sNamespace{
