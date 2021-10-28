@@ -23,7 +23,9 @@ kubeconfig:
     clientcert: ""
     privatekey: ""
     token: ""
-kubernetesrequesttimeoutseconds: 0
+kubernetes:
+  requesttimeoutseconds: 0
+  requestbatchsize: 0
 namespaces: []
 runmode: 0
 mode: ""

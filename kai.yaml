@@ -32,6 +32,14 @@ kubeconfig:
 namespaces:
   - all
 
+# Kubernetes API configuration parameters (should not need tuning)
+kubernetes:
+  # Sets the request timeout for kubernetes API requests
+  request-timeout-seconds: 60
+
+  # Sets the number of objects to iteratively return when listing resources
+  request-batch-size: 100
+
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 
