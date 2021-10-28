@@ -27,7 +27,7 @@ type ImageResult struct {
 	Err        error
 }
 
-type K8sNamespace struct {
+type k8sNamespace struct {
 	Name string
 	Err  error
 }
@@ -77,9 +77,9 @@ func GetImageResults(cfg *config.Application) (result.Result, error) {
 		return result.Result{}, err
 	}
 
-	nsCh := make(chan K8sNamespace)
+	nsCh := make(chan k8sNamespace)
 	resultCh := make(chan ImageResult)
-	go resolveNamespaceList(kubeconfig, cfg, nsCh)
+	go fetchNamespaces(kubeconfig, cfg, nsCh)
 
 	total := 0
 	for ns := range nsCh {
@@ -124,7 +124,10 @@ func GetImageResults(cfg *config.Application) (result.Result, error) {
 	}, nil
 }
 
-func resolveNamespaceList(kubeconfig *rest.Config, cfg *config.Application, nsCh chan K8sNamespace) {
+// fetchNamespaces sends namespace strings through a channel back to the calling function. It will
+// either return the namespaces detailed in the configuration OR if "all" is specified then it will
+// call fetchAllNamespaces to return every namespace in the cluster.
+func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan k8sNamespace) {
 
 	getAll := false
 	for _, ns := range cfg.Namespaces {
@@ -135,25 +138,25 @@ func resolveNamespaceList(kubeconfig *rest.Config, cfg *config.Application, nsCh
 	}
 
 	if len(cfg.Namespaces) == 0 || getAll {
-		GetAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
+		fetchAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
 	} else {
 		for _, ns := range cfg.Namespaces {
-			nsCh <- K8sNamespace{
+			nsCh <- k8sNamespace{
 				Name: ns,
 				Err:  nil,
 			}
 		}
-		close(nsCh)
 	}
+	close(nsCh)
 }
 
-// GetAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
+// fetchAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
 // Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan K8sNamespace) {
+func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan k8sNamespace) {
 
 	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		nsCh <- K8sNamespace{
+		nsCh <- k8sNamespace{
 			Name: "",
 			Err:  fmt.Errorf("failed to get k8s client set: %w", err),
 		}
@@ -171,7 +174,7 @@ func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, 
 		list, err := clientset.CoreV1().Namespaces().List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
-			nsCh <- K8sNamespace{
+			nsCh <- k8sNamespace{
 				Name: "",
 				Err:  fmt.Errorf("failed to list namespaces: %w", err),
 			}
@@ -179,7 +182,7 @@ func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, 
 		}
 
 		for _, ns := range list.Items {
-			nsCh <- K8sNamespace{
+			nsCh <- k8sNamespace{
 				Name: ns.ObjectMeta.Name,
 				Err:  nil,
 			}
@@ -191,7 +194,6 @@ func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, 
 			break
 		}
 	}
-	close(nsCh)
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel

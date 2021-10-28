@@ -5,8 +5,6 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/anchore/kai/kai/client"
-
 	"github.com/anchore/kai/kai/mode"
 
 	"github.com/anchore/kai/kai"
@@ -88,22 +86,7 @@ func init() {
 	opt = "namespaces"
 	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
 	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		kubeconfig, err := client.GetKubeConfig(appConfig)
-		if err != nil {
-			return []string{"failed to build kubeconfig from app config"}, cobra.ShellCompDirectiveError
-		}
-		nsCh := make(chan kai.K8sNamespace)
-		namespaces := make([]string, 0)
-		go kai.GetAllNamespaces(kubeconfig, appConfig.Kubernetes, nsCh)
-
-		for ns := range nsCh {
-			if ns.Err != nil {
-				return []string{"completion failed"}, cobra.ShellCompDirectiveError
-			}
-			namespaces = append(namespaces, ns.Name)
-		}
-
-		return append(namespaces, "all"), cobra.ShellCompDirectiveDefault
+		return []string{"all"}, cobra.ShellCompDirectiveDefault
 	})
 	if err != nil {
 		fmt.Printf("unable to register flag completion script for \"namespace\": %+v", err)
