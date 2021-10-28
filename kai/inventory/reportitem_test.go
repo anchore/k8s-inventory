@@ -38,9 +38,9 @@ func TestConstructorFromPod(t *testing.T) {
 
 	actualNamespace := NewFromPod(mockPod)
 
-	expectedNamespace := Namespace{
+	expectedNamespace := ReportItem{
 		Namespace: "default",
-		Images: []Image{
+		Images: []ReportImage{
 			{
 				Tag:        "dakaneye/test:1.0.0",
 				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
@@ -64,7 +64,7 @@ func TestConstructorFromPod(t *testing.T) {
 }
 
 func TestAddImages(t *testing.T) {
-	expectedImages := []Image{
+	expectedImages := []ReportImage{
 		{
 			Tag:        "dakaneye/test:1.0.0",
 			RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
@@ -79,9 +79,9 @@ func TestAddImages(t *testing.T) {
 		},
 	}
 
-	namespace := Namespace{
+	namespace := ReportItem{
 		Namespace: "default",
-		Images:    []Image{},
+		Images:    []ReportImage{},
 	}
 	namespace.AddImages(v1.Pod{
 		Status: v1.PodStatus{
@@ -108,10 +108,10 @@ func TestAddImages(t *testing.T) {
 	compareImageSlices(expectedImages, namespace.Images, t)
 }
 
-func compareImageSlices(expectedImages []Image, actualImages []Image, t *testing.T) {
+func compareImageSlices(expectedImages []ReportImage, actualImages []ReportImage, t *testing.T) {
 	// Couldn't find something that did good equality comparisons on slices (regardless of order)
 	// So, load images expected into a map, and compare them one by one against actual images added
-	expectedImagesMap := make(map[string]Image)
+	expectedImagesMap := make(map[string]ReportImage)
 	for _, expectedImage := range expectedImages {
 		expectedImagesMap[expectedImage.Tag] = expectedImage
 	}

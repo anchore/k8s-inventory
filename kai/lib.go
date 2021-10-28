@@ -23,7 +23,7 @@ import (
 )
 
 type ImageResult struct {
-	Namespaces []inventory.Namespace
+	Namespaces []inventory.ReportItem
 	Err        error
 }
 
@@ -92,7 +92,7 @@ func GetImageResults(cfg *config.Application) (inventory.Result, error) {
 		total++
 	}
 
-	resolvedNamespaces := make([]inventory.Namespace, 0)
+	resolvedNamespaces := make([]inventory.ReportItem, 0)
 	for len(resolvedNamespaces) < total {
 		select {
 		case imageResult := <-resultCh:
@@ -239,7 +239,7 @@ func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 
 // Parse Pod List results into a list of Namespaces (each with unique Images)
 func parseNamespaceImages(pods []v1.Pod, namespace string) ImageResult {
-	namespaces := make([]inventory.Namespace, 0)
+	namespaces := make([]inventory.ReportItem, 0)
 	if len(pods) < 1 {
 		namespaces = append(namespaces, *inventory.New(namespace))
 		return ImageResult{
@@ -248,7 +248,7 @@ func parseNamespaceImages(pods []v1.Pod, namespace string) ImageResult {
 		}
 	}
 
-	namespaceMap := make(map[string]*inventory.Namespace)
+	namespaceMap := make(map[string]*inventory.ReportItem)
 	for _, pod := range pods {
 		namespace := pod.ObjectMeta.Namespace
 		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {

@@ -7,43 +7,43 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// Represents a Namespace Images list result
-type Namespace struct {
-	Namespace string  `json:"namespace,omitempty"`
-	Images    []Image `json:"images"`
+// Represents a ReportItem Images list result
+type ReportItem struct {
+	Namespace string        `json:"namespace,omitempty"`
+	Images    []ReportImage `json:"images"`
 }
 
-type Image struct {
+type ReportImage struct {
 	Tag        string `json:"tag,omitempty"`
 	RepoDigest string `json:"repoDigest,omitempty"`
 }
 
-func NewFromPod(pod v1.Pod) *Namespace {
-	return &Namespace{
+func NewFromPod(pod v1.Pod) *ReportItem {
+	return &ReportItem{
 		Namespace: pod.Namespace,
 		Images:    getUniqueImagesFromPodStatus(pod),
 	}
 }
 
-func New(namespace string) *Namespace {
-	return &Namespace{
+func New(namespace string) *ReportItem {
+	return &ReportItem{
 		Namespace: namespace,
-		Images:    []Image{},
+		Images:    []ReportImage{},
 	}
 }
 
 // Represent the namespace as a string
-func (n *Namespace) String() string {
-	return fmt.Sprintf("Namespace(namespace=%s, images=%v)", n.Namespace, n.Images)
+func (n *ReportItem) String() string {
+	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", n.Namespace, n.Images)
 }
 
-// Adds an Image to the Namespace struct (if it doesn't exist there already)
-func (n *Namespace) AddImages(pod v1.Pod) {
+// Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
+func (n *ReportItem) AddImages(pod v1.Pod) {
 	if len(n.Images) == 0 {
 		n.Images = getUniqueImagesFromPodStatus(pod)
 	} else {
 		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
-		imageSet := make(map[string]Image)
+		imageSet := make(map[string]ReportImage)
 		for _, image := range n.Images {
 			// There's always a tag, the repoDigest may be missing
 			imageSet[image.Tag] = image
@@ -57,16 +57,16 @@ func (n *Namespace) AddImages(pod v1.Pod) {
 	}
 }
 
-func getUniqueImagesFromPodStatus(pod v1.Pod) []Image {
-	imageMap := make(map[string]Image)
+func getUniqueImagesFromPodStatus(pod v1.Pod) []ReportImage {
+	imageMap := make(map[string]ReportImage)
 	for _, container := range pod.Status.ContainerStatuses {
 		repoDigest := getImageDigest(container.ImageID)
-		imageMap[container.Image] = Image{
+		imageMap[container.Image] = ReportImage{
 			Tag:        container.Image,
 			RepoDigest: repoDigest,
 		}
 	}
-	imageSlice := make([]Image, 0, len(imageMap))
+	imageSlice := make([]ReportImage, 0, len(imageMap))
 	for _, v := range imageMap {
 		imageSlice = append(imageSlice, v)
 	}
