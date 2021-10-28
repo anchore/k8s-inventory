@@ -144,8 +144,8 @@ func resolveNamespaceList(kubeconfig *rest.Config, cfg *config.Application, nsCh
 				Err:  nil,
 			}
 		}
+		close(nsCh)
 	}
-	close(nsCh)
 }
 
 // GetAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
@@ -192,6 +192,7 @@ func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, 
 			break
 		}
 	}
+	close(nsCh)
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
