@@ -32,36 +32,36 @@ type channels struct {
 	errors     chan error
 }
 
-func HandleResults(report inventory.Report, cfg *config.Application) error {
+func HandleReport(report inventory.Report, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
 		if err := reporter.Post(report, cfg.AnchoreDetails, cfg); err != nil {
-			return fmt.Errorf("unable to report Images to Anchore: %w", err)
+			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
 		}
 	} else {
-		log.Debug("Anchore details not specified, not reporting in-use image data")
+		log.Debug("Anchore details not specified, not reporting inventory")
 	}
 
 	if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
-		return fmt.Errorf("unable to show Kai results: %w", err)
+		return fmt.Errorf("unable to show inventory: %w", err)
 	}
 	return nil
 }
 
-// PeriodicallyGetImageResults periodically retrieve image results and report/output them according to the configuration.
+// PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
-func PeriodicallyGetImageResults(cfg *config.Application) {
+func PeriodicallyGetInventoryReport(cfg *config.Application) {
 
 	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
-		report, err := GetImageResults(cfg)
+		report, err := GetInventoryReport(cfg)
 		if err != nil {
-			log.Errorf("Failed to get Image Results: %w", err)
+			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
-			err := HandleResults(report, cfg)
+			err := HandleReport(report, cfg)
 			if err != nil {
-				log.Errorf("Failed to handle Image Results: %w", err)
+				log.Errorf("Failed to handle Inventory Report: %w", err)
 			}
 		}
 
@@ -70,20 +70,19 @@ func PeriodicallyGetImageResults(cfg *config.Application) {
 	}
 }
 
-// GetImageResults is an atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(cfg *config.Application) (inventory.Report, error) {
+// GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
+func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
 		return inventory.Report{}, err
 	}
 
-	nsCh := make(chan k8sNamespace)
-	// resultCh := make(chan inventory.ReportItem)
-	// errorCh := make(chan error)
 	ch := channels{
 		reportItem: make(chan inventory.ReportItem),
 		errors:     make(chan error),
 	}
+	nsCh := make(chan k8sNamespace)
+
 	go fetchNamespaces(kubeconfig, cfg, nsCh)
 
 	total := 0
@@ -92,16 +91,16 @@ func GetImageResults(cfg *config.Application) (inventory.Report, error) {
 			return inventory.Report{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
 		}
 
-		// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
+		// Does a "get pods" for the specified namespace and returns the unique set of images to the ch.reportItem channel
 		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns.Name, ch)
 		total++
 	}
 
-	resolvedNamespaces := make([]inventory.ReportItem, 0)
-	for len(resolvedNamespaces) < total {
+	results := make([]inventory.ReportItem, 0)
+	for len(results) < total {
 		select {
 		case item := <-ch.reportItem:
-			resolvedNamespaces = append(resolvedNamespaces, item)
+			results = append(results, item)
 
 		case err := <-ch.errors:
 			return inventory.Report{}, err
@@ -125,7 +124,7 @@ func GetImageResults(cfg *config.Application) (inventory.Report, error) {
 
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
-		Results:               resolvedNamespaces,
+		Results:               results,
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
 		InventoryType:         "kubernetes",

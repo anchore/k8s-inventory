@@ -1,10 +1,11 @@
 package integration
 
 import (
-	"github.com/anchore/kai/cmd"
-	"github.com/anchore/kai/kai"
 	"strings"
 	"testing"
+
+	"github.com/anchore/kai/cmd"
+	"github.com/anchore/kai/kai"
 )
 
 const IntegrationTestNamespace = "kai-integration-test"
@@ -13,21 +14,29 @@ const IntegrationTestImageTag = "nginx:latest"
 // Assumes that the hello-world helm chart in ./fixtures was installed (basic nginx container)
 func TestGetImageResults(t *testing.T) {
 	cmd.InitAppConfig()
-	imagesResult, err := kai.GetImageResults(cmd.GetAppConfig())
+	report, err := kai.GetInventoryReport(cmd.GetAppConfig())
 	if err != nil {
 		t.Fatalf("failed to get image results: %v", err)
 	}
 
-	if imagesResult.ServerVersionMetadata == nil {
-		t.Errorf("Failed to include Server Version Metadata in result")
+	if report.ServerVersionMetadata == nil {
+		t.Errorf("Failed to include Server Version Metadata in report")
 	}
 
-	if imagesResult.Timestamp == "" {
-		t.Errorf("Failed to include Timestamp in result")
+	if report.ClusterName == "" {
+		t.Errorf("Failed to include ClusterName in report")
+	}
+
+	if report.InventoryType == "" {
+		t.Errorf("Failed to include InventoryType in report")
+	}
+
+	if report.Timestamp == "" {
+		t.Errorf("Failed to include Timestamp in report")
 	}
 
 	foundIntegrationTestNamespace := false
-	for _, namespace := range imagesResult.Results {
+	for _, namespace := range report.Results {
 		if namespace.Namespace != IntegrationTestNamespace {
 			continue
 		} else {
