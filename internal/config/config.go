@@ -56,7 +56,7 @@ type Application struct {
 
 type KubernetesAPI struct {
 	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds"`
-	ListLimit             int64 `mapstructure:"list-limit"`
+	RequestBatchSize      int64 `mapstructure:"request-batch-size"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)
@@ -104,7 +104,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeoutSeconds", 10)
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
-	v.SetDefault("kubernetes.list-limit", 100)
+	v.SetDefault("kubernetes.request-batch-size", 100)
 }
 
 // Load the Application Configuration from the Viper specifications

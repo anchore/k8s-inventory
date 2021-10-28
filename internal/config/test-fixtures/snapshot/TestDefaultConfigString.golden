@@ -25,7 +25,7 @@ kubeconfig:
     token: ""
 kubernetes:
   requesttimeoutseconds: 60
-  listlimit: 100
+  requestbatchsize: 100
 namespaces:
 - all
 runmode: 0

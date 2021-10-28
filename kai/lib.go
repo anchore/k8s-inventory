@@ -136,7 +136,6 @@ func resolveNamespaceList(kubeconfig *rest.Config, cfg *config.Application, nsCh
 
 	if len(cfg.Namespaces) == 0 || getAll {
 		GetAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
-
 	} else {
 		for _, ns := range cfg.Namespaces {
 			nsCh <- K8sNamespace{
@@ -164,7 +163,7 @@ func GetAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, 
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.ListLimit,
+			Limit:          kubernetes.RequestBatchSize,
 			Continue:       cont,
 			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
@@ -209,7 +208,7 @@ func getNamespaceImages(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.ListLimit,
+			Limit:          kubernetes.RequestBatchSize,
 			Continue:       cont,
 			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}

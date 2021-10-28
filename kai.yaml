@@ -38,7 +38,7 @@ kubernetes:
   request-timeout-seconds: 60
 
   # Sets the number of objects to iteratively return when listing resources
-  list-limit: 100
+  request-batch-size: 100
 
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
