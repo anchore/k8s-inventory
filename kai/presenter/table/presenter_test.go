@@ -71,12 +71,12 @@ func TestTablePresenter(t *testing.T) {
 	}
 
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
-	var mockResult = inventory.Result{
+	var mockReport = inventory.Report{
 		Timestamp: testTime.Format(time.RFC3339),
 		Results:   []inventory.ReportItem{namespace1, namespace2},
 	}
 
-	pres := NewPresenter(mockResult)
+	pres := NewPresenter(mockReport)
 
 	// run presenter
 	err := pres.Present(&buffer)
@@ -101,7 +101,7 @@ func TestEmptyTablePresenter(t *testing.T) {
 
 	var buffer bytes.Buffer
 
-	pres := NewPresenter(inventory.Result{})
+	pres := NewPresenter(inventory.Report{})
 
 	// run presenter
 	err := pres.Present(&buffer)

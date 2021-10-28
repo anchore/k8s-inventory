@@ -32,16 +32,16 @@ type k8sNamespace struct {
 	Err  error
 }
 
-func HandleResults(imageResult inventory.Result, cfg *config.Application) error {
+func HandleResults(report inventory.Report, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
-		if err := reporter.Post(imageResult, cfg.AnchoreDetails, cfg); err != nil {
+		if err := reporter.Post(report, cfg.AnchoreDetails, cfg); err != nil {
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
 	} else {
 		log.Debug("Anchore details not specified, not reporting in-use image data")
 	}
 
-	if err := presenter.GetPresenter(cfg.PresenterOpt, imageResult).Present(os.Stdout); err != nil {
+	if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
 		return fmt.Errorf("unable to show Kai results: %w", err)
 	}
 	return nil
@@ -55,11 +55,11 @@ func PeriodicallyGetImageResults(cfg *config.Application) {
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
-		imageResult, err := GetImageResults(cfg)
+		report, err := GetImageResults(cfg)
 		if err != nil {
 			log.Errorf("Failed to get Image Results: %w", err)
 		} else {
-			err := HandleResults(imageResult, cfg)
+			err := HandleResults(report, cfg)
 			if err != nil {
 				log.Errorf("Failed to handle Image Results: %w", err)
 			}
@@ -71,10 +71,10 @@ func PeriodicallyGetImageResults(cfg *config.Application) {
 }
 
 // GetImageResults is an atomic method for getting in-use image results, in parallel for multiple namespaces
-func GetImageResults(cfg *config.Application) (inventory.Result, error) {
+func GetImageResults(cfg *config.Application) (inventory.Report, error) {
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
-		return inventory.Result{}, err
+		return inventory.Report{}, err
 	}
 
 	nsCh := make(chan k8sNamespace)
@@ -84,7 +84,7 @@ func GetImageResults(cfg *config.Application) (inventory.Result, error) {
 	total := 0
 	for ns := range nsCh {
 		if ns.Err != nil {
-			return inventory.Result{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
+			return inventory.Report{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
 		}
 
 		// Does a "get pods" for the specified namespace and returns the unique set of images to the resultCh channel
@@ -97,30 +97,32 @@ func GetImageResults(cfg *config.Application) (inventory.Result, error) {
 		select {
 		case imageResult := <-resultCh:
 			if imageResult.Err != nil {
-				return inventory.Result{}, imageResult.Err
+				return inventory.Report{}, imageResult.Err
 			}
 			resolvedNamespaces = append(resolvedNamespaces, imageResult.Namespaces...)
 
 		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
-			return inventory.Result{}, fmt.Errorf("timed out waiting for results")
+			return inventory.Report{}, fmt.Errorf("timed out waiting for results")
 		}
 	}
 	close(resultCh)
 
 	clientSet, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		return inventory.Result{}, fmt.Errorf("failed to get k8s client set: %w", err)
+		return inventory.Report{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
-		return inventory.Result{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
+		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
 
-	return inventory.Result{
+	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Results:               resolvedNamespaces,
 		ServerVersionMetadata: serverVersion,
+		ClusterName:           cfg.KubeConfig.Cluster,
+		InventoryType:         "kubernetes",
 	}, nil
 }
 

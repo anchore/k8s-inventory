@@ -62,5 +62,7 @@
   "goVersion": "go1.13.5",
   "compiler": "gc",
   "platform": "linux/amd64"
- }
+ },
+ "cluster_name": "docker-desktop",
+ "inventory_type": "kubernetes"
 }

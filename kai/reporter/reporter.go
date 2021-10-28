@@ -19,7 +19,7 @@ const ReportAPIPath = "v1/enterprise/inventories"
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //nolint:gosec
-func Post(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
+func Post(report inventory.Report, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
 	log.Debug("Reporting results to Anchore")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -34,7 +34,7 @@ func Post(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfig 
 		return fmt.Errorf("failed to build url: %w", err)
 	}
 
-	reqBody, err := json.Marshal(inventory.NewReport(result, appConfig.KubeConfig.Cluster))
+	reqBody, err := json.Marshal(report)
 	if err != nil {
 		return fmt.Errorf("failed to serialize results as JSON: %w", err)
 	}

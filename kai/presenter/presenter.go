@@ -15,12 +15,12 @@ type Presenter interface {
 }
 
 // GetPresenter retrieves a Presenter that matches a CLI option
-func GetPresenter(option Option, result inventory.Result) Presenter {
+func GetPresenter(option Option, report inventory.Report) Presenter {
 	switch option {
 	case JSONPresenter:
-		return json.NewPresenter(result)
+		return json.NewPresenter(report)
 	case TablePresenter:
-		return table.NewPresenter(result)
+		return table.NewPresenter(report)
 	default:
 		return nil
 	}

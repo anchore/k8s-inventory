@@ -12,13 +12,13 @@ import (
 
 // Presenter is a generic struct for holding fields needed for reporting
 type Presenter struct {
-	result inventory.Result
+	report inventory.Report
 }
 
 // NewPresenter is a *Presenter constructor
-func NewPresenter(result inventory.Result) *Presenter {
+func NewPresenter(report inventory.Report) *Presenter {
 	return &Presenter{
-		result: result,
+		report: report,
 	}
 }
 
@@ -27,7 +27,7 @@ func (pres *Presenter) Present(output io.Writer) error {
 	rows := make([][]string, 0)
 
 	columns := []string{"Image Tag", "Repo Digest", "Namespace"}
-	for _, n := range pres.result.Results {
+	for _, n := range pres.report.Results {
 		namespace := n.Namespace
 		for _, image := range n.Images {
 			row := []string{image.Tag, image.RepoDigest, namespace}

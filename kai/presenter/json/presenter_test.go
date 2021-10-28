@@ -71,7 +71,7 @@ func TestJsonPresenter(t *testing.T) {
 	}
 
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
-	var mockResult = inventory.Result{
+	var mockReport = inventory.Report{
 		Timestamp: testTime.Format(time.RFC3339),
 		Results:   []inventory.ReportItem{namespace1, namespace2},
 		ServerVersionMetadata: &version.Info{
@@ -85,9 +85,11 @@ func TestJsonPresenter(t *testing.T) {
 			Compiler:     "gc",
 			Platform:     "linux/amd64",
 		},
+		ClusterName:   "docker-desktop",
+		InventoryType: "kubernetes",
 	}
 
-	pres := NewPresenter(mockResult)
+	pres := NewPresenter(mockReport)
 
 	// run presenter
 	if err := pres.Present(&buffer); err != nil {
@@ -112,7 +114,7 @@ func TestEmptyJsonPresenter(t *testing.T) {
 	// Expected to have an empty JSON object back
 	var buffer bytes.Buffer
 
-	pres := NewPresenter(inventory.Result{})
+	pres := NewPresenter(inventory.Report{})
 
 	// run presenter
 	err := pres.Present(&buffer)
@@ -139,9 +141,11 @@ func TestNoResultsJsonPresenter(t *testing.T) {
 	var buffer bytes.Buffer
 
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
-	pres := NewPresenter(inventory.Result{
-		Timestamp: testTime.Format(time.RFC3339),
-		Results:   []inventory.ReportItem{},
+	pres := NewPresenter(inventory.Report{
+		Timestamp:     testTime.Format(time.RFC3339),
+		Results:       []inventory.ReportItem{},
+		ClusterName:   "docker-desktop",
+		InventoryType: "kubernetes",
 	})
 
 	// run presenter
