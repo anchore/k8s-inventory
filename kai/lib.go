@@ -34,7 +34,7 @@ type k8sNamespace struct {
 
 func HandleResults(imageResult inventory.Result, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
-		if err := reporter.Report(imageResult, cfg.AnchoreDetails, cfg); err != nil {
+		if err := reporter.Post(imageResult, cfg.AnchoreDetails, cfg); err != nil {
 			return fmt.Errorf("unable to report Images to Anchore: %w", err)
 		}
 	} else {

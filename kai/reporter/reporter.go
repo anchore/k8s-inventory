@@ -17,23 +17,9 @@ import (
 
 const ReportAPIPath = "v1/enterprise/inventories"
 
-type InventoryReport struct {
-	inventory.Result
-	ClusterName   string `json:"cluster_name"`
-	InventoryType string `json:"inventory_type"`
-}
-
-func NewInventoryReport(result inventory.Result, clusterName string) *InventoryReport {
-	return &InventoryReport{
-		result,
-		clusterName,
-		"kubernetes",
-	}
-}
-
 // This method does the actual Reporting (via HTTP) to Anchore
 //nolint:gosec
-func Report(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
+func Post(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
 	log.Debug("Reporting results to Anchore")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -48,7 +34,7 @@ func Report(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfi
 		return fmt.Errorf("failed to build url: %w", err)
 	}
 
-	reqBody, err := json.Marshal(NewInventoryReport(result, appConfig.KubeConfig.Cluster))
+	reqBody, err := json.Marshal(inventory.NewReport(result, appConfig.KubeConfig.Cluster))
 	if err != nil {
 		return fmt.Errorf("failed to serialize results as JSON: %w", err)
 	}
