@@ -5,16 +5,16 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/anchore/kai/kai/result"
+	"github.com/anchore/kai/kai/inventory"
 )
 
 // Presenter is a generic struct for holding fields needed for reporting
 type Presenter struct {
-	result result.Result
+	result inventory.Result
 }
 
 // NewPresenter is a *Presenter constructor
-func NewPresenter(result result.Result) *Presenter {
+func NewPresenter(result inventory.Result) *Presenter {
 	return &Presenter{
 		result: result,
 	}

@@ -12,18 +12,18 @@ import (
 
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
-	"github.com/anchore/kai/kai/result"
+	"github.com/anchore/kai/kai/inventory"
 )
 
 const ReportAPIPath = "v1/enterprise/inventories"
 
 type InventoryReport struct {
-	result.Result
+	inventory.Result
 	ClusterName   string `json:"cluster_name"`
 	InventoryType string `json:"inventory_type"`
 }
 
-func NewInventoryReport(result result.Result, clusterName string) *InventoryReport {
+func NewInventoryReport(result inventory.Result, clusterName string) *InventoryReport {
 	return &InventoryReport{
 		result,
 		clusterName,
@@ -33,7 +33,7 @@ func NewInventoryReport(result result.Result, clusterName string) *InventoryRepo
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //nolint:gosec
-func Report(result result.Result, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
+func Report(result inventory.Result, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
 	log.Debug("Reporting results to Anchore")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},

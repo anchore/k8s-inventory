@@ -1,11 +1,12 @@
-package result
+package inventory
 
 import (
+	"testing"
+
 	"github.com/go-test/deep"
 	"github.com/magiconair/properties/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestConstructorFromPod(t *testing.T) {

@@ -1,5 +1,5 @@
 // The structs here define the result format which is parsed from K8s Client requests
-package result
+package inventory
 
 import (
 	"k8s.io/apimachinery/pkg/version"

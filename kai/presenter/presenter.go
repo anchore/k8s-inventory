@@ -4,9 +4,9 @@ package presenter
 import (
 	"io"
 
+	"github.com/anchore/kai/kai/inventory"
 	"github.com/anchore/kai/kai/presenter/json"
 	"github.com/anchore/kai/kai/presenter/table"
-	"github.com/anchore/kai/kai/result"
 )
 
 // Presenter is the main interface other Presenters need to implement
@@ -15,7 +15,7 @@ type Presenter interface {
 }
 
 // GetPresenter retrieves a Presenter that matches a CLI option
-func GetPresenter(option Option, result result.Result) Presenter {
+func GetPresenter(option Option, result inventory.Result) Presenter {
 	switch option {
 	case JSONPresenter:
 		return json.NewPresenter(result)
