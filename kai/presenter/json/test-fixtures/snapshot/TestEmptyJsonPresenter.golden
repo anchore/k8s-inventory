@@ -1,4 +1,6 @@
 {
  "results": null,
- "serverVersionMetadata": null
+ "serverVersionMetadata": null,
+ "cluster_name": "",
+ "inventory_type": ""
 }

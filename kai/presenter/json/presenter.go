@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/anchore/kai/kai/result"
+	"github.com/anchore/kai/kai/inventory"
 )
 
 // Presenter is a generic struct for holding fields needed for reporting
 type Presenter struct {
-	result result.Result
+	report inventory.Report
 }
 
 // NewPresenter is a *Presenter constructor
-func NewPresenter(result result.Result) *Presenter {
+func NewPresenter(report inventory.Report) *Presenter {
 	return &Presenter{
-		result: result,
+		report: report,
 	}
 }
 
@@ -26,5 +26,5 @@ func (pres *Presenter) Present(output io.Writer) error {
 	// prevent > and < from being escaped in the payload
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", " ")
-	return enc.Encode(pres.result)
+	return enc.Encode(pres.report)
 }

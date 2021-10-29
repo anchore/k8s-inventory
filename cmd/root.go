@@ -44,9 +44,9 @@ var rootCmd = &cobra.Command{
 
 		switch appConfig.RunMode {
 		case mode.PeriodicPolling:
-			kai.PeriodicallyGetImageResults(appConfig)
+			kai.PeriodicallyGetInventoryReport(appConfig)
 		default:
-			imagesResult, err := kai.GetImageResults(appConfig)
+			imagesResult, err := kai.GetInventoryReport(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -54,7 +54,7 @@ var rootCmd = &cobra.Command{
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
 			} else {
-				err := kai.HandleResults(imagesResult, appConfig)
+				err := kai.HandleReport(imagesResult, appConfig)
 				if err != nil {
 					log.Errorf("Failed to handle Image Results: %+v", err)
 					os.Exit(1)

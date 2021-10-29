@@ -3,9 +3,10 @@ package table
 import (
 	"bytes"
 	"flag"
-	"github.com/anchore/kai/kai/result"
 	"testing"
 	"time"
+
+	"github.com/anchore/kai/kai/inventory"
 
 	"github.com/anchore/go-testutils"
 	"github.com/sergi/go-diff/diffmatchpatch"
@@ -17,9 +18,9 @@ func TestTablePresenter(t *testing.T) {
 
 	var buffer bytes.Buffer
 
-	var namespace1 = result.Namespace{
+	var item1 = inventory.ReportItem{
 		Namespace: "docker",
-		Images: []result.Image{
+		Images: []inventory.ReportImage{
 			{
 				Tag:        "docker/kube-compose-controller:v0.4.25-alpha1",
 				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
@@ -31,9 +32,9 @@ func TestTablePresenter(t *testing.T) {
 		},
 	}
 
-	var namespace2 = result.Namespace{
+	var item2 = inventory.ReportItem{
 		Namespace: "kube-system",
-		Images: []result.Image{
+		Images: []inventory.ReportImage{
 			{
 				Tag:        "k8s.gcr.io/coredns:1.6.2",
 				RepoDigest: "sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5",
@@ -70,12 +71,12 @@ func TestTablePresenter(t *testing.T) {
 	}
 
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
-	var mockResult = result.Result{
+	var mockReport = inventory.Report{
 		Timestamp: testTime.Format(time.RFC3339),
-		Results:   []result.Namespace{namespace1, namespace2},
+		Results:   []inventory.ReportItem{item1, item2},
 	}
 
-	pres := NewPresenter(mockResult)
+	pres := NewPresenter(mockReport)
 
 	// run presenter
 	err := pres.Present(&buffer)
@@ -100,7 +101,7 @@ func TestEmptyTablePresenter(t *testing.T) {
 
 	var buffer bytes.Buffer
 
-	pres := NewPresenter(result.Result{})
+	pres := NewPresenter(inventory.Report{})
 
 	// run presenter
 	err := pres.Present(&buffer)

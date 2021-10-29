@@ -1,11 +1,12 @@
-package result
+package inventory
 
 import (
+	"testing"
+
 	"github.com/go-test/deep"
 	"github.com/magiconair/properties/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestConstructorFromPod(t *testing.T) {
@@ -35,11 +36,11 @@ func TestConstructorFromPod(t *testing.T) {
 		},
 	}
 
-	actualNamespace := NewFromPod(mockPod)
+	actual := NewFromPod(mockPod)
 
-	expectedNamespace := Namespace{
+	expected := ReportItem{
 		Namespace: "default",
-		Images: []Image{
+		Images: []ReportImage{
 			{
 				Tag:        "dakaneye/test:1.0.0",
 				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
@@ -55,15 +56,15 @@ func TestConstructorFromPod(t *testing.T) {
 		},
 	}
 
-	if actualNamespace.Namespace != expectedNamespace.Namespace {
-		t.Errorf("Namespaces do not match:\nexpected=%s\nactual=%s", expectedNamespace.Namespace, actualNamespace.Namespace)
+	if actual.Namespace != expected.Namespace {
+		t.Errorf("Namespaces do not match:\nexpected=%s\nactual=%s", expected.Namespace, actual.Namespace)
 	}
 
-	compareImageSlices(expectedNamespace.Images, actualNamespace.Images, t)
+	compareImageSlices(expected.Images, actual.Images, t)
 }
 
 func TestAddImages(t *testing.T) {
-	expectedImages := []Image{
+	expected := []ReportImage{
 		{
 			Tag:        "dakaneye/test:1.0.0",
 			RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
@@ -78,11 +79,11 @@ func TestAddImages(t *testing.T) {
 		},
 	}
 
-	namespace := Namespace{
+	actual := ReportItem{
 		Namespace: "default",
-		Images:    []Image{},
+		Images:    []ReportImage{},
 	}
-	namespace.AddImages(v1.Pod{
+	actual.AddImages(v1.Pod{
 		Status: v1.PodStatus{
 			ContainerStatuses: []v1.ContainerStatus{
 				{
@@ -104,19 +105,19 @@ func TestAddImages(t *testing.T) {
 			},
 		},
 	})
-	compareImageSlices(expectedImages, namespace.Images, t)
+	compareImageSlices(expected, actual.Images, t)
 }
 
-func compareImageSlices(expectedImages []Image, actualImages []Image, t *testing.T) {
+func compareImageSlices(expected []ReportImage, actual []ReportImage, t *testing.T) {
 	// Couldn't find something that did good equality comparisons on slices (regardless of order)
 	// So, load images expected into a map, and compare them one by one against actual images added
-	expectedImagesMap := make(map[string]Image)
-	for _, expectedImage := range expectedImages {
+	expectedImagesMap := make(map[string]ReportImage)
+	for _, expectedImage := range expected {
 		expectedImagesMap[expectedImage.Tag] = expectedImage
 	}
 
 	matches := 0
-	for _, actualImage := range actualImages {
+	for _, actualImage := range actual {
 		expected, ok := expectedImagesMap[actualImage.Tag]
 		if !ok {
 			t.Errorf("Unexpected Image Tag added: %v", actualImage)
@@ -130,8 +131,8 @@ func compareImageSlices(expectedImages []Image, actualImages []Image, t *testing
 			return
 		}
 	}
-	if matches != len(expectedImages) {
-		diff := deep.Equal(expectedImages, actualImages)
+	if matches != len(expected) {
+		diff := deep.Equal(expected, actual)
 		t.Error(diff)
 	}
 }
