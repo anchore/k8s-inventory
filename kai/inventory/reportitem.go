@@ -52,25 +52,25 @@ func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
 }
 
 // Represent the namespace as a string
-func (n *ReportItem) String() string {
-	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", n.Namespace, n.Images)
+func (r *ReportItem) String() string {
+	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", r.Namespace, r.Images)
 }
 
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
-func (n *ReportItem) AddImages(pod v1.Pod) {
-	if len(n.Images) == 0 {
-		n.Images = getUniqueImagesFromPodStatus(pod)
+func (r *ReportItem) AddImages(pod v1.Pod) {
+	if len(r.Images) == 0 {
+		r.Images = getUniqueImagesFromPodStatus(pod)
 	} else {
 		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
 		imageSet := make(map[string]ReportImage)
-		for _, image := range n.Images {
+		for _, image := range r.Images {
 			// There's always a tag, the repoDigest may be missing
 			imageSet[image.Tag] = image
 		}
 		// If the image isn't in the set already, append it to the list
 		for _, image := range getUniqueImagesFromPodStatus(pod) {
 			if _, ok := imageSet[image.Tag]; !ok {
-				n.Images = append(n.Images, image)
+				r.Images = append(r.Images, image)
 			}
 		}
 	}
