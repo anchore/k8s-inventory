@@ -36,13 +36,13 @@ func TestGetImageResults(t *testing.T) {
 	}
 
 	foundIntegrationTestNamespace := false
-	for _, namespace := range report.Results {
-		if namespace.Namespace != IntegrationTestNamespace {
+	for _, item := range report.Results {
+		if item.Namespace != IntegrationTestNamespace {
 			continue
 		} else {
 			foundIntegrationTestNamespace = true
 			foundIntegrationTestImage := false
-			for _, image := range namespace.Images {
+			for _, image := range item.Images {
 				if !strings.Contains(image.Tag, IntegrationTestImageTag) {
 					continue
 				} else {
