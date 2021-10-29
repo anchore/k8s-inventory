@@ -18,7 +18,7 @@ var update = flag.Bool("update", false, "update the *.golden files for json pres
 func TestJsonPresenter(t *testing.T) {
 	var buffer bytes.Buffer
 
-	var namespace1 = inventory.ReportItem{
+	var item1 = inventory.ReportItem{
 		Namespace: "docker",
 		Images: []inventory.ReportImage{
 			{
@@ -32,7 +32,7 @@ func TestJsonPresenter(t *testing.T) {
 		},
 	}
 
-	var namespace2 = inventory.ReportItem{
+	var item2 = inventory.ReportItem{
 		Namespace: "kube-system",
 		Images: []inventory.ReportImage{
 			{
@@ -73,7 +73,7 @@ func TestJsonPresenter(t *testing.T) {
 	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
 	var mockReport = inventory.Report{
 		Timestamp: testTime.Format(time.RFC3339),
-		Results:   []inventory.ReportItem{namespace1, namespace2},
+		Results:   []inventory.ReportItem{item1, item2},
 		ServerVersionMetadata: &version.Info{
 			Major:        "1",
 			Minor:        "16+",
