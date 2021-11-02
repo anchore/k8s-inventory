@@ -22,11 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type k8sNamespace struct {
-	Name string
-	Err  error
-}
-
 type channels struct {
 	reportItem chan inventory.ReportItem
 	errors     chan error
@@ -80,23 +75,20 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		reportItem: make(chan inventory.ReportItem),
 		errors:     make(chan error),
 	}
-	nsCh := make(chan k8sNamespace)
 
-	go fetchNamespaces(kubeconfig, cfg, nsCh)
+	namespaces, err := fetchNamespaces(kubeconfig, cfg)
+	if err != nil {
+		return inventory.Report{}, err
+	}
 
-	total := 0
-	for ns := range nsCh {
-		if ns.Err != nil {
-			return inventory.Report{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
-		}
-
+	for _, ns := range namespaces {
+		// TODO: worker pool here!
 		// Does a "get pods" for the specified namespace and returns the unique set of images to the ch.reportItem channel
-		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns.Name, ch)
-		total++
+		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns, ch)
 	}
 
 	results := make([]inventory.ReportItem, 0)
-	for len(results) < total {
+	for len(results) < len(namespaces) {
 		select {
 		case item := <-ch.reportItem:
 			results = append(results, item)
@@ -130,58 +122,39 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}, nil
 }
 
-// fetchNamespaces sends namespace strings through a channel back to the calling function. It will
-// either return the namespaces detailed in the configuration OR if "all" is specified then it will
-// call fetchAllNamespaces to return every namespace in the cluster.
-func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan k8sNamespace) {
-	if len(cfg.Namespaces) == 0 {
-		fetchAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
-	} else {
-		for _, ns := range cfg.Namespaces {
-			nsCh <- k8sNamespace{
-				Name: ns,
-				Err:  nil,
-			}
-		}
-	}
-	close(nsCh)
-}
+// fetchNamespaces either return the namespaces detailed in the configuration
+// OR if there are no namespaces listed in the configuration then it will
+// return every namespace in the cluster.
+func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
 
-// fetchAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
-// Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan k8sNamespace) {
+	// Return list of namespaces if there are any present
+	if len(cfg.Namespaces) > 0 {
+		return cfg.Namespaces, nil
+	}
+
+	// Otherwise collect all namespaces
 	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		nsCh <- k8sNamespace{
-			Name: "",
-			Err:  fmt.Errorf("failed to get k8s client set: %w", err),
-		}
-		return
+		return []string{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
+	namespaces := make([]string, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.RequestBatchSize,
+			Limit:          cfg.Kubernetes.RequestBatchSize,
 			Continue:       cont,
-			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
+			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
 		list, err := clientset.CoreV1().Namespaces().List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
-			nsCh <- k8sNamespace{
-				Name: "",
-				Err:  fmt.Errorf("failed to list namespaces: %w", err),
-			}
-			return
+			return namespaces, fmt.Errorf("failed to list namespaces: %w", err)
 		}
 
 		for _, ns := range list.Items {
-			nsCh <- k8sNamespace{
-				Name: ns.ObjectMeta.Name,
-				Err:  nil,
-			}
+			namespaces = append(namespaces, ns.ObjectMeta.Name)
 		}
 
 		cont = list.GetListMeta().GetContinue()
@@ -190,6 +163,7 @@ func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 			break
 		}
 	}
+	return namespaces, nil
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
