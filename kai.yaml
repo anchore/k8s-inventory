@@ -28,9 +28,8 @@ kubeconfig:
     private-key:
     token:
 
-# Which namespaces to search (can just be a single element "all" or it can be multiple)
-namespaces:
-  - all
+# Which namespaces to search. Will search all namespaces if left as an empty array
+namespaces: []
 
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:

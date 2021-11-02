@@ -134,15 +134,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 // either return the namespaces detailed in the configuration OR if "all" is specified then it will
 // call fetchAllNamespaces to return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan k8sNamespace) {
-	getAll := false
-	for _, ns := range cfg.Namespaces {
-		if ns == "all" {
-			getAll = true
-			break
-		}
-	}
-
-	if len(cfg.Namespaces) == 0 || getAll {
+	if len(cfg.Namespaces) == 0 {
 		fetchAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
 	} else {
 		for _, ns := range cfg.Namespaces {
