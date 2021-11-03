@@ -81,12 +81,24 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		return inventory.Report{}, err
 	}
 
-	for _, ns := range namespaces {
-		// TODO: worker pool here!
-		// Does a "get pods" for the specified namespace and returns the unique set of images to the ch.reportItem channel
-		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns, ch)
+	// fill the queue of namespaces to process
+	queue := make(chan string, len(namespaces))
+	for _, n := range namespaces {
+		queue <- n
+	}
+	close(queue)
+
+	// get pods from namespaces using a worker pool pattern
+	numWorkers := 100
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			for item := range queue {
+				fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, item, ch)
+			}
+		}()
 	}
 
+	// listen for results from worker pool
 	results := make([]inventory.ReportItem, 0)
 	for len(results) < len(namespaces) {
 		select {
