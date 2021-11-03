@@ -28,9 +28,8 @@ kubeconfig:
     private-key:
     token:
 
-# Which namespaces to search (can just be a single element "all" or it can be multiple)
-namespaces:
-  - all
+# Which namespaces to search. Will search all namespaces if left as an empty array
+namespaces: []
 
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:
@@ -39,6 +38,9 @@ kubernetes:
 
   # Sets the number of objects to iteratively return when listing resources
   request-batch-size: 100
+
+  # Worker pool size for collecting pods from namespaces. Adjust this if the api-server gets overwhelmed
+  worker-pool-size: 100
 
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc

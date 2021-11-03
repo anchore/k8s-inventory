@@ -26,6 +26,7 @@ kubeconfig:
 kubernetes:
   requesttimeoutseconds: 0
   requestbatchsize: 0
+  workerpoolsize: 0
 namespaces: []
 runmode: 0
 mode: ""

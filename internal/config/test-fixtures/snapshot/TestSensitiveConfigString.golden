@@ -26,8 +26,8 @@ kubeconfig:
 kubernetes:
   requesttimeoutseconds: 60
   requestbatchsize: 100
-namespaces:
-- all
+  workerpoolsize: 100
+namespaces: []
 runmode: 0
 mode: adhoc
 pollingintervalseconds: 300

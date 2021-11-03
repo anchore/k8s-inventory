@@ -11,6 +11,7 @@ import (
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/anchore/kai/kai/reporter"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/anchore/kai/internal/config"
@@ -22,14 +23,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type k8sNamespace struct {
-	Name string
-	Err  error
-}
-
 type channels struct {
 	reportItem chan inventory.ReportItem
 	errors     chan error
+	stopper    chan struct{}
 }
 
 func HandleReport(report inventory.Report, cfg *config.Application) error {
@@ -79,29 +76,51 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	ch := channels{
 		reportItem: make(chan inventory.ReportItem),
 		errors:     make(chan error),
-	}
-	nsCh := make(chan k8sNamespace)
-
-	go fetchNamespaces(kubeconfig, cfg, nsCh)
-
-	total := 0
-	for ns := range nsCh {
-		if ns.Err != nil {
-			return inventory.Report{}, fmt.Errorf("failed to resolve namespace: %w", ns.Err)
-		}
-
-		// Does a "get pods" for the specified namespace and returns the unique set of images to the ch.reportItem channel
-		go fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, ns.Name, ch)
-		total++
+		stopper:    make(chan struct{}, 1),
 	}
 
+	namespaces, err := fetchNamespaces(kubeconfig, cfg)
+	if err != nil {
+		return inventory.Report{}, err
+	}
+
+	// fill the queue of namespaces to process
+	queue := make(chan string, len(namespaces))
+	for _, n := range namespaces {
+		queue <- n
+	}
+	close(queue)
+
+	// get pods from namespaces using a worker pool pattern
+	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
+		go func() {
+			// each worker needs its own clientset
+			clientset, err := client.GetClientSet(kubeconfig)
+			if err != nil {
+				ch.errors <- err
+				return
+			}
+
+			for namespace := range queue {
+				select {
+				case <-ch.stopper:
+					return
+				default:
+					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+				}
+			}
+		}()
+	}
+
+	// listen for results from worker pool
 	results := make([]inventory.ReportItem, 0)
-	for len(results) < total {
+	for len(results) < len(namespaces) {
 		select {
 		case item := <-ch.reportItem:
 			results = append(results, item)
 
 		case err := <-ch.errors:
+			close(ch.stopper)
 			return inventory.Report{}, err
 
 		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
@@ -110,13 +129,15 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}
 	close(ch.reportItem)
 	close(ch.errors)
+	// safe to close here since the other channel close precedes a return statement
+	close(ch.stopper)
 
-	clientSet, err := client.GetClientSet(kubeconfig)
+	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
 		return inventory.Report{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
-	serverVersion, err := clientSet.Discovery().ServerVersion()
+	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
 		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
@@ -130,66 +151,39 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}, nil
 }
 
-// fetchNamespaces sends namespace strings through a channel back to the calling function. It will
-// either return the namespaces detailed in the configuration OR if "all" is specified then it will
-// call fetchAllNamespaces to return every namespace in the cluster.
-func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application, nsCh chan k8sNamespace) {
-	getAll := false
-	for _, ns := range cfg.Namespaces {
-		if ns == "all" {
-			getAll = true
-			break
-		}
+// fetchNamespaces either return the namespaces detailed in the configuration
+// OR if there are no namespaces listed in the configuration then it will
+// return every namespace in the cluster.
+func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
+
+	// Return list of namespaces if there are any present
+	if len(cfg.Namespaces) > 0 {
+		return cfg.Namespaces, nil
 	}
 
-	if len(cfg.Namespaces) == 0 || getAll {
-		fetchAllNamespaces(kubeconfig, cfg.Kubernetes, nsCh)
-	} else {
-		for _, ns := range cfg.Namespaces {
-			nsCh <- k8sNamespace{
-				Name: ns,
-				Err:  nil,
-			}
-		}
-	}
-	close(nsCh)
-}
-
-// fetchAllNamespaces fetches all the namespaces in a cluster and returns them in a slice
-// Helper function for retrieving the namespaces in the configured cluster (see client.GetClientSet)
-func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, nsCh chan k8sNamespace) {
+	// Otherwise collect all namespaces
 	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		nsCh <- k8sNamespace{
-			Name: "",
-			Err:  fmt.Errorf("failed to get k8s client set: %w", err),
-		}
-		return
+		return []string{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
+	namespaces := make([]string, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.RequestBatchSize,
+			Limit:          cfg.Kubernetes.RequestBatchSize,
 			Continue:       cont,
-			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
+			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
 		list, err := clientset.CoreV1().Namespaces().List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
-			nsCh <- k8sNamespace{
-				Name: "",
-				Err:  fmt.Errorf("failed to list namespaces: %w", err),
-			}
-			return
+			return namespaces, fmt.Errorf("failed to list namespaces: %w", err)
 		}
 
 		for _, ns := range list.Items {
-			nsCh <- k8sNamespace{
-				Name: ns.ObjectMeta.Name,
-				Err:  nil,
-			}
+			namespaces = append(namespaces, ns.ObjectMeta.Name)
 		}
 
 		cont = list.GetListMeta().GetContinue()
@@ -198,16 +192,11 @@ func fetchAllNamespaces(kubeconfig *rest.Config, kubernetes config.KubernetesAPI
 			break
 		}
 	}
+	return namespaces, nil
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func fetchPodsInNamespace(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, ns string, ch channels) {
-	clientSet, err := client.GetClientSet(kubeconfig)
-	if err != nil {
-		ch.errors <- err
-		return
-	}
-
+func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.KubernetesAPI, ns string, ch channels) {
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {
@@ -217,7 +206,7 @@ func fetchPodsInNamespace(kubeconfig *rest.Config, kubernetes config.KubernetesA
 			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
 
-		list, err := clientSet.CoreV1().Pods(ns).List(opts)
+		list, err := clientset.CoreV1().Pods(ns).List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
 			ch.errors <- err
