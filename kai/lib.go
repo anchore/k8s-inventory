@@ -11,6 +11,7 @@ import (
 	"github.com/anchore/kai/kai/presenter"
 	"github.com/anchore/kai/kai/reporter"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	"github.com/anchore/kai/internal/config"
@@ -25,6 +26,7 @@ import (
 type channels struct {
 	reportItem chan inventory.ReportItem
 	errors     chan error
+	stopper    chan struct{}
 }
 
 func HandleReport(report inventory.Report, cfg *config.Application) error {
@@ -74,6 +76,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	ch := channels{
 		reportItem: make(chan inventory.ReportItem),
 		errors:     make(chan error),
+		stopper:    make(chan struct{}, 1),
 	}
 
 	namespaces, err := fetchNamespaces(kubeconfig, cfg)
@@ -91,8 +94,20 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	// get pods from namespaces using a worker pool pattern
 	for i := int64(0); i < cfg.Kubernetes.WorkerPoolSize; i++ {
 		go func() {
+			// each worker needs its own clientset
+			clientset, err := client.GetClientSet(kubeconfig)
+			if err != nil {
+				ch.errors <- err
+				return
+			}
+
 			for namespace := range queue {
-				fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, namespace, ch)
+				select {
+				case <-ch.stopper:
+					return
+				default:
+					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+				}
 			}
 		}()
 	}
@@ -105,6 +120,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 			results = append(results, item)
 
 		case err := <-ch.errors:
+			close(ch.stopper)
 			return inventory.Report{}, err
 
 		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
@@ -113,13 +129,15 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}
 	close(ch.reportItem)
 	close(ch.errors)
+	// safe to close here since the other channel close precedes a return statement
+	close(ch.stopper)
 
-	clientSet, err := client.GetClientSet(kubeconfig)
+	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
 		return inventory.Report{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
-	serverVersion, err := clientSet.Discovery().ServerVersion()
+	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
 		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
@@ -178,13 +196,7 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func fetchPodsInNamespace(kubeconfig *rest.Config, kubernetes config.KubernetesAPI, ns string, ch channels) {
-	clientSet, err := client.GetClientSet(kubeconfig)
-	if err != nil {
-		ch.errors <- err
-		return
-	}
-
+func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.KubernetesAPI, ns string, ch channels) {
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {
@@ -194,7 +206,7 @@ func fetchPodsInNamespace(kubeconfig *rest.Config, kubernetes config.KubernetesA
 			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
 		}
 
-		list, err := clientSet.CoreV1().Pods(ns).List(opts)
+		list, err := clientset.CoreV1().Pods(ns).List(opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
 			ch.errors <- err
