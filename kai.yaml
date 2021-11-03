@@ -39,6 +39,9 @@ kubernetes:
   # Sets the number of objects to iteratively return when listing resources
   request-batch-size: 100
 
+  # Worker pool size for collecting pods from namespaces. Adjust this if the api-server gets overwhelmed
+  worker-pool-size: 100
+
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 

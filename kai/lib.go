@@ -89,11 +89,10 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	// get pods from namespaces using a worker pool pattern
-	numWorkers := 100
-	for i := 0; i < numWorkers; i++ {
+	for i := int64(0); i < cfg.Kubernetes.WorkerPoolSize; i++ {
 		go func() {
-			for item := range queue {
-				fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, item, ch)
+			for namespace := range queue {
+				fetchPodsInNamespace(kubeconfig, cfg.Kubernetes, namespace, ch)
 			}
 		}()
 	}
