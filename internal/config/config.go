@@ -57,7 +57,7 @@ type Application struct {
 type KubernetesAPI struct {
 	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds"`
 	RequestBatchSize      int64 `mapstructure:"request-batch-size"`
-	WorkerPoolSize        int64 `mapstructure:"worker-pool-size"`
+	WorkerPoolSize        int   `mapstructure:"worker-pool-size"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)

@@ -92,7 +92,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	// get pods from namespaces using a worker pool pattern
-	for i := int64(0); i < cfg.Kubernetes.WorkerPoolSize; i++ {
+	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
 		go func() {
 			// each worker needs its own clientset
 			clientset, err := client.GetClientSet(kubeconfig)
