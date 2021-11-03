@@ -58,9 +58,12 @@ func (r *ReportItem) String() string {
 
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
 func (r *ReportItem) AddImages(pod v1.Pod) {
+
 	if len(r.Images) == 0 {
 		r.Images = getUniqueImagesFromPodStatus(pod)
+
 	} else {
+
 		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
 		imageSet := make(map[string]ReportImage)
 		for _, image := range r.Images {
@@ -95,8 +98,8 @@ func getUniqueImagesFromPodStatus(pod v1.Pod) []ReportImage {
 func getImageDigest(imageID string) string {
 	var imageDigest = ""
 	// If the image ID contains "sha", it corresponds to the repo digest. If not, it's not a digest
-	if strings.Contains(imageID, "sha") {
-		imageDigest = "sha" + strings.Split(imageID, "sha")[1]
+	if strings.Contains(imageID, "@") {
+		imageDigest = strings.Split(imageID, "@")[1]
 	}
 	return imageDigest
 }
