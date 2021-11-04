@@ -92,25 +92,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	// get pods from namespaces using a worker pool pattern
-	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
-		go func() {
-			// each worker needs its own clientset
-			clientset, err := client.GetClientSet(kubeconfig)
-			if err != nil {
-				ch.errors <- err
-				return
-			}
-
-			for namespace := range queue {
-				select {
-				case <-ch.stopper:
-					return
-				default:
-					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
-				}
-			}
-		}()
-	}
+	getPodsFromNameSpace(cfg, kubeconfig, ch, queue)
 
 	// listen for results from worker pool
 	results := make([]inventory.ReportItem, 0)
@@ -151,11 +133,34 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}, nil
 }
 
+// This logic was separated to reduce block size.
+func getPodsFromNameSpace(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan string) {
+	// get pods from namespaces using a worker pool pattern
+	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
+		go func() {
+			// each worker needs its own clientset
+			clientset, err := client.GetClientSet(kubeconfig)
+			if err != nil {
+				ch.errors <- err
+				return
+			}
+
+			for namespace := range queue {
+				select {
+				case <-ch.stopper:
+					return
+				default:
+					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+				}
+			}
+		}()
+	}
+}
+
 // fetchNamespaces either return the namespaces detailed in the configuration
 // OR if there are no namespaces listed in the configuration then it will
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
-
 	// Return list of namespaces if there are any present
 	if len(cfg.Namespaces) > 0 {
 		return cfg.Namespaces, nil

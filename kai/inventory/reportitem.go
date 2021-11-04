@@ -34,7 +34,6 @@ func New(namespace string) *ReportItem {
 
 // NewReportItem parses a list of pods into a ReportItem full of unique images
 func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
-
 	reportItem := ReportItem{
 		Namespace: namespace,
 		Images:    []ReportImage{},
