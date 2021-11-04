@@ -1,174 +1,506 @@
 package inventory
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/go-test/deep"
-	"github.com/magiconair/properties/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestConstructorFromPod(t *testing.T) {
+func equivalent(left, right ReportItem, t *testing.T) error {
+	if left.Namespace != right.Namespace {
+		return fmt.Errorf("Namespaces do not match %s != %s", left.Namespace, right.Namespace)
+	}
+
+	if len(left.Images) != len(right.Images) {
+		return fmt.Errorf("Mismatch in number of images %d != %d", len(left.Images), len(right.Images))
+	}
+
+	tmap := make(map[string]struct{})
+	for _, image := range left.Images {
+		key := fmt.Sprintf("%s@%s", image.Tag, image.RepoDigest)
+		tmap[key] = struct{}{}
+	}
+
+	for _, image := range right.Images {
+		key := fmt.Sprintf("%s@%s", image.Tag, image.RepoDigest)
+		_, exists := tmap[key]
+		if !exists {
+			return fmt.Errorf("Mismatch in ReportItem Images array %s does not exist", key)
+		}
+	}
+	return nil
+}
+
+func TestSameTagDifferentDigestSamePod(t *testing.T) {
+	namespace := "default"
 	mockPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "sametag-alpine",
+					Image: "jpetersenames/sametag:latest",
+				},
+				{
+					Name:  "sametag-centos",
+					Image: "jpetersenames/sametag:latest",
+				},
+			},
 		},
 		Status: v1.PodStatus{
 			ContainerStatuses: []v1.ContainerStatus{
 				{
-					Image:   "dakaneye/test:1.0.0",
-					ImageID: "docker-pullable://dakaneye/test@sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // note this isn't the real digest
+					Name:    "sametag-alpine",
+					Image:   "jpetersenames/sametag:latest",
+					ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
 				},
 				{
-					Image:   "k8s.gcr.io/coredns:1.6.2",
-					ImageID: "docker-pullable://k8s.gcr.io/coredns@sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5", // real
-				},
-				{
-					Image:   "k8s.gcr.io/coredns:1.6.2",
-					ImageID: "docker-pullable://k8s.gcr.io/coredns@sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5",
-				},
-				{
-					Image:   "localhost/samtest:latest",
-					ImageID: "docker://sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
+					Name:    "sametag-centos",
+					Image:   "jpetersenames/sametag:latest",
+					ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
 				},
 			},
 		},
 	}
-
-	actual := NewFromPod(mockPod)
-
-	expected := ReportItem{
-		Namespace: "default",
-		Images: []ReportImage{
-			{
-				Tag:        "dakaneye/test:1.0.0",
-				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
-			},
-			{
-				Tag:        "k8s.gcr.io/coredns:1.6.2",
-				RepoDigest: "sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5", // real
-			},
-			{
-				Tag:        "localhost/samtest:latest",
-				RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
-			},
-		},
-	}
-
-	if actual.Namespace != expected.Namespace {
-		t.Errorf("Namespaces do not match:\nexpected=%s\nactual=%s", expected.Namespace, actual.Namespace)
-	}
-
-	compareImageSlices(expected.Images, actual.Images, t)
-}
-
-func TestAddImages(t *testing.T) {
-	expected := []ReportImage{
-		{
-			Tag:        "dakaneye/test:1.0.0",
-			RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // not real
-		},
-		{
-			Tag:        "k8s.gcr.io/coredns:1.6.2",
-			RepoDigest: "sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5", // real
-		},
-		{
-			Tag:        "localhost/samtest:latest",
-			RepoDigest: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
-		},
-	}
-
 	actual := ReportItem{
-		Namespace: "default",
+		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.AddImages(v1.Pod{
-		Status: v1.PodStatus{
-			ContainerStatuses: []v1.ContainerStatus{
-				{
-					Image:   "dakaneye/test:1.0.0",
-					ImageID: "docker-pullable://dakaneye/test@sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd", // note this isn't the real digest
+	actual.extractUniqueImages(mockPod)
+
+	for _, image := range actual.Images {
+		t.Log(image)
+	}
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "sametag-centos",
+						Image: "jpetersenames/sametag:latest",
+					},
 				},
-				{
-					Image:   "k8s.gcr.io/coredns:1.6.2",
-					ImageID: "docker-pullable://k8s.gcr.io/coredns@sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5", // real
-				},
-				{
-					Image:   "k8s.gcr.io/coredns:1.6.2",
-					ImageID: "docker-pullable://k8s.gcr.io/coredns@sha256:12eb885b8685b1b13a04ecf5c23bc809c2e57917252fd7b0be9e9c00644e8ee5",
-				},
-				{
-					Image:   "localhost/samtest:latest",
-					ImageID: "docker://sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "sametag-centos",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+					},
 				},
 			},
 		},
-	})
-	compareImageSlices(expected, actual.Images, t)
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "sametag-alpine",
+						Image: "jpetersenames/sametag:latest",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "sametag-alpine",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+					},
+				},
+			},
+		},
+	}
+	actual := NewReportItem(mockPods, namespace)
+
+	for _, image := range actual.Images {
+		t.Log(image)
+	}
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
-func compareImageSlices(expected []ReportImage, actual []ReportImage, t *testing.T) {
-	// Couldn't find something that did good equality comparisons on slices (regardless of order)
-	// So, load images expected into a map, and compare them one by one against actual images added
-	expectedImagesMap := make(map[string]ReportImage)
-	for _, expectedImage := range expected {
-		expectedImagesMap[expectedImage.Tag] = expectedImage
+// kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+func TestAddImageWithDigestNoTag(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine1",
+					Image: "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine1",
+					Image:   "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+		},
 	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod)
 
-	matches := 0
-	for _, actualImage := range actual {
-		expected, ok := expectedImagesMap[actualImage.Tag]
-		if !ok {
-			t.Errorf("Unexpected Image Tag added: %v", actualImage)
-			return
-		}
-		// Tags must have already matched
-		if expected.RepoDigest == actualImage.RepoDigest {
-			matches++
-		} else {
-			t.Errorf("Image Digests don't match:\nexpected=%s\nactual=%s", expected.RepoDigest, actualImage.RepoDigest)
-			return
-		}
+	// TODO: What should the null tag be?
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:", // TODO: This needs to change when the null tag is decided
+				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+			},
+		},
 	}
-	if matches != len(expected) {
-		diff := deep.Equal(expected, actual)
-		t.Error(diff)
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
-func TestGetImageDigest(t *testing.T) {
-	cases := []struct {
-		name     string
-		imageID  string
-		expected string
-	}{
-		{
-			name:     "common sha256",
-			imageID:  "docker.io/anchore/test_images@sha256:f3026e3f808e38c86ffb64e4fc5b49516d0783df2d94f06f959cf8f23c197495",
-			expected: "sha256:f3026e3f808e38c86ffb64e4fc5b49516d0783df2d94f06f959cf8f23c197495",
+// kubectl run alpiney --image=alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+func TestAddImageWithDigestWithTag(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
 		},
-		{
-			name:     "common sha512",
-			imageID:  "docker.io/anchore/test_images@sha512:72e59bea07d815ee05114b487d9d60594c9b3fc20fa055bff9c09a46ec8c9ff2",
-			expected: "sha512:72e59bea07d815ee05114b487d9d60594c9b3fc20fa055bff9c09a46ec8c9ff2",
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine2",
+					Image: "alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
 		},
-		{
-			name:     "docker-pullable",
-			imageID:  "docker-pullable://dakaneye/test@sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
-			expected: "sha256:6ad2d6a2cc1909fbc477f64e3292c16b88db31eb83458f420eb223f119f3dffd",
-		},
-		{
-			name:     "docker",
-			imageID:  "docker://sha256:ea65104b4b40b5d23eb4b2ebd4f62adf24f714a2fdaff19060de207d1f3c2111",
-			expected: "sha256:ea65104b4b40b5d23eb4b2ebd4f62adf24f714a2fdaff19060de207d1f3c2111",
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "alpine2",
+					// For some reason k8s makes this the image id...
+					Image:   "sha256:2d1d6881767e3e1c194b061b3422aa76bf076aefd51d1d27c679ff998ead3104",
+					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
 		},
 	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod)
 
-	for _, test := range cases {
-		t.Run(test.name, func(t *testing.T) {
-			actual := getImageDigest(test.imageID)
-			assert.Equal(t, test.expected, actual)
-		})
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3.13.6",
+				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// kubectl run alpiney --image=alpine
+func TestAddImageNoDigestNoTag(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine3",
+					Image: "alpine",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine3",
+					Image:   "alpine:3", // TODO: Check this when rate limiting subsides
+					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// kubectl run alpiney --image=alpine:3
+func TestAddImageNoDigestWithTag(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine4",
+					Image: "alpine:3",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine4",
+					Image:   "alpine:3",
+					ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+				},
+			},
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// kubectl run alpiney --image=alpine:3
+func TestInitContainer(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:  "alpine-init",
+					Image: "alpine:3",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			InitContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine-init",
+					Image:   "alpine:3",
+					ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+				},
+			},
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+// kubectl run alpiney --image=alpine:3
+func TestNewReportItem(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:  "alpine-init",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine-init",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "alpine4",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine4",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "sametag-alpine",
+						Image: "jpetersenames/sametag:latest",
+					},
+					{
+						Name:  "sametag-centos",
+						Image: "jpetersenames/sametag:latest",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "sametag-alpine",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+					},
+					{
+						Name:    "sametag-centos",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+					},
+				},
+			},
+		},
+	}
+	actual := NewReportItem(mockPods, namespace)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+			},
+		},
+	}
+	err := equivalent(actual, expected, t)
+	if err != nil {
+		t.Error(err)
 	}
 }
