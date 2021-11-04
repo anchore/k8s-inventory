@@ -33,6 +33,11 @@ func equivalent(left, right ReportItem, t *testing.T) error {
 	return nil
 }
 
+//
+//	Test out two containers with the same tag but different digests to ensure
+//	the uniqueness of images is parsed correctly when looking at a list of
+//	containers in a single pod
+//
 func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -95,6 +100,11 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	}
 }
 
+//
+//	Test out two pods running containers with the same tag but different digests
+//	to ensure the uniqueness of images is parsed correctly when looking at
+//	individual pods in the same namespace
+//
 func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -168,7 +178,11 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
+//	Test out a pod running with an image added by digest only.
+//
+//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
 func TestAddImageWithDigestNoTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -215,7 +229,11 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
+//	Test out a pod running with an image added by tag and digest.
+//
+//	kubectl run alpiney --image=alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
 func TestAddImageWithDigestWithTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -262,7 +280,13 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine
+//
+//	Test out a pod running without a tag or digest (inferred 'latest')
+//
+//	kubectl run alpiney --image=alpine
+//
+//	TODO: Find where in the runtime this is actually inferred as latest
+//
 func TestAddImageNoDigestNoTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -308,7 +332,11 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine:3
+//
+//	Test out a pod running with an image and tag but no digest.
+//
+//	kubectl run alpiney --image=alpine:3
+//
 func TestAddImageNoDigestWithTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -354,7 +382,9 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine:3
+//
+//	Test out a pod running with an init container
+//
 func TestInitContainer(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -400,11 +430,14 @@ func TestInitContainer(t *testing.T) {
 	}
 }
 
-// kubectl run alpiney --image=alpine:3
+//
+//	Test out NewReportItem which takes a list of pods. Include pods with init
+//	containers and regular containers.
+//
 func TestNewReportItem(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
-		{
+		{ // pod-1
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 			},
@@ -426,7 +459,7 @@ func TestNewReportItem(t *testing.T) {
 				},
 			},
 		},
-		{
+		{ // pod-2
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 			},
@@ -448,7 +481,7 @@ func TestNewReportItem(t *testing.T) {
 				},
 			},
 		},
-		{
+		{ // pod-3
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 			},
