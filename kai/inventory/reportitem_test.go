@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func equivalent(left, right ReportItem, t *testing.T) error {
+func equivalent(left, right ReportItem) error {
 	if left.Namespace != right.Namespace {
 		return fmt.Errorf("Namespaces do not match %s != %s", left.Namespace, right.Namespace)
 	}
@@ -94,7 +94,7 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -172,7 +172,7 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -223,7 +223,7 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -274,7 +274,7 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -326,7 +326,7 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -376,7 +376,7 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -424,7 +424,7 @@ func TestInitContainer(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
@@ -532,7 +532,7 @@ func TestNewReportItem(t *testing.T) {
 			},
 		},
 	}
-	err := equivalent(actual, expected, t)
+	err := equivalent(actual, expected)
 	if err != nil {
 		t.Error(err)
 	}
