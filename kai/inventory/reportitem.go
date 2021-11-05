@@ -71,86 +71,40 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) {
 }
 
 const regexTag = `:[\w][\w.-]{0,127}$`
+const regexDigest = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
 
-type Image struct {
+type image struct {
 	digest string
 	tag    string
 	image  string
 	key    string
 }
 
-type Spec struct {
-	image string
-}
-
-type Status struct {
-	image   string
-	imageID string
-}
-
-type data struct {
-	spec   Spec
-	status Status
-}
-
-func fill(pod v1.Pod) map[string]data {
-	cmap := make(map[string]data)
+func fill(pod v1.Pod) map[string][]string {
+	cmap := make(map[string][]string)
 
 	// grab init images
 	for _, c := range pod.Spec.InitContainers {
-		cmap[c.Name] = data{
-			spec: Spec{
-				image: c.Image,
-			},
-		}
+		cmap[c.Name] = append(cmap[c.Name], c.Image)
 	}
 
 	for _, c := range pod.Status.InitContainerStatuses {
-		mm, exists := cmap[c.Name]
-		spec := Spec{}
-
-		if exists {
-			spec = mm.spec
-		}
-
-		cmap[c.Name] = data{
-			spec: spec,
-			status: Status{
-				image:   c.Image,
-				imageID: c.ImageID,
-			},
-		}
+		cmap[c.Name] = append(cmap[c.Name], c.Image, c.ImageID)
 	}
 
 	// grab regular images
 	for _, c := range pod.Spec.Containers {
-		cmap[c.Name] = data{
-			spec: Spec{
-				image: c.Image,
-			},
-		}
+		cmap[c.Name] = append(cmap[c.Name], c.Image)
 	}
 
 	for _, c := range pod.Status.ContainerStatuses {
-		mm, exists := cmap[c.Name]
-		spec := Spec{}
-
-		if exists {
-			spec = mm.spec
-		}
-
-		cmap[c.Name] = data{
-			spec: spec,
-			status: Status{
-				image:   c.Image,
-				imageID: c.ImageID,
-			},
-		}
+		cmap[c.Name] = append(cmap[c.Name], c.Image, c.ImageID)
 	}
+
 	return cmap
 }
 
-func parseout(s string, c *Image) error {
+func parseout(s string, c *image) error {
 
 	if c.digest != "" && c.tag != "" && c.image != "" {
 		log.Info("all fields have been parsed")
@@ -190,18 +144,18 @@ func parseout(s string, c *Image) error {
 	return nil
 }
 
-func extract(d data) (Image, error) {
+func extract(imagedata []string) (image, error) {
 
-	c := Image{
+	c := image{
 		image:  "",
 		tag:    "",
 		digest: "",
 		key:    "",
 	}
 
-	parseout(d.spec.image, &c)
-	parseout(d.status.image, &c)
-	parseout(d.status.imageID, &c)
+	for _, data := range imagedata {
+		parseout(data, &c)
+	}
 
 	c.key = fmt.Sprintf("%s:%s@%s", c.image, c.tag, c.digest)
 	return c, nil
@@ -210,7 +164,7 @@ func extract(d data) (Image, error) {
 func process(pod v1.Pod) []ReportImage {
 	cmap := fill(pod)
 
-	unique := make(map[string]Image)
+	unique := make(map[string]image)
 	for _, n := range cmap {
 		c, err := extract(n)
 		if err != nil {
