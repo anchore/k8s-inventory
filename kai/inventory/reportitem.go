@@ -107,21 +107,25 @@ func fill(pod v1.Pod) map[string][]string {
 func parseout(s string, c *image) error {
 
 	if c.digest != "" && c.tag != "" && c.image != "" {
-		log.Info("all fields have been parsed")
 		return nil
 	}
 
-	reg, err := regexp.Compile(regexTag)
+	regdigest, err := regexp.Compile(regexDigest)
 	if err != nil {
 		return err
 	}
 
 	image := s
 	digest := ""
-	if strings.Contains(s, "@") {
-		split := strings.Split(s, "@")
-		image = split[0]
-		digest = split[1]
+	d := regdigest.FindAllString(image, -1)
+	if len(d) > 0 {
+		digest = d[0]
+		image = strings.TrimRight(image, fmt.Sprintf("@%s", digest))
+	}
+
+	reg, err := regexp.Compile(regexTag)
+	if err != nil {
+		return err
 	}
 
 	tag := ""
@@ -146,7 +150,7 @@ func parseout(s string, c *image) error {
 
 func extract(imagedata []string) (image, error) {
 
-	c := image{
+	img := image{
 		image:  "",
 		tag:    "",
 		digest: "",
@@ -154,11 +158,11 @@ func extract(imagedata []string) (image, error) {
 	}
 
 	for _, data := range imagedata {
-		parseout(data, &c)
+		parseout(data, &img)
 	}
 
-	c.key = fmt.Sprintf("%s:%s@%s", c.image, c.tag, c.digest)
-	return c, nil
+	img.key = fmt.Sprintf("%s:%s@%s", img.image, img.tag, img.digest)
+	return img, nil
 }
 
 func process(pod v1.Pod) []ReportImage {
@@ -166,12 +170,14 @@ func process(pod v1.Pod) []ReportImage {
 
 	unique := make(map[string]image)
 	for _, n := range cmap {
+
 		c, err := extract(n)
+
 		if err != nil {
 			log.Errorf("issue processing %s", n)
-			continue
+		} else {
+			unique[c.key] = c
 		}
-		unique[c.key] = c
 	}
 
 	ri := make([]ReportImage, 0)
