@@ -8,6 +8,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func logout(actual, expected ReportItem, t *testing.T) {
+	t.Log("")
+	t.Log("Actual")
+	for _, image := range actual.Images {
+		t.Logf("  %#v", image)
+	}
+	t.Log("")
+	t.Log("Expected")
+	for _, image := range expected.Images {
+		t.Logf("  %#v", image)
+	}
+	t.Log("")
+}
+
 func equivalent(left, right ReportItem) error {
 	if left.Namespace != right.Namespace {
 		return fmt.Errorf("Namespaces do not match %s != %s", left.Namespace, right.Namespace)
@@ -18,16 +32,16 @@ func equivalent(left, right ReportItem) error {
 	}
 
 	tmap := make(map[string]struct{})
-	for _, image := range left.Images {
+	for _, image := range right.Images {
 		key := fmt.Sprintf("%s@%s", image.Tag, image.RepoDigest)
 		tmap[key] = struct{}{}
 	}
 
-	for _, image := range right.Images {
+	for _, image := range left.Images {
 		key := fmt.Sprintf("%s@%s", image.Tag, image.RepoDigest)
 		_, exists := tmap[key]
 		if !exists {
-			return fmt.Errorf("Mismatch in ReportItem Images array %s does not exist", key)
+			return fmt.Errorf("Actual key %s not found in expected results", key)
 		}
 	}
 	return nil
@@ -77,10 +91,6 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	}
 	actual.extractUniqueImages(mockPod)
 
-	for _, image := range actual.Images {
-		t.Log(image)
-	}
-
 	expected := ReportItem{
 		Namespace: namespace,
 		Images: []ReportImage{
@@ -96,6 +106,7 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -155,10 +166,6 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	}
 	actual := NewReportItem(mockPods, namespace)
 
-	for _, image := range actual.Images {
-		t.Log(image)
-	}
-
 	expected := ReportItem{
 		Namespace: namespace,
 		Images: []ReportImage{
@@ -174,6 +181,7 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -225,6 +233,7 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -276,6 +285,7 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -328,6 +338,7 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -378,6 +389,7 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -426,6 +438,7 @@ func TestInitContainer(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }
@@ -534,6 +547,7 @@ func TestNewReportItem(t *testing.T) {
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
+		logout(actual, expected, t)
 		t.Error(err)
 	}
 }

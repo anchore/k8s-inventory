@@ -110,17 +110,12 @@ func parseout(s string, c *image) error {
 		return nil
 	}
 
-	regdigest, err := regexp.Compile(regexDigest)
-	if err != nil {
-		return err
-	}
-
 	image := s
 	digest := ""
-	d := regdigest.FindAllString(image, -1)
-	if len(d) > 0 {
-		digest = d[0]
-		image = strings.TrimRight(image, fmt.Sprintf("@%s", digest))
+	if strings.Contains(s, "@") {
+		split := strings.Split(s, "@")
+		image = split[0]
+		digest = split[1]
 	}
 
 	reg, err := regexp.Compile(regexTag)
