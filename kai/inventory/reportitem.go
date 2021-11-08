@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/anchore/kai/internal/log"
-
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -31,11 +30,16 @@ func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
 	}
 
 	for _, pod := range pods {
+		// Check for non-running
 		namespace := pod.ObjectMeta.Namespace
 		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
 			continue
 		}
-		reportItem.extractUniqueImages(pod)
+		err := reportItem.extractUniqueImages(pod)
+		if err != nil {
+			// Log the failure and continue processing pods
+			log.Errorf("Issue processing images in %s/%s", pod.GetNamespace(), pod.GetName())
+		}
 	}
 
 	return reportItem
@@ -47,132 +51,144 @@ func (r *ReportItem) String() string {
 }
 
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
-func (r *ReportItem) extractUniqueImages(pod v1.Pod) {
+//
+// Important: Ensures unique images across pods
+func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 
-	if len(r.Images) == 0 {
-		r.Images = process(pod)
+	// Build a Map to make use as a Set (unique list). Values
+	// are empty structs so they don't waste space
+	imageSet := make(map[string]struct{})
+	for _, image := range r.Images {
+		// TODO: Use the image:tag@digest to test for uniqueness
+		imageSet[image.Tag] = struct{}{}
+	}
 
-	} else {
+	// If the image isn't in the set already, append it to the list
+	images, err := processContainers(pod)
+	if err != nil {
+		return err
+	}
 
-		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
-		imageSet := make(map[string]ReportImage)
-		for _, image := range r.Images {
-			// TODO: Use the image:tag@digest to test for uniqueness
-			imageSet[image.Tag] = image
-		}
-
-		// If the image isn't in the set already, append it to the list
-		for _, image := range process(pod) {
-			if _, ok := imageSet[image.Tag]; !ok {
-				r.Images = append(r.Images, image)
-			}
+	for _, image := range images {
+		if _, exist := imageSet[image.Tag]; !exist {
+			r.Images = append(r.Images, image)
 		}
 	}
+	return nil
 }
 
-const regexTag = `:[\w][\w.-]{0,127}$`
-const regexDigest = `[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}`
-
-type image struct {
-	digest string
-	tag    string
-	image  string
-	key    string
-}
-
-func fill(pod v1.Pod) map[string][]string {
-	cmap := make(map[string][]string)
+// fillContainerDetails grabs all the relevant fields out of a pod object so
+// they can be used to parse out the image details for all the containers in
+// a pod.
+func fillContainerDetails(pod v1.Pod) map[string][]string {
+	details := make(map[string][]string)
 
 	// grab init images
 	for _, c := range pod.Spec.InitContainers {
-		cmap[c.Name] = append(cmap[c.Name], c.Image)
+		details[c.Name] = append(details[c.Name], c.Image)
 	}
 
 	for _, c := range pod.Status.InitContainerStatuses {
-		cmap[c.Name] = append(cmap[c.Name], c.Image, c.ImageID)
+		details[c.Name] = append(details[c.Name], c.Image, c.ImageID)
 	}
 
 	// grab regular images
 	for _, c := range pod.Spec.Containers {
-		cmap[c.Name] = append(cmap[c.Name], c.Image)
+		details[c.Name] = append(details[c.Name], c.Image)
 	}
 
 	for _, c := range pod.Status.ContainerStatuses {
-		cmap[c.Name] = append(cmap[c.Name], c.Image, c.ImageID)
+		details[c.Name] = append(details[c.Name], c.Image, c.ImageID)
 	}
 
-	return cmap
+	return details
 }
 
-func parseout(s string, c *image) error {
+// Intermediate struct for parsing out image details from a list of containers
+type image struct {
+	digest string
+	tag    string
+	image  string
+}
 
-	if c.digest != "" && c.tag != "" && c.image != "" {
+// extractImageDetails extracts the details of an image out of the fields
+// grabbed from the pod.
+func (img *image) extractImageDetails(s string) error {
+
+	if img.digest != "" && img.tag != "" && img.image != "" {
 		return nil
 	}
 
 	image := s
 	digest := ""
+
+	// Look for something like:
+	//  k3d-registry.localhost:5000/redis:4@sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
 	if strings.Contains(s, "@") {
 		split := strings.Split(s, "@")
-		image = split[0]
-		digest = split[1]
+		image = split[0]  // k3d-registry.localhost:5000/redis:4
+		digest = split[1] // sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
 	}
 
+	const regexTag = `:[\w][\w.-]{0,127}$`
 	reg, err := regexp.Compile(regexTag)
 	if err != nil {
 		return err
 	}
 
 	tag := ""
-	m := reg.FindAllString(image, -1)
-	if len(m) > 0 {
+
+	// image contains something like
+	//  k3d-registry.localhost:5000/redis:4
+	tagresult := reg.FindAllString(image, -1)
+	if len(tagresult) > 0 {
 		i := strings.LastIndex(image, ":")
-		image = image[0:i]
-		tag = strings.TrimPrefix(m[0], ":")
+		image = image[0:i]                          // k3d-registry.localhost:5000/redis
+		tag = strings.TrimPrefix(tagresult[0], ":") // 4
 	}
 
-	if c.digest == "" {
-		c.digest = digest
+	// Only fill if the field hasn't been successfully parsed yet
+	if img.digest == "" {
+		img.digest = digest
 	}
-	if c.tag == "" {
-		c.tag = tag
+
+	if img.tag == "" {
+		img.tag = tag
 	}
-	if c.image == "" {
-		c.image = image
+
+	if img.image == "" {
+		img.image = image
 	}
+
 	return nil
 }
 
-func extract(imagedata []string) (image, error) {
-
-	img := image{
-		image:  "",
-		tag:    "",
-		digest: "",
-		key:    "",
-	}
-
-	for _, data := range imagedata {
-		parseout(data, &img)
-	}
-
-	img.key = fmt.Sprintf("%s:%s@%s", img.image, img.tag, img.digest)
-	return img, nil
-}
-
-func process(pod v1.Pod) []ReportImage {
-	cmap := fill(pod)
+// processContainers takes in a pod object and will return a list of unique
+// ReportImage structures from the containers inside the pod
+//
+// Important: Returns unique images in a pod
+func processContainers(pod v1.Pod) ([]ReportImage, error) {
 
 	unique := make(map[string]image)
-	for _, n := range cmap {
 
-		c, err := extract(n)
+	containerset := fillContainerDetails(pod)
+	for _, containerdata := range containerset {
 
-		if err != nil {
-			log.Errorf("issue processing %s", n)
-		} else {
-			unique[c.key] = c
+		img := image{
+			image:  "",
+			tag:    "",
+			digest: "",
 		}
+
+		for _, container := range containerdata {
+			err := img.extractImageDetails(container)
+			if err != nil {
+				return []ReportImage{}, err
+			}
+		}
+
+		key := fmt.Sprintf("%s:%s@%s", img.image, img.tag, img.digest)
+		unique[key] = img
 	}
 
 	ri := make([]ReportImage, 0)
@@ -182,5 +198,5 @@ func process(pod v1.Pod) []ReportImage {
 			RepoDigest: u.digest,
 		})
 	}
-	return ri
+	return ri, nil
 }
