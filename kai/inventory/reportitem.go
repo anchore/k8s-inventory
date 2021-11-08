@@ -50,17 +50,21 @@ func (r *ReportItem) String() string {
 	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", r.Namespace, r.Images)
 }
 
+func (i *ReportImage) key() string {
+	return fmt.Sprintf("%s@%s", i.Tag, i.RepoDigest)
+}
+
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
 //
-// Important: Ensures unique images across pods
+// IMPORTANT: Ensures unique images across pods
 func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 
 	// Build a Map to make use as a Set (unique list). Values
 	// are empty structs so they don't waste space
-	imageSet := make(map[string]struct{})
+	unique := make(map[string]struct{})
 	for _, image := range r.Images {
 		// TODO: Use the image:tag@digest to test for uniqueness
-		imageSet[image.Tag] = struct{}{}
+		unique[image.key()] = struct{}{}
 	}
 
 	// If the image isn't in the set already, append it to the list
@@ -70,7 +74,7 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 	}
 
 	for _, image := range images {
-		if _, exist := imageSet[image.Tag]; !exist {
+		if _, exist := unique[image.key()]; !exist {
 			r.Images = append(r.Images, image)
 		}
 	}
@@ -79,7 +83,8 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 
 // fillContainerDetails grabs all the relevant fields out of a pod object so
 // they can be used to parse out the image details for all the containers in
-// a pod.
+// a pod. Return details as an mapped array of strings using the container name
+// as the map key and the fields as an array of strings so they can be iterated
 func fillContainerDetails(pod v1.Pod) map[string][]string {
 	details := make(map[string][]string)
 
@@ -104,7 +109,8 @@ func fillContainerDetails(pod v1.Pod) map[string][]string {
 	return details
 }
 
-// Intermediate struct for parsing out image details from a list of containers
+// image is an intermediate struct for parsing out image details from
+// a list of containers
 type image struct {
 	digest string
 	tag    string
@@ -166,7 +172,7 @@ func (img *image) extractImageDetails(s string) error {
 // processContainers takes in a pod object and will return a list of unique
 // ReportImage structures from the containers inside the pod
 //
-// Important: Returns unique images in a pod
+// IMPORTANT: Ensures unique images inside a pod
 func processContainers(pod v1.Pod) ([]ReportImage, error) {
 
 	unique := make(map[string]image)
