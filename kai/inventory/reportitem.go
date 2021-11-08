@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ReportItem represents a ReportItem Images list result
+// ReportItem represents a namespace and all it's unique images
 type ReportItem struct {
 	Namespace string        `json:"namespace,omitempty"`
 	Images    []ReportImage `json:"images"`
@@ -45,11 +45,12 @@ func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
 	return reportItem
 }
 
-// Represent the namespace as a string
+// String represent the ReportItem as a string
 func (r *ReportItem) String() string {
 	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", r.Namespace, r.Images)
 }
 
+// key will return a unique key for a ReportImage
 func (i *ReportImage) key() string {
 	return fmt.Sprintf("%s@%s", i.Tag, i.RepoDigest)
 }
@@ -63,16 +64,16 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 	// are empty structs so they don't waste space
 	unique := make(map[string]struct{})
 	for _, image := range r.Images {
-		// TODO: Use the image:tag@digest to test for uniqueness
 		unique[image.key()] = struct{}{}
 	}
 
-	// If the image isn't in the set already, append it to the list
+	// Process all containers in a pod and return all the unique images
 	images, err := processContainers(pod)
 	if err != nil {
 		return err
 	}
 
+	// If the image isn't in the set already, append it to the list
 	for _, image := range images {
 		if _, exist := unique[image.key()]; !exist {
 			r.Images = append(r.Images, image)
@@ -112,27 +113,29 @@ func fillContainerDetails(pod v1.Pod) map[string][]string {
 // image is an intermediate struct for parsing out image details from
 // a list of containers
 type image struct {
-	digest string
+	repo   string
 	tag    string
-	image  string
+	digest string
 }
 
-// extractImageDetails extracts the details of an image out of the fields
+// extractImageDetails extracts the image, tag, and digest of an image out of the fields
 // grabbed from the pod.
 func (img *image) extractImageDetails(s string) error {
 
-	if img.digest != "" && img.tag != "" && img.image != "" {
+	if img.digest != "" && img.tag != "" && img.repo != "" {
 		return nil
 	}
 
-	image := s
+	// Set repo to the initial string. If there's no digest to parse then we can assume
+	// it's just a repo and tag
+	repo := s
 	digest := ""
 
 	// Look for something like:
 	//  k3d-registry.localhost:5000/redis:4@sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
 	if strings.Contains(s, "@") {
 		split := strings.Split(s, "@")
-		image = split[0]  // k3d-registry.localhost:5000/redis:4
+		repo = split[0]   // k3d-registry.localhost:5000/redis:4
 		digest = split[1] // sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
 	}
 
@@ -144,12 +147,12 @@ func (img *image) extractImageDetails(s string) error {
 
 	tag := ""
 
-	// image contains something like
+	// repo contains something like
 	//  k3d-registry.localhost:5000/redis:4
-	tagresult := reg.FindAllString(image, -1)
+	tagresult := reg.FindAllString(repo, -1)
 	if len(tagresult) > 0 {
-		i := strings.LastIndex(image, ":")
-		image = image[0:i]                          // k3d-registry.localhost:5000/redis
+		i := strings.LastIndex(repo, ":")
+		repo = repo[0:i]                            // k3d-registry.localhost:5000/redis
 		tag = strings.TrimPrefix(tagresult[0], ":") // 4
 	}
 
@@ -162,8 +165,8 @@ func (img *image) extractImageDetails(s string) error {
 		img.tag = tag
 	}
 
-	if img.image == "" {
-		img.image = image
+	if img.repo == "" {
+		img.repo = repo
 	}
 
 	return nil
@@ -181,7 +184,7 @@ func processContainers(pod v1.Pod) ([]ReportImage, error) {
 	for _, containerdata := range containerset {
 
 		img := image{
-			image:  "",
+			repo:   "",
 			tag:    "",
 			digest: "",
 		}
@@ -193,14 +196,14 @@ func processContainers(pod v1.Pod) ([]ReportImage, error) {
 			}
 		}
 
-		key := fmt.Sprintf("%s:%s@%s", img.image, img.tag, img.digest)
+		key := fmt.Sprintf("%s:%s@%s", img.repo, img.tag, img.digest)
 		unique[key] = img
 	}
 
 	ri := make([]ReportImage, 0)
 	for _, u := range unique {
 		ri = append(ri, ReportImage{
-			Tag:        fmt.Sprintf("%s:%s", u.image, u.tag),
+			Tag:        fmt.Sprintf("%s:%s", u.repo, u.tag),
 			RepoDigest: u.digest,
 		})
 	}
