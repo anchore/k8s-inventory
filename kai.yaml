@@ -30,10 +30,18 @@ kubeconfig:
 
 # Which namespaces to search or exclude.
 namespaces:
-  # Namespaces to include - will search ALL namespaces if left as an empty array
+  # Namespaces to include as an explicit list
+  # NOTE: Will search ALL namespaces if left as an empty array
   include: []
 
-  # Namespaces to exclude
+  # List of namespaces to exclude, can use explicit strings and/or regexes.
+  # For example
+  #
+  # list:
+  # - default
+  # - ^kube-*
+  #
+  # Will exclude the default, kube-system, and kube-public namespaces
   exclude: []
 
 # Kubernetes API configuration parameters (should not need tuning)
