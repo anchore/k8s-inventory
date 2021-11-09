@@ -83,6 +83,7 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 					ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -139,6 +140,7 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
 					},
 				},
+				Phase: "Running",
 			},
 		},
 		{
@@ -161,10 +163,11 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 						ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
 					},
 				},
+				Phase: "Running",
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace)
+	actual := NewReportItem(mockPods, namespace, true)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -213,6 +216,7 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -226,7 +230,7 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 		Namespace: namespace,
 		Images: []ReportImage{
 			{
-				Tag:        "alpine:", // TODO: This needs to change when the null tag is decided
+				Tag:        "alpine", // TODO: This needs to change when the null tag is decided
 				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 			},
 		},
@@ -266,6 +270,7 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -319,6 +324,7 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -370,6 +376,7 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 					ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -419,6 +426,7 @@ func TestInitContainer(t *testing.T) {
 					ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
 				},
 			},
+			Phase: "Running",
 		},
 	}
 	actual := ReportItem{
@@ -470,6 +478,7 @@ func TestNewReportItem(t *testing.T) {
 						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
 					},
 				},
+				Phase: "Running",
 			},
 		},
 		{ // pod-2
@@ -492,6 +501,7 @@ func TestNewReportItem(t *testing.T) {
 						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
 					},
 				},
+				Phase: "Running",
 			},
 		},
 		{ // pod-3
@@ -523,10 +533,11 @@ func TestNewReportItem(t *testing.T) {
 						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
 					},
 				},
+				Phase: "Running",
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace)
+	actual := NewReportItem(mockPods, namespace, true)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -544,6 +555,297 @@ func TestNewReportItem(t *testing.T) {
 				RepoDigest: "sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
 			},
 		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out NewReportItem which takes a list of pods. Include pods with init
+//	containers and regular containers. Include a pod that is in a Pending state
+//
+func TestNewReportItemNotRunningTrue(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{
+		{ // pod-1
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:  "alpine-init",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine-init",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+				Phase: "Running",
+			},
+		},
+		{ // pod-2
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "alpine4",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine4",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+				Phase: "Running",
+			},
+		},
+		{ // pod-3
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "sametag-alpine",
+						Image: "jpetersenames/sametag:latest",
+					},
+					{
+						Name:  "sametag-centos",
+						Image: "jpetersenames/sametag:latest",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "sametag-alpine",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+					},
+					{
+						Name:    "sametag-centos",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+					},
+				},
+				Phase: "Pending",
+			},
+		},
+	}
+	actual := NewReportItem(mockPods, namespace, true)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+			},
+		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out NewReportItem which takes a list of pods. Include pods with init
+//	containers and regular containers. Include a pod that is in a Pending state
+//
+func TestNewReportItemNotRunningFalse(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{
+		{ // pod-1
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{
+					{
+						Name:  "alpine-init",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine-init",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+				Phase: "Running",
+			},
+		},
+		{ // pod-2
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "alpine4",
+						Image: "alpine:3",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "alpine4",
+						Image:   "alpine:3",
+						ImageID: "docker-pullable://alpine@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+					},
+				},
+				Phase: "Running",
+			},
+		},
+		{ // pod-3
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "sametag-alpine",
+						Image: "jpetersenames/sametag:latest",
+					},
+					{
+						Name:  "sametag-centos",
+						Image: "jpetersenames/sametag:latest",
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:    "sametag-alpine",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+					},
+					{
+						Name:    "sametag-centos",
+						Image:   "jpetersenames/sametag:latest",
+						ImageID: "docker-pullable://jpetersenames/sametag@sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+					},
+				},
+				Phase: "Pending",
+			},
+		},
+	}
+	actual := NewReportItem(mockPods, namespace, false)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:3",
+				RepoDigest: "sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:5762a7f909e42866c63570f3107e2ab9d6d39309233f4312bb40c3b68aaf4f8a",
+			},
+			{
+				Tag:        "jpetersenames/sametag:latest",
+				RepoDigest: "sha256:a0b39cd754f1236114a1603ee1791deb660c78bb963da1f6aed48807c796b9d1",
+			},
+		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out NewReportItem with pods that are for some reason empty
+//
+func TestNewReportItemEmptyPods(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{
+		{ // pod-1
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				InitContainers: []v1.Container{},
+			},
+			Status: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{},
+				Phase:                 "Running",
+			},
+		},
+		{ // pod-2
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{},
+				Phase:             "Running",
+			},
+		},
+		{ // pod-3
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{},
+				Phase:             "Pending",
+			},
+		},
+	}
+	actual := NewReportItem(mockPods, namespace, true)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out NewReportItem with an empty list of pods
+//
+func TestNewReportItemEmptyPodList(t *testing.T) {
+	namespace := "default"
+	mockPods := []v1.Pod{}
+	actual := NewReportItem(mockPods, namespace, true)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
 	}
 	err := equivalent(actual, expected)
 	if err != nil {

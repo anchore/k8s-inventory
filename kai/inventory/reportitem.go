@@ -21,7 +21,7 @@ type ReportImage struct {
 }
 
 // NewReportItem parses a list of pods into a ReportItem full of unique images
-func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
+func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) ReportItem {
 
 	reportItem := ReportItem{
 		Namespace: namespace,
@@ -30,8 +30,7 @@ func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
 
 	for _, pod := range pods {
 		// Check for non-running
-		namespace := pod.ObjectMeta.Namespace
-		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
+		if ignoreNotRunning && pod.Status.Phase != "Running" {
 			continue
 		}
 		err := reportItem.extractUniqueImages(pod)
@@ -152,8 +151,8 @@ func (img *image) extractImageDetails(s string) error {
 	tagresult := tagRegex.FindStringSubmatchIndex(repo)
 	if len(tagresult) > 0 {
 		i := tagresult[0]
-		tag = repo[i+1:] // 4
-		repo = repo[:i]  // k3d-registry.localhost:5000/redis
+		tag = repo[i:]  // :4 - leave the colon to reattach later
+		repo = repo[:i] // k3d-registry.localhost:5000/redis
 	}
 
 	// Only fill if the field hasn't been successfully parsed yet
@@ -202,8 +201,10 @@ func processContainers(pod v1.Pod) ([]ReportImage, error) {
 
 	ri := make([]ReportImage, 0)
 	for _, u := range unique {
+		// TODO: what should the null tag be?
 		ri = append(ri, ReportImage{
-			Tag:        fmt.Sprintf("%s:%s", u.repo, u.tag),
+			// u.tag will be :tag or an empty string
+			Tag:        fmt.Sprintf("%s%s", u.repo, u.tag),
 			RepoDigest: u.digest,
 		})
 	}

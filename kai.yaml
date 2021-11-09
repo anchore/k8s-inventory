@@ -45,6 +45,9 @@ kubernetes:
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 
+# Ignore images out of pods that are not in a Running state
+ignore-not-running: true
+
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
