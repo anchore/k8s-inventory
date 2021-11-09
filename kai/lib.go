@@ -156,9 +156,23 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
 
+	namespaces := make([]string, 0)
+
+	exclusionSet := make(map[string]struct{})
+
+	if len(cfg.Namespaces.Exclude) > 0 {
+		for _, ns := range cfg.Namespaces.Exclude {
+			exclusionSet[ns] = struct{}{}
+		}
+	}
+
 	// Return list of namespaces if there are any present
-	if len(cfg.Namespaces) > 0 {
-		return cfg.Namespaces, nil
+	if len(cfg.Namespaces.Include) > 0 {
+		for _, ns := range cfg.Namespaces.Include {
+			if _, exist := exclusionSet[ns]; !exist {
+				namespaces = append(namespaces, ns)
+			}
+		}
 	}
 
 	// Otherwise collect all namespaces
@@ -167,7 +181,6 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 		return []string{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
-	namespaces := make([]string, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
@@ -183,7 +196,9 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 		}
 
 		for _, ns := range list.Items {
-			namespaces = append(namespaces, ns.ObjectMeta.Name)
+			if _, exist := exclusionSet[ns.ObjectMeta.Name]; !exist {
+				namespaces = append(namespaces, ns.ObjectMeta.Name)
+			}
 		}
 
 		cont = list.GetListMeta().GetContinue()
