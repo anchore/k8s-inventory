@@ -3,7 +3,6 @@ package inventory
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/anchore/kai/internal/log"
 	v1 "k8s.io/api/core/v1"
@@ -118,6 +117,10 @@ type image struct {
 	digest string
 }
 
+// Compile the regexes used for parsing once so they can be reused without having to recompile
+var digestRegex *regexp.Regexp = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
+var tagRegex *regexp.Regexp = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
+
 // extractImageDetails extracts the image, tag, and digest of an image out of the fields
 // grabbed from the pod.
 func (img *image) extractImageDetails(s string) error {
@@ -126,6 +129,7 @@ func (img *image) extractImageDetails(s string) error {
 		return nil
 	}
 
+	// Attempt to grab the digest out of the string
 	// Set repo to the initial string. If there's no digest to parse then we can assume
 	// it's just a repo and tag
 	repo := s
@@ -133,27 +137,23 @@ func (img *image) extractImageDetails(s string) error {
 
 	// Look for something like:
 	//  k3d-registry.localhost:5000/redis:4@sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
-	if strings.Contains(s, "@") {
-		split := strings.Split(s, "@")
-		repo = split[0]   // k3d-registry.localhost:5000/redis:4
-		digest = split[1] // sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
+	digestresult := digestRegex.FindStringSubmatchIndex(repo)
+	if len(digestresult) > 0 {
+		i := digestresult[0]
+		digest = repo[i+1:] // sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
+		repo = repo[:i]     // k3d-registry.localhost:5000/redis:4
 	}
 
-	const regexTag = `:[\w][\w.-]{0,127}$`
-	reg, err := regexp.Compile(regexTag)
-	if err != nil {
-		return err
-	}
-
+	// Attempt to split the repo and tag
 	tag := ""
 
 	// repo contains something like
 	//  k3d-registry.localhost:5000/redis:4
-	tagresult := reg.FindAllString(repo, -1)
+	tagresult := tagRegex.FindStringSubmatchIndex(repo)
 	if len(tagresult) > 0 {
-		i := strings.LastIndex(repo, ":")
-		repo = repo[0:i]                            // k3d-registry.localhost:5000/redis
-		tag = strings.TrimPrefix(tagresult[0], ":") // 4
+		i := tagresult[0]
+		tag = repo[i+1:] // 4
+		repo = repo[:i]  // k3d-registry.localhost:5000/redis
 	}
 
 	// Only fill if the field hasn't been successfully parsed yet
