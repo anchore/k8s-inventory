@@ -106,7 +106,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 				case <-ch.stopper:
 					return
 				default:
-					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+					fetchPodsInNamespace(clientset, cfg, namespace, ch)
 				}
 			}
 		}()
@@ -196,14 +196,14 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.KubernetesAPI, ns string, ch channels) {
+func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Application, ns string, ch channels) {
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.RequestBatchSize,
+			Limit:          cfg.Kubernetes.RequestBatchSize,
 			Continue:       cont,
-			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
+			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
 		list, err := clientset.CoreV1().Pods(ns).List(opts)
@@ -223,7 +223,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.Kub
 	}
 
 	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
-	ch.reportItem <- inventory.NewReportItem(pods, ns)
+	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning)
 }
 
 func SetLogger(logger logger.Logger) {
