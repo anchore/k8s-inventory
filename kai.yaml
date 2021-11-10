@@ -30,7 +30,7 @@ kubeconfig:
 
 # Which namespaces to search or exclude.
 namespaces:
-  # Namespaces to include as an explicit list
+  # Namespaces to include as explicit strings, not regex
   # NOTE: Will search ALL namespaces if left as an empty array
   include: []
 

@@ -172,6 +172,9 @@ func excludeSet(check map[string]struct{}) excludeCheck {
 	}
 }
 
+// Regex to determine whether a string is a valid namespace (valid dns name)
+var validNamespaceRegex *regexp.Regexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
 // buildExclusionChecklist will create a list of checks based on the configured
 // exclusion strings. The checks could be regexes or direct string matches.
 // It will create a regex check if the namespace string is not a valid dns
@@ -182,12 +185,11 @@ func buildExclusionChecklist(exclusions []string) []excludeCheck {
 	var excludeChecks []excludeCheck
 
 	if len(exclusions) > 0 {
-		re := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 		excludeMap := make(map[string]struct{})
 
 		for _, ex := range exclusions {
-			if !re.MatchString(ex) {
+			if !validNamespaceRegex.MatchString(ex) {
 				// assume the check is a regex
 				excludeChecks = append(excludeChecks, excludeRegex(ex))
 			} else {
