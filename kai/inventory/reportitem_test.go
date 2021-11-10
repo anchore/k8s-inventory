@@ -566,6 +566,7 @@ func TestNewReportItem(t *testing.T) {
 //
 //	Test out NewReportItem which takes a list of pods. Include pods with init
 //	containers and regular containers. Include a pod that is in a Pending state
+//	that should be ignored.
 //
 func TestNewReportItemNotRunningTrue(t *testing.T) {
 	namespace := "default"
@@ -670,6 +671,7 @@ func TestNewReportItemNotRunningTrue(t *testing.T) {
 //
 //	Test out NewReportItem which takes a list of pods. Include pods with init
 //	containers and regular containers. Include a pod that is in a Pending state
+//	that should still be captured.
 //
 func TestNewReportItemNotRunningFalse(t *testing.T) {
 	namespace := "default"

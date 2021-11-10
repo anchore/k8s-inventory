@@ -36,7 +36,7 @@ func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) Repor
 		err := reportItem.extractUniqueImages(pod)
 		if err != nil {
 			// Log the failure and continue processing pods
-			log.Errorf("Issue processing images in %s/%s", pod.GetNamespace(), pod.GetName())
+			log.Errorf("Issue processing images in %s/%s - %s", pod.GetNamespace(), pod.GetName(), err)
 		}
 	}
 
@@ -120,7 +120,7 @@ type image struct {
 var digestRegex *regexp.Regexp = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
 var tagRegex *regexp.Regexp = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 
-// extractImageDetails extracts the image, tag, and digest of an image out of the fields
+// extractImageDetails extracts the repo, tag, and digest of an image out of the fields
 // grabbed from the pod.
 func (img *image) extractImageDetails(s string) error {
 
