@@ -27,7 +27,9 @@ kubernetes:
   requesttimeoutseconds: 0
   requestbatchsize: 0
   workerpoolsize: 0
-namespaces: []
+namespaces:
+  include: []
+  exclude: []
 runmode: 0
 mode: ""
 ignorenotrunning: false
