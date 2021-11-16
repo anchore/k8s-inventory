@@ -66,6 +66,31 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 	}
 }
 
+// launchPodWorkerPool will create a worker pool of goroutines to grab pods
+// from each namespace. This should alleviate the load on the api server
+func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan string) {
+	// get pods from namespaces using a worker pool pattern
+	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
+		go func() {
+			// each worker needs its own clientset
+			clientset, err := client.GetClientSet(kubeconfig)
+			if err != nil {
+				ch.errors <- err
+				return
+			}
+
+			for namespace := range queue {
+				select {
+				case <-ch.stopper:
+					return
+				default:
+					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+				}
+			}
+		}()
+	}
+}
+
 // GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
 func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	kubeconfig, err := client.GetKubeConfig(cfg)
@@ -92,7 +117,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	// get pods from namespaces using a worker pool pattern
-	getPodsFromNameSpace(cfg, kubeconfig, ch, queue)
+	launchPodWorkerPool(cfg, kubeconfig, ch, queue)
 
 	// listen for results from worker pool
 	results := make([]inventory.ReportItem, 0)
@@ -131,30 +156,6 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		ClusterName:           cfg.KubeConfig.Cluster,
 		InventoryType:         "kubernetes",
 	}, nil
-}
-
-// This logic was separated to reduce block size.
-func getPodsFromNameSpace(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan string) {
-	// get pods from namespaces using a worker pool pattern
-	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
-		go func() {
-			// each worker needs its own clientset
-			clientset, err := client.GetClientSet(kubeconfig)
-			if err != nil {
-				ch.errors <- err
-				return
-			}
-
-			for namespace := range queue {
-				select {
-				case <-ch.stopper:
-					return
-				default:
-					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
-				}
-			}
-		}()
-	}
 }
 
 // fetchNamespaces either return the namespaces detailed in the configuration
