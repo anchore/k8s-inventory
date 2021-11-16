@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/anchore/kai/internal/log"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -22,7 +21,6 @@ type ReportImage struct {
 
 // NewReportItem parses a list of pods into a ReportItem full of unique images
 func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) ReportItem {
-
 	reportItem := ReportItem{
 		Namespace: namespace,
 		Images:    []ReportImage{},
@@ -33,11 +31,7 @@ func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) Repor
 		if ignoreNotRunning && pod.Status.Phase != "Running" {
 			continue
 		}
-		err := reportItem.extractUniqueImages(pod)
-		if err != nil {
-			// Log the failure and continue processing pods
-			log.Errorf("Issue processing images in %s/%s - %s", pod.GetNamespace(), pod.GetName(), err)
-		}
+		reportItem.extractUniqueImages(pod)
 	}
 
 	return reportItem
@@ -56,8 +50,7 @@ func (i *ReportImage) key() string {
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
 //
 // IMPORTANT: Ensures unique images across pods
-func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
-
+func (r *ReportItem) extractUniqueImages(pod v1.Pod) {
 	// Build a Map to make use as a Set (unique list). Values
 	// are empty structs so they don't waste space
 	unique := make(map[string]struct{})
@@ -66,10 +59,7 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 	}
 
 	// Process all containers in a pod and return all the unique images
-	images, err := processContainers(pod)
-	if err != nil {
-		return err
-	}
+	images := processContainers(pod)
 
 	// If the image isn't in the set already, append it to the list
 	for _, image := range images {
@@ -77,7 +67,6 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
 			r.Images = append(r.Images, image)
 		}
 	}
-	return nil
 }
 
 // fillContainerDetails grabs all the relevant fields out of a pod object so
@@ -122,10 +111,9 @@ var tagRegex *regexp.Regexp = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 
 // extractImageDetails extracts the repo, tag, and digest of an image out of the fields
 // grabbed from the pod.
-func (img *image) extractImageDetails(s string) error {
-
+func (img *image) extractImageDetails(s string) {
 	if img.digest != "" && img.tag != "" && img.repo != "" {
-		return nil
+		return
 	}
 
 	// Attempt to grab the digest out of the string
@@ -167,21 +155,17 @@ func (img *image) extractImageDetails(s string) error {
 	if img.repo == "" {
 		img.repo = repo
 	}
-
-	return nil
 }
 
 // processContainers takes in a pod object and will return a list of unique
 // ReportImage structures from the containers inside the pod
 //
 // IMPORTANT: Ensures unique images inside a pod
-func processContainers(pod v1.Pod) ([]ReportImage, error) {
-
+func processContainers(pod v1.Pod) []ReportImage {
 	unique := make(map[string]image)
 
 	containerset := fillContainerDetails(pod)
 	for _, containerdata := range containerset {
-
 		img := image{
 			repo:   "",
 			tag:    "",
@@ -189,10 +173,7 @@ func processContainers(pod v1.Pod) ([]ReportImage, error) {
 		}
 
 		for _, container := range containerdata {
-			err := img.extractImageDetails(container)
-			if err != nil {
-				return []ReportImage{}, err
-			}
+			img.extractImageDetails(container)
 		}
 
 		key := fmt.Sprintf("%s:%s@%s", img.repo, img.tag, img.digest)
@@ -208,5 +189,5 @@ func processContainers(pod v1.Pod) ([]ReportImage, error) {
 			RepoDigest: u.digest,
 		})
 	}
-	return ri, nil
+	return ri
 }
