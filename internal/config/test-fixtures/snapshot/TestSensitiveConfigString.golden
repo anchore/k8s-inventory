@@ -41,4 +41,4 @@ anchoredetails:
   account: admin
   http:
     insecure: false
-    timeoutseconds: 5
+    timeoutseconds: 10
