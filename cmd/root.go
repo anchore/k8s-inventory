@@ -83,19 +83,6 @@ func init() {
 		os.Exit(1)
 	}
 
-	opt = "namespaces"
-	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
-	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"all"}, cobra.ShellCompDirectiveDefault
-	})
-	if err != nil {
-		fmt.Printf("unable to register flag completion script for \"namespace\": %+v", err)
-	}
-	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
-		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
-		os.Exit(1)
-	}
-
 	opt = "mode"
 	rootCmd.Flags().StringP(opt, "m", mode.AdHoc.String(), fmt.Sprintf("execution mode, options=%v", mode.Modes))
 	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
