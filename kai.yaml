@@ -28,8 +28,21 @@ kubeconfig:
     private-key:
     token:
 
-# Which namespaces to search. Will search all namespaces if left as an empty array
-namespaces: []
+# Which namespaces to search or exclude.
+namespaces:
+  # Namespaces to include as explicit strings, not regex
+  # NOTE: Will search ALL namespaces if left as an empty array
+  include: []
+
+  # List of namespaces to exclude, can use explicit strings and/or regexes.
+  # For example
+  #
+  # list:
+  # - default
+  # - ^kube-*
+  #
+  # Will exclude the default, kube-system, and kube-public namespaces
+  exclude: []
 
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:
@@ -44,6 +57,9 @@ kubernetes:
 
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
+
+# Ignore images out of pods that are not in a Running state
+ignore-not-running: true
 
 # Only respected if mode is periodic
 polling-interval-seconds: 300

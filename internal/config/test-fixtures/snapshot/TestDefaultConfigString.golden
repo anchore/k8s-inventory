@@ -27,9 +27,12 @@ kubernetes:
   requesttimeoutseconds: 60
   requestbatchsize: 100
   workerpoolsize: 100
-namespaces: []
+namespaces:
+  include: []
+  exclude: []
 runmode: 0
 mode: adhoc
+ignorenotrunning: true
 pollingintervalseconds: 300
 anchoredetails:
   url: ""

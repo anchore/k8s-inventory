@@ -44,14 +44,20 @@ type Application struct {
 	Quiet                  bool    `mapstructure:"quiet"`
 	Log                    Logging `mapstructure:"log"`
 	CliOptions             CliOnlyOptions
-	Dev                    Development   `mapstructure:"dev"`
-	KubeConfig             KubeConf      `mapstructure:"kubeconfig"`
-	Kubernetes             KubernetesAPI `mapstructure:"kubernetes"`
-	Namespaces             []string      `mapstructure:"namespaces"`
+	Dev                    Development    `mapstructure:"dev"`
+	KubeConfig             KubeConf       `mapstructure:"kubeconfig"`
+	Kubernetes             KubernetesAPI  `mapstructure:"kubernetes"`
+	Namespaces             NamespacesConf `mapstructure:"namespaces"`
 	RunMode                mode.Mode
 	Mode                   string      `mapstructure:"mode"`
+	IgnoreNotRunning       bool        `mapstructure:"ignore-not-running"`
 	PollingIntervalSeconds int         `mapstructure:"polling-interval-seconds"`
 	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
+}
+
+type NamespacesConf struct {
+	Include []string `mapstructure:"include"`
+	Exclude []string `mapstructure:"exclude"`
 }
 
 type KubernetesAPI struct {
@@ -107,6 +113,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
+	v.SetDefault("ignore-not-running", true)
 }
 
 // Load the Application Configuration from the Viper specifications

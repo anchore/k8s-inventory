@@ -6,6 +6,7 @@ package kai
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/anchore/kai/kai/presenter"
@@ -69,7 +70,6 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 // launchPodWorkerPool will create a worker pool of goroutines to grab pods
 // from each namespace. This should alleviate the load on the api server
 func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan string) {
-	// get pods from namespaces using a worker pool pattern
 	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
 		go func() {
 			// each worker needs its own clientset
@@ -84,7 +84,7 @@ func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch ch
 				case <-ch.stopper:
 					return
 				default:
-					fetchPodsInNamespace(clientset, cfg.Kubernetes, namespace, ch)
+					fetchPodsInNamespace(clientset, cfg, namespace, ch)
 				}
 			}
 		}()
@@ -158,13 +158,84 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}, nil
 }
 
+// excludeCheck is a function that will return whether a namespace should be
+// excluded based on a regex or direct string match
+type excludeCheck func(namespace string) bool
+
+// excludeRegex compiles a regex to use for namespace matching
+func excludeRegex(check string) excludeCheck {
+	re := regexp.MustCompile(check)
+	return func(namespace string) bool {
+		return re.MatchString(namespace)
+	}
+}
+
+// excludeSet checks if a given string is present is a set
+func excludeSet(check map[string]struct{}) excludeCheck {
+	return func(namespace string) bool {
+		_, exist := check[namespace]
+		return exist
+	}
+}
+
+// Regex to determine whether a string is a valid namespace (valid dns name)
+var validNamespaceRegex *regexp.Regexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+
+// buildExclusionChecklist will create a list of checks based on the configured
+// exclusion strings. The checks could be regexes or direct string matches.
+// It will create a regex check if the namespace string is not a valid dns
+// name. If the namespace string in the exclude list is a valid dns name then
+// it will add it to a map for direct lookup when the checks are run.
+func buildExclusionChecklist(exclusions []string) []excludeCheck {
+
+	var excludeChecks []excludeCheck
+
+	if len(exclusions) > 0 {
+
+		excludeMap := make(map[string]struct{})
+
+		for _, ex := range exclusions {
+			if !validNamespaceRegex.MatchString(ex) {
+				// assume the check is a regex
+				excludeChecks = append(excludeChecks, excludeRegex(ex))
+			} else {
+				// assume check is raw string so add to set for lookup
+				excludeMap[ex] = struct{}{}
+			}
+		}
+		excludeChecks = append(excludeChecks, excludeSet(excludeMap))
+	}
+
+	return excludeChecks
+}
+
+// excludeNamespace is a helper function to check whether a namespace matches
+// any of the exclusion rules
+func excludeNamespace(checks []excludeCheck, namespace string) bool {
+	for _, check := range checks {
+		if check(namespace) {
+			return true
+		}
+	}
+	return false
+}
+
 // fetchNamespaces either return the namespaces detailed in the configuration
 // OR if there are no namespaces listed in the configuration then it will
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
+	namespaces := make([]string, 0)
+
+	exclusionChecklist := buildExclusionChecklist(cfg.Namespaces.Exclude)
+
 	// Return list of namespaces if there are any present
-	if len(cfg.Namespaces) > 0 {
-		return cfg.Namespaces, nil
+	if len(cfg.Namespaces.Include) > 0 {
+		for _, ns := range cfg.Namespaces.Include {
+			if !excludeNamespace(exclusionChecklist, ns) {
+				namespaces = append(namespaces, ns)
+			}
+		}
+		return namespaces, nil
 	}
 
 	// Otherwise collect all namespaces
@@ -173,7 +244,6 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 		return []string{}, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 
-	namespaces := make([]string, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
@@ -189,7 +259,9 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 		}
 
 		for _, ns := range list.Items {
-			namespaces = append(namespaces, ns.ObjectMeta.Name)
+			if !excludeNamespace(exclusionChecklist, ns.ObjectMeta.Name) {
+				namespaces = append(namespaces, ns.ObjectMeta.Name)
+			}
 		}
 
 		cont = list.GetListMeta().GetContinue()
@@ -202,14 +274,14 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 }
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
-func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.KubernetesAPI, ns string, ch channels) {
+func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Application, ns string, ch channels) {
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {
 		opts := metav1.ListOptions{
-			Limit:          kubernetes.RequestBatchSize,
+			Limit:          cfg.Kubernetes.RequestBatchSize,
 			Continue:       cont,
-			TimeoutSeconds: &kubernetes.RequestTimeoutSeconds,
+			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
 		list, err := clientset.CoreV1().Pods(ns).List(opts)
@@ -229,7 +301,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, kubernetes config.Kub
 	}
 
 	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
-	ch.reportItem <- inventory.NewReportItem(pods, ns)
+	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning)
 }
 
 func SetLogger(logger logger.Logger) {

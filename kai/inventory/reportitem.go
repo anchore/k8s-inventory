@@ -2,100 +2,211 @@ package inventory
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 
+	"github.com/anchore/kai/internal/log"
 	v1 "k8s.io/api/core/v1"
 )
 
-// Represents a ReportItem Images list result
+// ReportItem represents a namespace and all it's unique images
 type ReportItem struct {
 	Namespace string        `json:"namespace,omitempty"`
 	Images    []ReportImage `json:"images"`
 }
 
+// ReportImage represents a unique image in a cluster
 type ReportImage struct {
 	Tag        string `json:"tag,omitempty"`
 	RepoDigest string `json:"repoDigest,omitempty"`
 }
 
-func NewFromPod(pod v1.Pod) *ReportItem {
-	return &ReportItem{
-		Namespace: pod.Namespace,
-		Images:    getUniqueImagesFromPodStatus(pod),
-	}
-}
-
-func New(namespace string) *ReportItem {
-	return &ReportItem{
-		Namespace: namespace,
-		Images:    []ReportImage{},
-	}
-}
-
 // NewReportItem parses a list of pods into a ReportItem full of unique images
-func NewReportItem(pods []v1.Pod, namespace string) ReportItem {
+func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) ReportItem {
+
 	reportItem := ReportItem{
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
 
 	for _, pod := range pods {
-		namespace := pod.ObjectMeta.Namespace
-		if namespace == "" || len(pod.Status.ContainerStatuses) == 0 {
+		// Check for non-running
+		if ignoreNotRunning && pod.Status.Phase != "Running" {
 			continue
 		}
-		reportItem.AddImages(pod)
+		err := reportItem.extractUniqueImages(pod)
+		if err != nil {
+			// Log the failure and continue processing pods
+			log.Errorf("Issue processing images in %s/%s - %s", pod.GetNamespace(), pod.GetName(), err)
+		}
 	}
 
 	return reportItem
 }
 
-// Represent the namespace as a string
+// String represent the ReportItem as a string
 func (r *ReportItem) String() string {
 	return fmt.Sprintf("ReportItem(namespace=%s, images=%v)", r.Namespace, r.Images)
 }
 
+// key will return a unique key for a ReportImage
+func (i *ReportImage) key() string {
+	return fmt.Sprintf("%s@%s", i.Tag, i.RepoDigest)
+}
+
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
-func (r *ReportItem) AddImages(pod v1.Pod) {
-	if len(r.Images) == 0 {
-		r.Images = getUniqueImagesFromPodStatus(pod)
-	} else {
-		// Build a Map to make use as a Set (unique list). Values are empty structs so they don't waste space
-		imageSet := make(map[string]ReportImage)
-		for _, image := range r.Images {
-			// There's always a tag, the repoDigest may be missing
-			imageSet[image.Tag] = image
+//
+// IMPORTANT: Ensures unique images across pods
+func (r *ReportItem) extractUniqueImages(pod v1.Pod) error {
+
+	// Build a Map to make use as a Set (unique list). Values
+	// are empty structs so they don't waste space
+	unique := make(map[string]struct{})
+	for _, image := range r.Images {
+		unique[image.key()] = struct{}{}
+	}
+
+	// Process all containers in a pod and return all the unique images
+	images, err := processContainers(pod)
+	if err != nil {
+		return err
+	}
+
+	// If the image isn't in the set already, append it to the list
+	for _, image := range images {
+		if _, exist := unique[image.key()]; !exist {
+			r.Images = append(r.Images, image)
 		}
-		// If the image isn't in the set already, append it to the list
-		for _, image := range getUniqueImagesFromPodStatus(pod) {
-			if _, ok := imageSet[image.Tag]; !ok {
-				r.Images = append(r.Images, image)
+	}
+	return nil
+}
+
+// fillContainerDetails grabs all the relevant fields out of a pod object so
+// they can be used to parse out the image details for all the containers in
+// a pod. Return details as an mapped array of strings using the container name
+// as the map key and the fields as an array of strings so they can be iterated
+func fillContainerDetails(pod v1.Pod) map[string][]string {
+	details := make(map[string][]string)
+
+	// grab init images
+	for _, c := range pod.Spec.InitContainers {
+		details[c.Name] = append(details[c.Name], c.Image)
+	}
+
+	for _, c := range pod.Status.InitContainerStatuses {
+		details[c.Name] = append(details[c.Name], c.Image, c.ImageID)
+	}
+
+	// grab regular images
+	for _, c := range pod.Spec.Containers {
+		details[c.Name] = append(details[c.Name], c.Image)
+	}
+
+	for _, c := range pod.Status.ContainerStatuses {
+		details[c.Name] = append(details[c.Name], c.Image, c.ImageID)
+	}
+
+	return details
+}
+
+// image is an intermediate struct for parsing out image details from
+// a list of containers
+type image struct {
+	repo   string
+	tag    string
+	digest string
+}
+
+// Compile the regexes used for parsing once so they can be reused without having to recompile
+var digestRegex *regexp.Regexp = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
+var tagRegex *regexp.Regexp = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
+
+// extractImageDetails extracts the repo, tag, and digest of an image out of the fields
+// grabbed from the pod.
+func (img *image) extractImageDetails(s string) error {
+
+	if img.digest != "" && img.tag != "" && img.repo != "" {
+		return nil
+	}
+
+	// Attempt to grab the digest out of the string
+	// Set repo to the initial string. If there's no digest to parse then we can assume
+	// it's just a repo and tag
+	repo := s
+	digest := ""
+
+	// Look for something like:
+	//  k3d-registry.localhost:5000/redis:4@sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
+	digestresult := digestRegex.FindStringSubmatchIndex(repo)
+	if len(digestresult) > 0 {
+		i := digestresult[0]
+		digest = repo[i+1:] // sha256:5bd4fe08813b057df2ae55003a75c39d80a4aea9f1a0fbc0fbd7024edf555786
+		repo = repo[:i]     // k3d-registry.localhost:5000/redis:4
+	}
+
+	// Attempt to split the repo and tag
+	tag := ""
+
+	// repo contains something like
+	//  k3d-registry.localhost:5000/redis:4
+	tagresult := tagRegex.FindStringSubmatchIndex(repo)
+	if len(tagresult) > 0 {
+		i := tagresult[0]
+		tag = repo[i:]  // :4 - leave the colon to reattach later
+		repo = repo[:i] // k3d-registry.localhost:5000/redis
+	}
+
+	// Only fill if the field hasn't been successfully parsed yet
+	if img.digest == "" {
+		img.digest = digest
+	}
+
+	if img.tag == "" {
+		img.tag = tag
+	}
+
+	if img.repo == "" {
+		img.repo = repo
+	}
+
+	return nil
+}
+
+// processContainers takes in a pod object and will return a list of unique
+// ReportImage structures from the containers inside the pod
+//
+// IMPORTANT: Ensures unique images inside a pod
+func processContainers(pod v1.Pod) ([]ReportImage, error) {
+
+	unique := make(map[string]image)
+
+	containerset := fillContainerDetails(pod)
+	for _, containerdata := range containerset {
+
+		img := image{
+			repo:   "",
+			tag:    "",
+			digest: "",
+		}
+
+		for _, container := range containerdata {
+			err := img.extractImageDetails(container)
+			if err != nil {
+				return []ReportImage{}, err
 			}
 		}
-	}
-}
 
-func getUniqueImagesFromPodStatus(pod v1.Pod) []ReportImage {
-	imageMap := make(map[string]ReportImage)
-	for _, container := range pod.Status.ContainerStatuses {
-		repoDigest := getImageDigest(container.ImageID)
-		imageMap[container.Image] = ReportImage{
-			Tag:        container.Image,
-			RepoDigest: repoDigest,
-		}
+		key := fmt.Sprintf("%s:%s@%s", img.repo, img.tag, img.digest)
+		unique[key] = img
 	}
-	imageSlice := make([]ReportImage, 0, len(imageMap))
-	for _, v := range imageMap {
-		imageSlice = append(imageSlice, v)
-	}
-	return imageSlice
-}
 
-func getImageDigest(imageID string) string {
-	var imageDigest = ""
-	// If the image ID contains "sha", it corresponds to the repo digest. If not, it's not a digest
-	if strings.Contains(imageID, "sha") {
-		imageDigest = "sha" + strings.Split(imageID, "sha")[1]
+	ri := make([]ReportImage, 0)
+	for _, u := range unique {
+		// TODO: what should the null tag be?
+		ri = append(ri, ReportImage{
+			// u.tag will be :tag or an empty string
+			Tag:        fmt.Sprintf("%s%s", u.repo, u.tag),
+			RepoDigest: u.digest,
+		})
 	}
-	return imageDigest
+	return ri, nil
 }
