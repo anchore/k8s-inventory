@@ -218,8 +218,13 @@ func (cfg *Application) Build() error {
 		return fmt.Errorf("missing-tag-policy.policy must be one of %v", policies)
 	}
 
-	// BACKWARDS COMPATIBILITY - Translate namespaces into the new selector config
+	cfg.handleBackwardsCompatibility()
 
+	return nil
+}
+
+func (cfg *Application) handleBackwardsCompatibility() {
+	// BACKWARDS COMPATIBILITY - Translate namespaces into the new selector config
 	// Only trigger if there is nothing in the include selector.
 	if len(cfg.NamespaceSelectors.Include) == 0 && len(cfg.Namespaces) > 0 {
 		for _, ns := range cfg.Namespaces {
@@ -232,8 +237,6 @@ func (cfg *Application) Build() error {
 			cfg.NamespaceSelectors.Include = append(cfg.NamespaceSelectors.Include, ns)
 		}
 	}
-
-	return nil
 }
 
 func readConfig(v *viper.Viper, configPath string) error {
