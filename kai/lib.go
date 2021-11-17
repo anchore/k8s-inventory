@@ -67,6 +67,30 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 	}
 }
 
+// launchPodWorkerPool will create a worker pool of goroutines to grab pods
+// from each namespace. This should alleviate the load on the api server
+func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan string) {
+	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
+		go func() {
+			// each worker needs its own clientset
+			clientset, err := client.GetClientSet(kubeconfig)
+			if err != nil {
+				ch.errors <- err
+				return
+			}
+
+			for namespace := range queue {
+				select {
+				case <-ch.stopper:
+					return
+				default:
+					fetchPodsInNamespace(clientset, cfg, namespace, ch)
+				}
+			}
+		}()
+	}
+}
+
 // GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
 func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	kubeconfig, err := client.GetKubeConfig(cfg)
@@ -93,25 +117,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	// get pods from namespaces using a worker pool pattern
-	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
-		go func() {
-			// each worker needs its own clientset
-			clientset, err := client.GetClientSet(kubeconfig)
-			if err != nil {
-				ch.errors <- err
-				return
-			}
-
-			for namespace := range queue {
-				select {
-				case <-ch.stopper:
-					return
-				default:
-					fetchPodsInNamespace(clientset, cfg, namespace, ch)
-				}
-			}
-		}()
-	}
+	launchPodWorkerPool(cfg, kubeconfig, ch, queue)
 
 	// listen for results from worker pool
 	results := make([]inventory.ReportItem, 0)
@@ -158,9 +164,8 @@ type excludeCheck func(namespace string) bool
 
 // excludeRegex compiles a regex to use for namespace matching
 func excludeRegex(check string) excludeCheck {
-	re := regexp.MustCompile(check)
 	return func(namespace string) bool {
-		return re.MatchString(namespace)
+		return regexp.MustCompile(check).MatchString(namespace)
 	}
 }
 
@@ -181,11 +186,9 @@ var validNamespaceRegex *regexp.Regexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]
 // name. If the namespace string in the exclude list is a valid dns name then
 // it will add it to a map for direct lookup when the checks are run.
 func buildExclusionChecklist(exclusions []string) []excludeCheck {
-
 	var excludeChecks []excludeCheck
 
 	if len(exclusions) > 0 {
-
 		excludeMap := make(map[string]struct{})
 
 		for _, ex := range exclusions {
@@ -218,7 +221,6 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 // OR if there are no namespaces listed in the configuration then it will
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
-
 	namespaces := make([]string, 0)
 
 	exclusionChecklist := buildExclusionChecklist(cfg.Namespaces.Exclude)

@@ -23,14 +23,6 @@ func TestGetImageResults(t *testing.T) {
 		t.Errorf("Failed to include Server Version Metadata in report")
 	}
 
-	if report.ClusterName == "" {
-		t.Errorf("Failed to include ClusterName in report")
-	}
-
-	if report.InventoryType == "" {
-		t.Errorf("Failed to include InventoryType in report")
-	}
-
 	if report.Timestamp == "" {
 		t.Errorf("Failed to include Timestamp in report")
 	}

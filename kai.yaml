@@ -70,4 +70,4 @@ anchore:
   password: $KAI_ANCHORE_PASSWORD
 #  http:
 #    insecure: true
-#    timeoutSeconds: 5
+#    timeout-seconds: 10

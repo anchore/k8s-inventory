@@ -46,7 +46,7 @@ var rootCmd = &cobra.Command{
 		case mode.PeriodicPolling:
 			kai.PeriodicallyGetInventoryReport(appConfig)
 		default:
-			imagesResult, err := kai.GetInventoryReport(appConfig)
+			report, err := kai.GetInventoryReport(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -54,7 +54,7 @@ var rootCmd = &cobra.Command{
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
 			} else {
-				err := kai.HandleReport(imagesResult, appConfig)
+				err := kai.HandleReport(report, appConfig)
 				if err != nil {
 					log.Errorf("Failed to handle Image Results: %+v", err)
 					os.Exit(1)
@@ -79,19 +79,6 @@ func init() {
 	opt = "kubeconfig"
 	rootCmd.Flags().StringP(opt, "k", "", "(optional) absolute path to the kubeconfig file")
 	if err := viper.BindPFlag(opt+".path", rootCmd.Flags().Lookup(opt)); err != nil {
-		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
-		os.Exit(1)
-	}
-
-	opt = "namespaces"
-	rootCmd.Flags().StringSliceP(opt, "n", []string{"all"}, "(optional) namespaces to search")
-	err := rootCmd.RegisterFlagCompletionFunc(opt, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"all"}, cobra.ShellCompDirectiveDefault
-	})
-	if err != nil {
-		fmt.Printf("unable to register flag completion script for \"namespace\": %+v", err)
-	}
-	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
 	}
