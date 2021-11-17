@@ -223,11 +223,29 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
 	namespaces := make([]string, 0)
 
-	exclusionChecklist := buildExclusionChecklist(cfg.Namespaces.Exclude)
+	exclusionChecklist := buildExclusionChecklist(cfg.NamespaceSelectors.Exclude)
+
+	// Backwards Compatibility - Return list of namespaces if there are any present in old config
+	if len(cfg.NamespaceSelectors.Include) == 0 && len(cfg.NamespaceSelectors.Exclude) == 0 {
+		getAll := false
+		for _, ns := range cfg.Namespaces {
+			if ns == "all" {
+				getAll = true
+			}
+		}
+		if len(cfg.Namespaces) > 0 && !getAll {
+			for _, ns := range cfg.Namespaces {
+				if !excludeNamespace(exclusionChecklist, ns) {
+					namespaces = append(namespaces, ns)
+				}
+			}
+			return namespaces, nil
+		}
+	}
 
 	// Return list of namespaces if there are any present
-	if len(cfg.Namespaces.Include) > 0 {
-		for _, ns := range cfg.Namespaces.Include {
+	if len(cfg.NamespaceSelectors.Include) > 0 {
+		for _, ns := range cfg.NamespaceSelectors.Include {
 			if !excludeNamespace(exclusionChecklist, ns) {
 				namespaces = append(namespaces, ns)
 			}

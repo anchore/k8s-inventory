@@ -44,11 +44,12 @@ type Application struct {
 	Quiet                  bool    `mapstructure:"quiet"`
 	Log                    Logging `mapstructure:"log"`
 	CliOptions             CliOnlyOptions
-	Dev                    Development    `mapstructure:"dev"`
-	KubeConfig             KubeConf       `mapstructure:"kubeconfig"`
-	Kubernetes             KubernetesAPI  `mapstructure:"kubernetes"`
-	Namespaces             NamespacesConf `mapstructure:"namespaces"`
-	MissingTagPolicy       MissingTagConf `mapstructure:"missing-tag-policy"`
+	Dev                    Development       `mapstructure:"dev"`
+	KubeConfig             KubeConf          `mapstructure:"kubeconfig"`
+	Kubernetes             KubernetesAPI     `mapstructure:"kubernetes"`
+	Namespaces             []string          `mapstructure:"namespaces"`
+	NamespaceSelectors     NamespaceSelector `mapstructure:"namespace-selectors"`
+	MissingTagPolicy       MissingTagConf    `mapstructure:"missing-tag-policy"`
 	RunMode                mode.Mode
 	Mode                   string      `mapstructure:"mode"`
 	IgnoreNotRunning       bool        `mapstructure:"ignore-not-running"`
@@ -62,8 +63,8 @@ type MissingTagConf struct {
 	Tag    string `mapstructure:"tag,omitempty"`
 }
 
-// NamespacesConf details the inclusion/exclusion rules for namespaces
-type NamespacesConf struct {
+// NamespaceSelector details the inclusion/exclusion rules for namespaces
+type NamespaceSelector struct {
 	Include []string `mapstructure:"include"`
 	Exclude []string `mapstructure:"exclude"`
 }
@@ -125,6 +126,8 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("ignore-not-running", true)
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
+	v.SetDefault("namespace-selectors.include", []string{})
+	v.SetDefault("namespace-selectors.exclude", []string{})
 }
 
 // Load the Application Configuration from the Viper specifications
