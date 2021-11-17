@@ -12,9 +12,9 @@ It can be run inside a cluster (under a Service Account) or outside (via any pro
 [Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/kai)
 
 ## Installation
-Kai can be run as a CLI, Docker Container, or Helm Chart
+KAI can be run as a CLI, Docker Container, or Helm Chart
 
-By default, Kai will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI).
+By default, KAI will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI).
 
 ### CLI
 ```shell script
@@ -298,7 +298,7 @@ kubernetes:
   worker-pool-size: 100
 ```
 
-### Kai mode of operation
+### KAI mode of operation
 
 ```yaml
 # Can be one of adhoc, periodic (defaults to adhoc)
@@ -310,8 +310,8 @@ polling-interval-seconds: 300
 
 ### Missing Tag Policy
 
-There are cases where image in kubernetes do not have an associated tag - for
-example when an image is deployed using the digest
+There are cases where images in Kubernetes do not have an associated tag - for
+example when an image is deployed using the digest.
 
 ```sh
 kubectl run python --image=python@sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a
@@ -411,7 +411,7 @@ docker build -t localhost/kai:latest --build-arg KUBECONFIG=./kubeconfig .
 ```
 
 ### Shell Completion
-Kai comes with shell completion for specifying namespaces, it can be enabled as follows. Run with the `--help` command to get the instructions for the shell of your choice
+KAI comes with shell completion for specifying namespaces, it can be enabled as follows. Run with the `--help` command to get the instructions for the shell of your choice
 
 ```sh
 kai completion <zsh|bash|fish>
@@ -423,5 +423,5 @@ that we want to release. This tag shall be a semver prefixed with a `v`, e.g. `v
 This will trigger a GitHub Action that will create the release.
 
 After the release has been successfully created, make sure to specify the updated version
-in both Enterprise and the Kai Helm Chart in
+in both Enterprise and the KAI Helm Chart in
 [anchore-charts](https://github.com/anchore/anchore-charts).
