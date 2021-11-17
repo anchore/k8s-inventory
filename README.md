@@ -233,7 +233,7 @@ kubeconfig:
     token:
 ```
 
-#### Namespace selection
+### Namespace selection
 
 Configure which namespaces kai should search.
 
@@ -281,7 +281,7 @@ namespaces:
   exclude: []
 ```
 
-#### Kubernetes API Parameters
+### Kubernetes API Parameters
 
 This section will allow users to tune the way kai interacts with the kubernetes API server.
 
@@ -298,7 +298,7 @@ kubernetes:
   worker-pool-size: 100
 ```
 
-#### Kai mode of operation
+### Kai mode of operation
 
 ```yaml
 # Can be one of adhoc, periodic (defaults to adhoc)
@@ -401,7 +401,7 @@ The Makefile has testing built into it. For unit tests simply run
 make unit
 ```
 
-#### Docker
+### Docker
 To build a docker image, you'll need to provide a kubeconfig.
 
 Note: Docker build requires files to be within the docker build context
