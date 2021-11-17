@@ -30,6 +30,9 @@ kubernetes:
 namespaces:
   include: []
   exclude: []
+missingtagpolicy:
+  policy: ""
+  tag: ""
 runmode: 0
 mode: ""
 ignorenotrunning: false

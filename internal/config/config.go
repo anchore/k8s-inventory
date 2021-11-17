@@ -48,6 +48,7 @@ type Application struct {
 	KubeConfig             KubeConf       `mapstructure:"kubeconfig"`
 	Kubernetes             KubernetesAPI  `mapstructure:"kubernetes"`
 	Namespaces             NamespacesConf `mapstructure:"namespaces"`
+	MissingTagPolicy       MissingTagConf `mapstructure:"missing-tag-policy"`
 	RunMode                mode.Mode
 	Mode                   string      `mapstructure:"mode"`
 	IgnoreNotRunning       bool        `mapstructure:"ignore-not-running"`
@@ -55,11 +56,19 @@ type Application struct {
 	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
 }
 
+// MissingTagConf details the policy for handling missing tags when reporting images
+type MissingTagConf struct {
+	Policy string `mapstructure:"policy"`
+	Tag    string `mapstructure:"tag,omitempty"`
+}
+
+// NamespacesConf details the inclusion/exclusion rules for namespaces
 type NamespacesConf struct {
 	Include []string `mapstructure:"include"`
 	Exclude []string `mapstructure:"exclude"`
 }
 
+// KubernetesAPI details the configuration for interacting with the k8s api server
 type KubernetesAPI struct {
 	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds"`
 	RequestBatchSize      int64 `mapstructure:"request-batch-size"`
@@ -114,6 +123,8 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
 	v.SetDefault("ignore-not-running", true)
+	v.SetDefault("missing-tag-policy.policy", "digest")
+	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
 }
 
 // Load the Application Configuration from the Viper specifications
@@ -187,6 +198,20 @@ func (cfg *Application) Build() error {
 				cfg.Log.LevelOpt = logrus.ErrorLevel
 			}
 		}
+	}
+
+	// add new policies here if we decide to support more
+	policies := []string{"digest", "insert", "drop"}
+	validPolicy := false
+	for _, p := range policies {
+		if cfg.MissingTagPolicy.Policy == p {
+			validPolicy = true
+			break
+		}
+	}
+
+	if !validPolicy {
+		return fmt.Errorf("missing-tag-policy.policy must be one of %v", policies)
 	}
 
 	return nil

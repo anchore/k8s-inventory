@@ -30,6 +30,9 @@ kubernetes:
 namespaces:
   include: []
   exclude: []
+missingtagpolicy:
+  policy: digest
+  tag: UNKNOWN
 runmode: 0
 mode: adhoc
 ignorenotrunning: true

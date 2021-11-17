@@ -58,6 +58,23 @@ kubernetes:
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 
+# Handle cases where a tag is missing. For example - images designated by digest
+missing-tag-policy:
+  # One of the following options [digest, insert, drop]. Default is 'digest'
+  #
+  # [digest] will use the image's digest as a dummy tag.
+  #
+  # [insert] will insert a default tag in as a dummy tag. The dummy tag is
+  #          customizable under missing-tag-policy.tag
+  #
+  # [drop] will drop images that do not have tags associated with them. Not
+  #        recommended.
+  policy: digest
+
+  # Dummy tag to use. Only applicable if policy is 'insert'. Defaults to UNKNOWN
+  tag: UNKNOWN
+
+
 # Ignore images out of pods that are not in a Running state
 ignore-not-running: true
 

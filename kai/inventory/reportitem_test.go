@@ -8,6 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	defaultIgnoreNotRunning = true
+	defaultMissingTagPolicy = "digest"
+	defualtDummyTag         = "UNKNOWN"
+)
+
 func logout(actual, expected ReportItem, t *testing.T) {
 	t.Log("")
 	t.Log("Actual")
@@ -90,7 +96,7 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -167,7 +173,7 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace, true)
+	actual := NewReportItem(mockPods, namespace, defaultIgnoreNotRunning, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -192,9 +198,11 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 //
 //	Test out a pod running with an image added by digest only.
 //
+//	MissingTagPolicy == "digest"
+//
 //	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
 //
-func TestAddImageWithDigestNoTag(t *testing.T) {
+func TestAddImageWithDigestNoTagMTPAsDigest(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -223,17 +231,120 @@ func TestAddImageWithDigestNoTag(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
-	// TODO: What should the null tag be?
 	expected := ReportItem{
 		Namespace: namespace,
 		Images: []ReportImage{
 			{
-				Tag:        "alpine", // TODO: This needs to change when the null tag is decided
+				Tag:        "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
 			},
 		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out a pod running with an image added by digest only.
+//
+//	MissingTagPolicy == "insert"
+//	DummyTag == "UNKNOWN"
+//
+//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
+func TestAddImageWithDigestNoTagMTPAsInsert(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine1",
+					Image: "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine1",
+					Image:   "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+			Phase: "Running",
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod, "insert", defualtDummyTag)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        fmt.Sprintf("alpine:%s", defualtDummyTag),
+				RepoDigest: "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+			},
+		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
+//	Test out a pod running with an image added by digest only.
+//
+//	MissingTagPolicy == "drop"
+//
+//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
+//
+func TestAddImageWithDigestNoTagMTPAsDrop(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine1",
+					Image: "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine1",
+					Image:   "alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+					ImageID: "docker-pullable://alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+				},
+			},
+			Phase: "Running",
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod, "drop", defualtDummyTag)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
 	}
 	err := equivalent(actual, expected)
 	if err != nil {
@@ -277,7 +388,7 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -331,7 +442,7 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -383,7 +494,7 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -433,7 +544,7 @@ func TestInitContainer(t *testing.T) {
 		Namespace: namespace,
 		Images:    []ReportImage{},
 	}
-	actual.extractUniqueImages(mockPod)
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -537,7 +648,7 @@ func TestNewReportItem(t *testing.T) {
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace, true)
+	actual := NewReportItem(mockPods, namespace, defaultIgnoreNotRunning, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -650,7 +761,7 @@ func TestNewReportItemNotRunningTrue(t *testing.T) {
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace, true)
+	actual := NewReportItem(mockPods, namespace, defaultIgnoreNotRunning, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -755,7 +866,7 @@ func TestNewReportItemNotRunningFalse(t *testing.T) {
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace, false)
+	actual := NewReportItem(mockPods, namespace, false, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -824,7 +935,7 @@ func TestNewReportItemEmptyPods(t *testing.T) {
 			},
 		},
 	}
-	actual := NewReportItem(mockPods, namespace, true)
+	actual := NewReportItem(mockPods, namespace, defaultIgnoreNotRunning, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,
@@ -843,7 +954,7 @@ func TestNewReportItemEmptyPods(t *testing.T) {
 func TestNewReportItemEmptyPodList(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{}
-	actual := NewReportItem(mockPods, namespace, true)
+	actual := NewReportItem(mockPods, namespace, defaultIgnoreNotRunning, defaultMissingTagPolicy, defualtDummyTag)
 
 	expected := ReportItem{
 		Namespace: namespace,

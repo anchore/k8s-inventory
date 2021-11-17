@@ -3,7 +3,9 @@ package inventory
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
+	"github.com/anchore/kai/internal/log"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -20,7 +22,7 @@ type ReportImage struct {
 }
 
 // NewReportItem parses a list of pods into a ReportItem full of unique images
-func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) ReportItem {
+func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool, missingTagPolicy string, dummyTag string) ReportItem {
 	reportItem := ReportItem{
 		Namespace: namespace,
 		Images:    []ReportImage{},
@@ -31,7 +33,7 @@ func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool) Repor
 		if ignoreNotRunning && pod.Status.Phase != "Running" {
 			continue
 		}
-		reportItem.extractUniqueImages(pod)
+		reportItem.extractUniqueImages(pod, missingTagPolicy, dummyTag)
 	}
 
 	return reportItem
@@ -50,7 +52,7 @@ func (i *ReportImage) key() string {
 // Adds an ReportImage to the ReportItem struct (if it doesn't exist there already)
 //
 // IMPORTANT: Ensures unique images across pods
-func (r *ReportItem) extractUniqueImages(pod v1.Pod) {
+func (r *ReportItem) extractUniqueImages(pod v1.Pod, missingTagPolicy string, dummyTag string) {
 	// Build a Map to make use as a Set (unique list). Values
 	// are empty structs so they don't waste space
 	unique := make(map[string]struct{})
@@ -59,7 +61,7 @@ func (r *ReportItem) extractUniqueImages(pod v1.Pod) {
 	}
 
 	// Process all containers in a pod and return all the unique images
-	images := processContainers(pod)
+	images := processContainers(pod, missingTagPolicy, dummyTag)
 
 	// If the image isn't in the set already, append it to the list
 	for _, image := range images {
@@ -139,8 +141,8 @@ func (img *image) extractImageDetails(s string) {
 	tagresult := tagRegex.FindStringSubmatchIndex(repo)
 	if len(tagresult) > 0 {
 		i := tagresult[0]
-		tag = repo[i:]  // :4 - leave the colon to reattach later
-		repo = repo[:i] // k3d-registry.localhost:5000/redis
+		tag = repo[i+1:] // 4
+		repo = repo[:i]  // k3d-registry.localhost:5000/redis
 	}
 
 	// Only fill if the field hasn't been successfully parsed yet
@@ -157,11 +159,21 @@ func (img *image) extractImageDetails(s string) {
 	}
 }
 
+func (img *image) handleMissingTag(missingTagPolicy string, dummyTag string) {
+	switch missingTagPolicy {
+	case "digest":
+		tag := strings.Split(img.digest, ":")
+		img.tag = tag[len(tag)-1]
+	case "insert":
+		img.tag = dummyTag
+	}
+}
+
 // processContainers takes in a pod object and will return a list of unique
 // ReportImage structures from the containers inside the pod
 //
 // IMPORTANT: Ensures unique images inside a pod
-func processContainers(pod v1.Pod) []ReportImage {
+func processContainers(pod v1.Pod, missingTagPolicy string, dummyTag string) []ReportImage {
 	unique := make(map[string]image)
 
 	containerset := fillContainerDetails(pod)
@@ -176,16 +188,22 @@ func processContainers(pod v1.Pod) []ReportImage {
 			img.extractImageDetails(container)
 		}
 
+		if img.tag == "" {
+			if missingTagPolicy == "drop" {
+				log.Debugf("Dropping %s %s due to missing tag policy of 'drop'", img.repo, img.digest)
+				continue
+			}
+			img.handleMissingTag(missingTagPolicy, dummyTag)
+		}
+
 		key := fmt.Sprintf("%s:%s@%s", img.repo, img.tag, img.digest)
 		unique[key] = img
 	}
 
 	ri := make([]ReportImage, 0)
 	for _, u := range unique {
-		// TODO: what should the null tag be?
 		ri = append(ri, ReportImage{
-			// u.tag will be :tag or an empty string
-			Tag:        fmt.Sprintf("%s%s", u.repo, u.tag),
+			Tag:        fmt.Sprintf("%s:%s", u.repo, u.tag),
 			RepoDigest: u.digest,
 		})
 	}
