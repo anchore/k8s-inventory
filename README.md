@@ -4,7 +4,7 @@
 [![GitHub release](https://img.shields.io/github/release/anchore/kai.svg)](https://github.com/anchore/kai/releases/latest)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/anchore/kai/blob/main/LICENSE)
 
-KAI polls the Kubernetes API on an interval to retrieve which Docker images are currently in use.
+KAI polls the Kubernetes API on an interval to retrieve which images are currently in use.
 
 It can be run inside a cluster (under a Service Account) or outside (via any provided Kubeconfig).
 
@@ -14,66 +14,167 @@ It can be run inside a cluster (under a Service Account) or outside (via any pro
 ## Installation
 Kai can be run as a CLI, Docker Container, or Helm Chart
 
-By default, Kai will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI). 
+By default, Kai will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI).
 
 ### CLI
 ```shell script
 $ kai
 {
- "timestamp": "2020-09-21T21:36:46Z",
- "results": [
-  {
-   "namespace": "docker",
-   "images": [
-    "docker/kube-compose-controller:v0.4.25-alpha1",
-    "docker/kube-compose-api-server:v0.4.25-alpha1"
-   ]
+  "timestamp": "2021-11-17T18:47:36Z",
+  "results": [
+    {
+      "namespace": "kube-node-lease",
+      "images": []
+    },
+    {
+      "namespace": "kube-public",
+      "images": []
+    },
+    {
+      "namespace": "default",
+      "images": [
+        {
+          "tag": "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+          "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
+        },
+        {
+          "tag": "memcached:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f",
+          "repoDigest": "sha256:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f"
+        },
+        {
+          "tag": "python:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a",
+          "repoDigest": "sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a"
+        }
+      ]
+    },
+    {
+      "namespace": "kube-system",
+      "images": [
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.7.5-eksbuild.1",
+          "repoDigest": "sha256:d96d712513464de6ce94e422634a25546565418f20d1b28d3bce399d578f3296"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.7.5-eksbuild.1",
+          "repoDigest": "sha256:f310c918ee2b4ebced76d2d64a2ec128dde3b364d1b495f0ae73011f489d474d"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.8.4-eksbuild.1",
+          "repoDigest": "sha256:fcb60ebdb0d8ec23abe46c65d0f650d9e2bf2f803fac004ceb1f0bf348db0fd0"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/kube-proxy:v1.21.2-eksbuild.2",
+          "repoDigest": "sha256:0ea6717ed144c7f04922bf56662d58d5b14b7b62ef78c70e636a02d22052681c"
+        }
+      ]
+    }
+  ],
+  "serverVersionMetadata": {
+    "major": "1",
+    "minor": "21+",
+    "gitVersion": "v1.21.2-eks-06eac09",
+    "gitCommit": "5f6d83fe4cb7febb5f4f4e39b3b2b64ebbbe3e97",
+    "gitTreeState": "clean",
+    "buildDate": "2021-09-13T14:20:15Z",
+    "goVersion": "go1.16.5",
+    "compiler": "gc",
+    "platform": "linux/amd64"
   },
-...
+  "cluster_name": "eks-prod",
+  "inventory_type": "kubernetes"
+}
 ```
 ### Container
 
 In order to run kai as a container, it needs a kubeconfig
-```
-~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.1.0
+```sh
+~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.2.3
 {
- "timestamp": "2021-01-26T22:22:03Z",
- "results": [
-  {
-   "namespace": "kube-node-lease",
-   "images": []
-  },
-  {
-   "namespace": "kube-public",
-   "images": []
-  },
-  {
-   "namespace": "default",
-   "images": [
+  "timestamp": "2021-11-17T18:47:36Z",
+  "results": [
     {
-     "tag": "anchore/kai:v0.1.0",
-     "repoDigest": "sha256:668cd005062d5a5b04dcf822556c02da50cbc08db079d2a0fe4ea45a396e0ac1"
+      "namespace": "kube-node-lease",
+      "images": []
     },
-...
+    {
+      "namespace": "kube-public",
+      "images": []
+    },
+    {
+      "namespace": "default",
+      "images": [
+        {
+          "tag": "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+          "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
+        },
+        {
+          "tag": "memcached:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f",
+          "repoDigest": "sha256:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f"
+        },
+        {
+          "tag": "python:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a",
+          "repoDigest": "sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a"
+        }
+      ]
+    },
+    {
+      "namespace": "kube-system",
+      "images": [
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.7.5-eksbuild.1",
+          "repoDigest": "sha256:d96d712513464de6ce94e422634a25546565418f20d1b28d3bce399d578f3296"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.7.5-eksbuild.1",
+          "repoDigest": "sha256:f310c918ee2b4ebced76d2d64a2ec128dde3b364d1b495f0ae73011f489d474d"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.8.4-eksbuild.1",
+          "repoDigest": "sha256:fcb60ebdb0d8ec23abe46c65d0f650d9e2bf2f803fac004ceb1f0bf348db0fd0"
+        },
+        {
+          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/kube-proxy:v1.21.2-eksbuild.2",
+          "repoDigest": "sha256:0ea6717ed144c7f04922bf56662d58d5b14b7b62ef78c70e636a02d22052681c"
+        }
+      ]
+    }
+  ],
+  "serverVersionMetadata": {
+    "major": "1",
+    "minor": "21+",
+    "gitVersion": "v1.21.2-eks-06eac09",
+    "gitCommit": "5f6d83fe4cb7febb5f4f4e39b3b2b64ebbbe3e97",
+    "gitTreeState": "clean",
+    "buildDate": "2021-09-13T14:20:15Z",
+    "goVersion": "go1.16.5",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  },
+  "cluster_name": "eks-prod",
+  "inventory_type": "kubernetes"
+}
 ```
 
 ### Helm Chart
 
 KAI is the foundation of Anchore Enterprise's Runtime Inventory feature. Running KAI via Helm is a great way to retrieve your Kubernetes Image inventory without providing Cluster Credentials to Anchore.
 
-KAI runs as a read-only service account in the cluster it's deployed to. 
+KAI runs as a read-only service account in the cluster it's deployed to.
 
 In order to report the inventory to Anchore, KAI does require authentication material for your Anchore Enterprise deployment.
 KAI's helm chart automatically creates a kubernetes secret for the Anchore Password based on the values file you use, Ex.:
-```
+
+```yaml
 kai:
-    anchore:
-        password: foobar
+  anchore:
+    password: foobar
 ```
+
 It will set the following environment variable based on this: `KAI_ANCHORE_PASSWORD=foobar`.
 
 If you don't want to store your Anchore password in the values file, you can create your own secret to do this:
-```
+
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -82,16 +183,21 @@ type: Opaque
 stringData:
   KAI_ANCHORE_PASSWORD: foobar
 ```
+
 and then provide it to the helm chart via the values file:
-```
+
+```yaml
 kai:
-    existingSecret: kai-anchore-password
+  existingSecret: kai-anchore-password
 ```
+
 KAI's helm chart is part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
-```
+
+```sh
 helm repo add anchore https://charts.anchore.io
 helm install <release-name> -f <values.yaml> anchore/kai
-``` 
+```
+
 A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/master/stable/kai/values.yaml)
 
 ## Configuration
@@ -107,34 +213,123 @@ log:
   structured: false
 
   # the log level; note: detailed logging suppress the ETUI
-  level: "warn"
+  level: "debug"
 
   # location to write the log file (default is not to have a log file)
-  file: ""
+  file: "./kai.log"
 
 # enable/disable checking for application updates on startup
 check-for-app-update: true
 
-# Which namespaces to search (can just be a single element "all" or it can be multiple)
-namespaces:
-  - default
-  - docker
-  - kube-system
+kubeconfig:
+  path:
+  cluster: docker-desktop
+  cluster-cert:
+  server:  # ex. https://kubernetes.docker.internal:6443
+  user:
+    type:  # valid: [private_key, token]
+    client-cert:
+    private-key:
+    token:
+```
 
+#### Namespace selection
+
+Configure which namespaces kai should search.
+
+* `include` section
+  * A list of explicit strings that will detail the list of namespaces to capture image data from.
+  * If left as an empty list `[]` all namespaces will be searched
+
+* `exclude` section
+  * A list of explicit strings and/or regex patterns for namespaces to be excluded.
+  * A regex is determined if the string does not match standard DNS name requirements.
+
+```yaml
+# Which namespaces to search or exclude.
+namespaces:
+  # Namespaces to include as explicit strings, not regex
+  # NOTE: Will search ALL namespaces if left as an empty array
+  include: []
+
+  # List of namespaces to exclude, can use explicit strings and/or regexes.
+  # For example
+  #
+  # list:
+  # - default
+  # - ^kube-*
+  #
+  # Will exclude the default, kube-system, and kube-public namespaces
+  exclude: []
+```
+
+#### Kubernetes API Parameters
+
+This section will allow users to tune the way kai interacts with the kubernetes API server.
+
+```yaml
+# Kubernetes API configuration parameters (should not need tuning)
+kubernetes:
+  # Sets the request timeout for kubernetes API requests
+  request-timeout-seconds: 60
+
+  # Sets the number of objects to iteratively return when listing resources
+  request-batch-size: 100
+
+  # Worker pool size for collecting pods from namespaces. Adjust this if the api-server gets overwhelmed
+  worker-pool-size: 100
+```
+
+#### Kai mode of operation
+
+```
 # Can be one of adhoc, periodic (defaults to adhoc)
-mode: periodic
+mode: adhoc
+```
+
+#### Missing Tag Policy
+
+There are cases where image in kubernetes do not have an associated tag - for
+example when an image is deployed using the digest
+
+```
+kubectl run python --image=python@sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a
+```
+
+Anchore Enterprise will use the image digest to process an image but it still requires a tag to be
+associated with the image. The `missing-tag-policy` lets you configure the best way to handle the
+missing tag edge case in your environment.
+
+```yaml
+# Handle cases where a tag is missing. For example - images designated by digest
+missing-tag-policy:
+  # One of the following options [digest, insert, drop]. Default is 'digest'
+  #
+  # [digest] will use the image's digest as a dummy tag.
+  #
+  # [insert] will insert a default tag in as a dummy tag. The dummy tag is
+  #          customizable under missing-tag-policy.tag
+  #
+  # [drop] will drop images that do not have tags associated with them. Not
+  #        recommended.
+  policy: digest
+
+  # Dummy tag to use. Only applicable if policy is 'insert'. Defaults to UNKNOWN
+  tag: UNKNOWN
+
+# Ignore images out of pods that are not in a Running state
+ignore-not-running: true
 
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
-anchore: {}
-  # url: 
-  # user: admin
-  # password: foobar
-  # http:
-  #   insecure: false
-  #   timeoutSeconds: 10
-
+anchore:
+  url: <your anchore api url>
+  user: <kai_inventory_user>
+  password: $KAI_ANCHORE_PASSWORD
+  http:
+    insecure: true
+    timeout-seconds: 10
 ```
 
 ## Developing
@@ -144,7 +339,7 @@ Note: Can't point this to ./kai because there's already a subdirectory named kai
 `go build -o <localpath>/kai .`
 
 #### Docker
-To build a docker image, you'll need to provide a kubeconfig. 
+To build a docker image, you'll need to provide a kubeconfig.
 
 Note: Docker build requires files to be within the docker build context
 ```
