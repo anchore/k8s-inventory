@@ -240,10 +240,28 @@ Configure which namespaces kai should search.
 * `include` section
   * A list of explicit strings that will detail the list of namespaces to capture image data from.
   * If left as an empty list `[]` all namespaces will be searched
+  * Example:
+
+```yaml
+namespaces:
+  include:
+  - default
+  - kube-system
+  - prod-app
+```
 
 * `exclude` section
   * A list of explicit strings and/or regex patterns for namespaces to be excluded.
   * A regex is determined if the string does not match standard DNS name requirements.
+  * Example:
+
+```yaml
+namespaces:
+  exclude:
+  - default
+  - ^kube-*
+  - ^prod-*
+```
 
 ```yaml
 # Which namespaces to search or exclude.
@@ -299,6 +317,25 @@ kubectl run python --image=python@sha256:f0a210a37565286ecaaac0529a6749917e8ea58
 Anchore Enterprise will use the image digest to process an image but it still requires a tag to be
 associated with the image. The `missing-tag-policy` lets you configure the best way to handle the
 missing tag edge case in your environment.
+
+**digest** will use the image digest as a dummy tag.
+```json
+{
+  "tag": "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
+  "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
+}
+```
+
+**insert** will use a dummy tag configured by `missing-tag-policy.tag`
+```json
+{
+  "tag": "alpine:UNKNOWN",
+  "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
+}
+```
+
+**drop** will simply ignore the images that don't have tags.
+
 
 ```yaml
 # Handle cases where a tag is missing. For example - images designated by digest
