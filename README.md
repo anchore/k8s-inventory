@@ -416,3 +416,12 @@ Kai comes with shell completion for specifying namespaces, it can be enabled as 
 ```sh
 kai completion <zsh|bash|fish>
 ```
+
+## Releasing
+To create a release of kai, a tag needs to be created that points to a commit in `main`
+that we want to release. This tag shall be a semver prefixed with a `v`, e.g. `v0.2.7`.
+This will trigger a GitHub Action that will create the release.
+
+After the release has been successfully created, make sure to specify the updated version
+in both Enterprise and the Kai Helm Chart in
+[anchore-charts](https://github.com/anchore/anchore-charts).
