@@ -303,6 +303,9 @@ kubernetes:
 ```
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
+
+# Only respected if mode is periodic
+polling-interval-seconds: 300
 ```
 
 #### Missing Tag Policy
@@ -353,13 +356,20 @@ missing-tag-policy:
 
   # Dummy tag to use. Only applicable if policy is 'insert'. Defaults to UNKNOWN
   tag: UNKNOWN
+```
 
+### Ignore images that are not yet in a Running state
+
+```yaml
 # Ignore images out of pods that are not in a Running state
 ignore-not-running: true
+```
 
-# Only respected if mode is periodic
-polling-interval-seconds: 300
+### Anchore API configuration
 
+Use this section to configure the Anchore Enterprise API endpoint
+
+```yaml
 anchore:
   url: <your anchore api url>
   user: <kai_inventory_user>
