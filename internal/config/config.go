@@ -218,6 +218,21 @@ func (cfg *Application) Build() error {
 		return fmt.Errorf("missing-tag-policy.policy must be one of %v", policies)
 	}
 
+	// BACKWARDS COMPATIBILITY - Translate namespaces into the new selector config
+
+	// Only trigger if there is nothing in the include selector.
+	if len(cfg.NamespaceSelectors.Include) == 0 && len(cfg.Namespaces) > 0 {
+		for _, ns := range cfg.Namespaces {
+			if ns == "all" {
+				// set the include namespaces to an empty array if namespaces indicates collect "all"
+				cfg.NamespaceSelectors.Include = []string{}
+				break
+			}
+			// otherwise add the namespaces list to the include namespaces
+			cfg.NamespaceSelectors.Include = append(cfg.NamespaceSelectors.Include, ns)
+		}
+	}
+
 	return nil
 }
 
