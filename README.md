@@ -300,7 +300,7 @@ kubernetes:
 
 #### Kai mode of operation
 
-```
+```yaml
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 
@@ -313,7 +313,7 @@ polling-interval-seconds: 300
 There are cases where image in kubernetes do not have an associated tag - for
 example when an image is deployed using the digest
 
-```
+```sh
 kubectl run python --image=python@sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a
 ```
 
@@ -381,20 +381,38 @@ anchore:
 
 ## Developing
 ### Build
-Note: Can't point this to ./kai because there's already a subdirectory named kai
+**Note:** This will drop the binary in the `./snapshot/` directory
 
-`go build -o <localpath>/kai .`
+**On Mac**
+```sh
+make mac-binary
+```
+
+**On Linux**
+```sh
+make linux-binary
+```
+
+### Testing
+
+The Makefile has testing built into it. For unit tests simply run
+
+```sh
+make unit
+```
 
 #### Docker
 To build a docker image, you'll need to provide a kubeconfig.
 
 Note: Docker build requires files to be within the docker build context
-```
+
+```sh
 docker build -t localhost/kai:latest --build-arg KUBECONFIG=./kubeconfig .
 ```
 
 ### Shell Completion
 Kai comes with shell completion for specifying namespaces, it can be enabled as follows. Run with the `--help` command to get the instructions for the shell of your choice
-```
+
+```sh
 kai completion <zsh|bash|fish>
 ```
