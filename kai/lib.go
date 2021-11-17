@@ -298,7 +298,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Applicati
 	}
 
 	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
-	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning)
+	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning, cfg.MissingTagPolicy.Policy, cfg.MissingTagPolicy.Tag)
 }
 
 func SetLogger(logger logger.Logger) {
