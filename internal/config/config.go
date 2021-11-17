@@ -38,23 +38,24 @@ type CliOnlyOptions struct {
 
 // All Application configurations
 type Application struct {
-	ConfigPath             string
-	PresenterOpt           presenter.Option
-	Output                 string  `mapstructure:"output"`
-	Quiet                  bool    `mapstructure:"quiet"`
-	Log                    Logging `mapstructure:"log"`
-	CliOptions             CliOnlyOptions
-	Dev                    Development       `mapstructure:"dev"`
-	KubeConfig             KubeConf          `mapstructure:"kubeconfig"`
-	Kubernetes             KubernetesAPI     `mapstructure:"kubernetes"`
-	Namespaces             []string          `mapstructure:"namespaces"`
-	NamespaceSelectors     NamespaceSelector `mapstructure:"namespace-selectors"`
-	MissingTagPolicy       MissingTagConf    `mapstructure:"missing-tag-policy"`
-	RunMode                mode.Mode
-	Mode                   string      `mapstructure:"mode"`
-	IgnoreNotRunning       bool        `mapstructure:"ignore-not-running"`
-	PollingIntervalSeconds int         `mapstructure:"polling-interval-seconds"`
-	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
+	ConfigPath                      string
+	PresenterOpt                    presenter.Option
+	Output                          string  `mapstructure:"output"`
+	Quiet                           bool    `mapstructure:"quiet"`
+	Log                             Logging `mapstructure:"log"`
+	CliOptions                      CliOnlyOptions
+	Dev                             Development       `mapstructure:"dev"`
+	KubeConfig                      KubeConf          `mapstructure:"kubeconfig"`
+	Kubernetes                      KubernetesAPI     `mapstructure:"kubernetes"`
+	Namespaces                      []string          `mapstructure:"namespaces"`
+	KubernetesRequestTimeoutSeconds int64             `mapstructure:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors              NamespaceSelector `mapstructure:"namespace-selectors"`
+	MissingTagPolicy                MissingTagConf    `mapstructure:"missing-tag-policy"`
+	RunMode                         mode.Mode
+	Mode                            string      `mapstructure:"mode"`
+	IgnoreNotRunning                bool        `mapstructure:"ignore-not-running"`
+	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
+	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
@@ -120,6 +121,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeout-seconds", 10)
+	v.SetDefault("kubernetes-request-timeout-seconds", -1)
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
@@ -236,6 +238,11 @@ func (cfg *Application) handleBackwardsCompatibility() {
 			// otherwise add the namespaces list to the include namespaces
 			cfg.NamespaceSelectors.Include = append(cfg.NamespaceSelectors.Include, ns)
 		}
+	}
+
+	// defer to the old config parameter if it is still present
+	if cfg.KubernetesRequestTimeoutSeconds > 0 {
+		cfg.Kubernetes.RequestTimeoutSeconds = cfg.KubernetesRequestTimeoutSeconds
 	}
 }
 

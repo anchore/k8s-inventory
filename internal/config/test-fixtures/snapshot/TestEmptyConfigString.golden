@@ -28,6 +28,7 @@ kubernetes:
   requestbatchsize: 0
   workerpoolsize: 0
 namespaces: []
+kubernetesrequesttimeoutseconds: 0
 namespaceselectors:
   include: []
   exclude: []
