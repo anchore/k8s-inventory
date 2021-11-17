@@ -308,7 +308,7 @@ mode: adhoc
 polling-interval-seconds: 300
 ```
 
-#### Missing Tag Policy
+### Missing Tag Policy
 
 There are cases where image in kubernetes do not have an associated tag - for
 example when an image is deployed using the digest
