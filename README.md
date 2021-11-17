@@ -88,7 +88,7 @@ $ kai
 
 In order to run kai as a container, it needs a kubeconfig
 ```sh
-~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.2.3
+~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.3.0
 {
   "timestamp": "2021-11-17T18:47:36Z",
   "results": [
