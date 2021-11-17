@@ -71,7 +71,7 @@ missing-tag-policy:
   #        recommended.
   policy: digest
 
-  # Only applicable in policy is 'insert'. Defaults to UNKNOWN
+  # Dummy tag to use. Only applicable if policy is 'insert'. Defaults to UNKNOWN
   tag: UNKNOWN
 
 
