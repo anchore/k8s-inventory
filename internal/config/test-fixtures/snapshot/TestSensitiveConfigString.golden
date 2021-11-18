@@ -27,7 +27,9 @@ kubernetes:
   requesttimeoutseconds: 60
   requestbatchsize: 100
   workerpoolsize: 100
-namespaces:
+namespaces: []
+kubernetesrequesttimeoutseconds: -1
+namespaceselectors:
   include: []
   exclude: []
 missingtagpolicy:

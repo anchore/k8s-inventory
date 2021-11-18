@@ -243,7 +243,7 @@ Configure which namespaces kai should search.
   * Example:
 
 ```yaml
-namespaces:
+namespace-selectors:
   include:
   - default
   - kube-system
@@ -256,7 +256,7 @@ namespaces:
   * Example:
 
 ```yaml
-namespaces:
+namespace-selectors:
   exclude:
   - default
   - ^kube-*
@@ -265,7 +265,7 @@ namespaces:
 
 ```yaml
 # Which namespaces to search or exclude.
-namespaces:
+namespace-selectors:
   # Namespaces to include as explicit strings, not regex
   # NOTE: Will search ALL namespaces if left as an empty array
   include: []
@@ -378,6 +378,51 @@ anchore:
     insecure: true
     timeout-seconds: 10
 ```
+
+## Configuration Changes (v0.2.2 -> v0.3.0)
+
+There are a few configurations that were changed from v0.2.2 to v0.3.0
+
+#### `kubernetes-request-timeout-seconds`
+
+The request timeout for the kubernetes API was changed from
+
+```yaml
+kubernetes-request-timeout-seconds: 60
+```
+
+to
+
+```yaml
+kubernetes:
+  request-timeout-seconds: 60
+```
+
+KAI will still honor the old configuration. It will prefer the old configuration
+parameter until it is removed from the config entirely. It is safe to remove the
+old configuration in favor of the new config.
+
+#### `namespaces`
+
+The namespace configuration was changed from
+
+```yaml
+namespaces:
+- all
+```
+
+to
+
+```yaml
+namespace-selectors:
+  include: []
+  exclude: []
+```
+
+`namespace-selectors` was added to eventually replace `namespaces` to allow for both
+include and exclude configs. The old `namespaces` array will be honored if
+`namespace-selectors.include` is empty. It is safe to remove `namespaces` entirely
+in favor of `namespace-selectors`
 
 ## Developing
 ### Build

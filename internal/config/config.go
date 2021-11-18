@@ -38,22 +38,24 @@ type CliOnlyOptions struct {
 
 // All Application configurations
 type Application struct {
-	ConfigPath             string
-	PresenterOpt           presenter.Option
-	Output                 string  `mapstructure:"output"`
-	Quiet                  bool    `mapstructure:"quiet"`
-	Log                    Logging `mapstructure:"log"`
-	CliOptions             CliOnlyOptions
-	Dev                    Development    `mapstructure:"dev"`
-	KubeConfig             KubeConf       `mapstructure:"kubeconfig"`
-	Kubernetes             KubernetesAPI  `mapstructure:"kubernetes"`
-	Namespaces             NamespacesConf `mapstructure:"namespaces"`
-	MissingTagPolicy       MissingTagConf `mapstructure:"missing-tag-policy"`
-	RunMode                mode.Mode
-	Mode                   string      `mapstructure:"mode"`
-	IgnoreNotRunning       bool        `mapstructure:"ignore-not-running"`
-	PollingIntervalSeconds int         `mapstructure:"polling-interval-seconds"`
-	AnchoreDetails         AnchoreInfo `mapstructure:"anchore"`
+	ConfigPath                      string
+	PresenterOpt                    presenter.Option
+	Output                          string  `mapstructure:"output"`
+	Quiet                           bool    `mapstructure:"quiet"`
+	Log                             Logging `mapstructure:"log"`
+	CliOptions                      CliOnlyOptions
+	Dev                             Development       `mapstructure:"dev"`
+	KubeConfig                      KubeConf          `mapstructure:"kubeconfig"`
+	Kubernetes                      KubernetesAPI     `mapstructure:"kubernetes"`
+	Namespaces                      []string          `mapstructure:"namespaces"`
+	KubernetesRequestTimeoutSeconds int64             `mapstructure:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors              NamespaceSelector `mapstructure:"namespace-selectors"`
+	MissingTagPolicy                MissingTagConf    `mapstructure:"missing-tag-policy"`
+	RunMode                         mode.Mode
+	Mode                            string      `mapstructure:"mode"`
+	IgnoreNotRunning                bool        `mapstructure:"ignore-not-running"`
+	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
+	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
@@ -62,8 +64,8 @@ type MissingTagConf struct {
 	Tag    string `mapstructure:"tag,omitempty"`
 }
 
-// NamespacesConf details the inclusion/exclusion rules for namespaces
-type NamespacesConf struct {
+// NamespaceSelector details the inclusion/exclusion rules for namespaces
+type NamespaceSelector struct {
 	Include []string `mapstructure:"include"`
 	Exclude []string `mapstructure:"exclude"`
 }
@@ -119,12 +121,16 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
 	v.SetDefault("anchore.http.timeout-seconds", 10)
+	v.SetDefault("kubernetes-request-timeout-seconds", -1)
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
 	v.SetDefault("ignore-not-running", true)
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
+	v.SetDefault("namespaces", []string{})
+	v.SetDefault("namespace-selectors.include", []string{})
+	v.SetDefault("namespace-selectors.exclude", []string{})
 }
 
 // Load the Application Configuration from the Viper specifications
@@ -214,7 +220,30 @@ func (cfg *Application) Build() error {
 		return fmt.Errorf("missing-tag-policy.policy must be one of %v", policies)
 	}
 
+	cfg.handleBackwardsCompatibility()
+
 	return nil
+}
+
+func (cfg *Application) handleBackwardsCompatibility() {
+	// BACKWARDS COMPATIBILITY - Translate namespaces into the new selector config
+	// Only trigger if there is nothing in the include selector.
+	if len(cfg.NamespaceSelectors.Include) == 0 && len(cfg.Namespaces) > 0 {
+		for _, ns := range cfg.Namespaces {
+			if ns == "all" {
+				// set the include namespaces to an empty array if namespaces indicates collect "all"
+				cfg.NamespaceSelectors.Include = []string{}
+				break
+			}
+			// otherwise add the namespaces list to the include namespaces
+			cfg.NamespaceSelectors.Include = append(cfg.NamespaceSelectors.Include, ns)
+		}
+	}
+
+	// defer to the old config parameter if it is still present
+	if cfg.KubernetesRequestTimeoutSeconds > 0 {
+		cfg.Kubernetes.RequestTimeoutSeconds = cfg.KubernetesRequestTimeoutSeconds
+	}
 }
 
 func readConfig(v *viper.Viper, configPath string) error {

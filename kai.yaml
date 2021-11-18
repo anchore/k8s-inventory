@@ -29,7 +29,7 @@ kubeconfig:
     token:
 
 # Which namespaces to search or exclude.
-namespaces:
+namespace-selectors:
   # Namespaces to include as explicit strings, not regex
   # NOTE: Will search ALL namespaces if left as an empty array
   include: []
