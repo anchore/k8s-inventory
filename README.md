@@ -404,7 +404,22 @@ old configuration in favor of the new config.
 
 #### `namespaces`
 
-The `namespaces` section was changed to `namespace-selectors` to allow for both
+The namespace configuration was changed from
+
+```yaml
+namespaces:
+- all
+```
+
+to
+
+```yaml
+namespace-selectors:
+  include: []
+  exclude: []
+```
+
+`namespace-selectors` was added to eventually replace `namespaces` to allow for both
 include and exclude configs. The old `namespaces` array will be honored if
 `namespace-selectors.include` is empty. It is safe to remove `namespaces` entirely
 in favor of `namespace-selectors`
