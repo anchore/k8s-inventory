@@ -75,9 +75,9 @@ bootstrap: ## Download and install all go dependencies (+ prep tooling in the ./
 	# install go dependencies
 	go mod download
 	# install utilities
-	[ -f "$(TEMPDIR)/golangci" ] || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TEMPDIR)/ v1.26.0
-	[ -f "$(TEMPDIR)/bouncer" ] || curl -sSfL https://raw.githubusercontent.com/wagoodman/go-bouncer/master/bouncer.sh | sh -s -- -b $(TEMPDIR)/ v0.2.0
-	[ -f "$(TEMPDIR)/goreleaser" ] || curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sh -s -- -b $(TEMPDIR)/ v0.179.0
+	[ -f "$(TEMPDIR)/golangci" ] || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TEMPDIR)/ v1.43.0
+	[ -f "$(TEMPDIR)/bouncer" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/wagoodman/go-bouncer@v0.3.0
+	[ -f "$(TEMPDIR)/goreleaser" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/goreleaser/goreleaser@v1.3.1
 
 .PHONY: install-cluster-deps
 install-cluster-deps: ## Install Helm and Kubectl
@@ -157,10 +157,20 @@ linux-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
+.PHONY: linux-binary-aarch64
+linux-binary-aarch64: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=0 GOOS=linux GOARCH=aarch64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
 .PHONY: mac-binary
 mac-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
+.PHONY: mac-binary-aarch64
+mac-binary-aarch64: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=aarch64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
 $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 	$(call title,Building snapshot artifacts)
