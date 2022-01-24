@@ -19,6 +19,10 @@ COVERAGE_THRESHOLD := 50
 
 CLUSTER_NAME=kai-testing
 
+GOLANG_CI_VERSION=v1.43.0
+GOBOUNCER_VERSION=v0.3.0
+GORELEASER_VERSION=v1.3.1
+
 ## Build variables
 DISTDIR=./dist
 SNAPSHOTDIR=./snapshot
@@ -75,9 +79,9 @@ bootstrap: ## Download and install all go dependencies (+ prep tooling in the ./
 	# install go dependencies
 	go mod download
 	# install utilities
-	[ -f "$(TEMPDIR)/golangci" ] || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TEMPDIR)/ v1.43.0
-	[ -f "$(TEMPDIR)/bouncer" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/wagoodman/go-bouncer@v0.3.0
-	[ -f "$(TEMPDIR)/goreleaser" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/goreleaser/goreleaser@v1.3.1
+	[ -f "$(TEMPDIR)/golangci" ] || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TEMPDIR) $(GOLANG_CI_VERSION)
+	[ -f "$(TEMPDIR)/bouncer" ] || curl -sSfL https://raw.githubusercontent.com/wagoodman/go-bouncer/master/bouncer.sh | sh -s -- -b $(TEMPDIR) $(GOBOUNCER_VERSION)
+	[ -f "$(TEMPDIR)/goreleaser" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/goreleaser/goreleaser@$(GORELEASER_VERSION)
 
 .PHONY: install-cluster-deps
 install-cluster-deps: ## Install Helm and Kubectl
