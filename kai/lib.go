@@ -1,5 +1,6 @@
 /*
-Retrieve Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the k8s go SDK
+Package kai retrieves Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the
+k8s go SDK
 */
 package kai
 
@@ -178,7 +179,7 @@ func excludeSet(check map[string]struct{}) excludeCheck {
 }
 
 // Regex to determine whether a string is a valid namespace (valid dns name)
-var validNamespaceRegex *regexp.Regexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
+var validNamespaceRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 // buildExclusionChecklist will create a list of checks based on the configured
 // exclusion strings. The checks could be regexes or direct string matches.

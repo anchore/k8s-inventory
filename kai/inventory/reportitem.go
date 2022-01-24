@@ -108,8 +108,8 @@ type image struct {
 }
 
 // Compile the regexes used for parsing once so they can be reused without having to recompile
-var digestRegex *regexp.Regexp = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
-var tagRegex *regexp.Regexp = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
+var digestRegex = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
+var tagRegex = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 
 // extractImageDetails extracts the repo, tag, and digest of an image out of the fields
 // grabbed from the pod.
