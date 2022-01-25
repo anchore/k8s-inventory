@@ -63,7 +63,9 @@ execute() {
 get_binaries() {
   case "$PLATFORM" in
     darwin/amd64) BINARIES="kai" ;;
+    darwin/arm64) BINARIES="kai" ;;
     linux/amd64) BINARIES="kai" ;;
+    linux/arm64) BINARIES="kai" ;;
     windows/amd64) BINARIES="kai" ;;
     *)
       log_crit "platform $PLATFORM is not supported.  Make sure this script is up-to-date and file request at https://github.com/${PREFIX}/issues/new"
