@@ -513,6 +513,56 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 }
 
 //
+//	Test when there is no repo info in the ImageID
+//
+func TestAddImageNoDigestNoRepoInImageID(t *testing.T) {
+	namespace := "default"
+	mockPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "alpine",
+					Image: "alpine:123",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:    "alpine",
+					Image:   "alpine:123",
+					ImageID: "docker://sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a",
+				},
+			},
+			Phase: "Running",
+		},
+	}
+	actual := ReportItem{
+		Namespace: namespace,
+		Images:    []ReportImage{},
+	}
+	actual.extractUniqueImages(mockPod, defaultMissingTagPolicy, defualtDummyTag)
+
+	expected := ReportItem{
+		Namespace: namespace,
+		Images: []ReportImage{
+			{
+				Tag:        "alpine:123",
+				RepoDigest: "",
+			},
+		},
+	}
+	err := equivalent(actual, expected)
+	if err != nil {
+		logout(actual, expected, t)
+		t.Error(err)
+	}
+}
+
+//
 //	Test out a pod running with an init container
 //
 func TestInitContainer(t *testing.T) {
