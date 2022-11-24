@@ -18,6 +18,7 @@ import (
 const ReportAPIPath = "v1/enterprise/inventories"
 
 // This method does the actual Reporting (via HTTP) to Anchore
+//
 //nolint:gosec
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo, appConfig *config.Application) error {
 	log.Debug("Reporting results to Anchore")

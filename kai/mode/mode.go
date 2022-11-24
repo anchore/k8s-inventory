@@ -1,7 +1,7 @@
 /*
 Determines the Execution Modes supported by the application.
-	- adhoc: the application will poll the k8s API once and then print and report (if configured) its findings
-	- periodic: the application will poll the k8s API on an interval (polling-interval-seconds) and report (if configured) its findings
+  - adhoc: the application will poll the k8s API once and then print and report (if configured) its findings
+  - periodic: the application will poll the k8s API on an interval (polling-interval-seconds) and report (if configured) its findings
 */
 package mode
 

@@ -107,7 +107,6 @@ func TestJsonPresenter(t *testing.T) {
 		diffs := dmp.DiffMain(string(expected), string(actual), true)
 		t.Errorf("mismatched output:\n%s", dmp.DiffPrettyText(diffs))
 	}
-
 }
 
 func TestEmptyJsonPresenter(t *testing.T) {
@@ -133,7 +132,6 @@ func TestEmptyJsonPresenter(t *testing.T) {
 		diffs := dmp.DiffMain(string(expected), string(actual), true)
 		t.Errorf("mismatched output:\n%s", dmp.DiffPrettyText(diffs))
 	}
-
 }
 
 func TestNoResultsJsonPresenter(t *testing.T) {
@@ -165,5 +163,4 @@ func TestNoResultsJsonPresenter(t *testing.T) {
 		diffs := dmp.DiffMain(string(expected), string(actual), true)
 		t.Errorf("mismatched output:\n%s", dmp.DiffPrettyText(diffs))
 	}
-
 }
