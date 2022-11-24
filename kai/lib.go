@@ -5,6 +5,7 @@ k8s go SDK
 package kai
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -250,7 +251,7 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
-		list, err := clientset.CoreV1().Namespaces().List(opts)
+		list, err := clientset.CoreV1().Namespaces().List(context.TODO(), opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
 			return namespaces, fmt.Errorf("failed to list namespaces: %w", err)
@@ -282,7 +283,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Applicati
 			TimeoutSeconds: &cfg.Kubernetes.RequestTimeoutSeconds,
 		}
 
-		list, err := clientset.CoreV1().Pods(ns).List(opts)
+		list, err := clientset.CoreV1().Pods(ns).List(context.TODO(), opts)
 		if err != nil {
 			// TODO: Handle HTTP 410 and recover
 			ch.errors <- err
