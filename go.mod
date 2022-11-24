@@ -10,7 +10,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/spf13/cobra v1.0.1-0.20200909172742-8a63648dd905
+	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.7.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	gopkg.in/yaml.v2 v2.3.0
@@ -28,7 +28,7 @@ require (
 	github.com/googleapis/gnostic v0.2.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/json-iterator/go v1.1.8 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/kr/text v0.2.0 // indirect
