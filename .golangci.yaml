@@ -1,24 +1,19 @@
 run:
   timeout: 2m
-  tests: false
   skip-dirs:
-    - .circleci
-    - .github
-    - scripts
-linters-settings:
-  funlen:
-    lines: 65
+     - .circleci
+     - .github
+     - scripts
 linters:
   # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - depguard
-    - dogsled
     - dupl
     - errcheck
+    - errorlint
     - exportloopref
     - funlen
     - gocognit
@@ -26,38 +21,60 @@ linters:
     - gocritic
     - gocyclo
     - gofmt
-    - goimports
-    - goprintffuncname
+    - tparallel
+    - importas
     - gosec
     - gosimple
     - govet
     - ineffassign
     - misspell
-    - nakedret
     - nolintlint
-    - prealloc
     - revive
-    - rowserrcheck
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
+linters-settings:
+  funlen:
+    # Checks the number of lines in a function.
+    # If lower than 0, disable the check.
+    # Default: 60
+    lines: 70
+    # Checks the number of statements in a function.
+    # If lower than 0, disable the check.
+    # Default: 40
+    statements: 50
+output:
+  uniq-by-line: false
+issues:
+  exclude-rules:
+    - path: (.+)_test.go
+      linters:
+        - funlen
+        - dupl
+        - goconst
 
 # do not enable...
+#    - dogsled           # found to be to niche and ineffective
+#    - goprintffuncname  # does not catch all cases and there are exceptions
+#    - nakedret          # does not catch all cases and should not fail a build
 #    - gochecknoglobals
 #    - gochecknoinits    # this is too aggressive
+#    - rowserrcheck disabled per generics https://github.com/golangci/golangci-lint/issues/2649
 #    - godot
 #    - godox
 #    - goerr113
+#    - goimports   # we're using gosimports now instead to account for extra whitespaces (see https://github.com/golang/go/issues/20818)
+#    - golint      # deprecated
 #    - gomnd       # this is too aggressive
 #    - interfacer  # this is a good idea, but is no longer supported and is prone to false positives
 #    - lll         # without a way to specify per-line exception cases, this is not usable
 #    - maligned    # this is an excellent linter, but tricky to optimize and we are not sensitive to memory layout optimizations
 #    - nestif
+#    - prealloc    # following this rule isn't consistently a good idea, as it sometimes forces unnecessary allocations that result in less idiomatic code
+#    - scopelint   # deprecated
 #    - testpackage
-#    - wsl
+#    - wsl         # this doens't have an auto-fixer yet and is pretty noisy (https://github.com/bombsimon/wsl/issues/90)

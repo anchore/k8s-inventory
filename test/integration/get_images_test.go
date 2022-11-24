@@ -52,5 +52,4 @@ func TestGetImageResults(t *testing.T) {
 	if !foundIntegrationTestNamespace {
 		t.Errorf("failed to locate integration test namespace")
 	}
-
 }

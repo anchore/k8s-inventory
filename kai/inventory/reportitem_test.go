@@ -53,11 +53,9 @@ func equivalent(left, right ReportItem) error {
 	return nil
 }
 
-//
-//	Test out two containers with the same tag but different digests to ensure
-//	the uniqueness of images is parsed correctly when looking at a list of
-//	containers in a single pod
-//
+// Test out two containers with the same tag but different digests to ensure
+// the uniqueness of images is parsed correctly when looking at a list of
+// containers in a single pod
 func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -118,11 +116,9 @@ func TestSameTagDifferentDigestSamePod(t *testing.T) {
 	}
 }
 
-//
-//	Test out two pods running containers with the same tag but different digests
-//	to ensure the uniqueness of images is parsed correctly when looking at
-//	individual pods in the same namespace
-//
+// Test out two pods running containers with the same tag but different digests
+// to ensure the uniqueness of images is parsed correctly when looking at
+// individual pods in the same namespace
 func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -195,13 +191,11 @@ func TestSameTagDifferentDigestDistinctPods(t *testing.T) {
 	}
 }
 
+// Test out a pod running with an image added by digest only.
 //
-//	Test out a pod running with an image added by digest only.
+// MissingTagPolicy == "digest"
 //
-//	MissingTagPolicy == "digest"
-//
-//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
-//
+// kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
 func TestAddImageWithDigestNoTagMTPAsDigest(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -249,14 +243,12 @@ func TestAddImageWithDigestNoTagMTPAsDigest(t *testing.T) {
 	}
 }
 
+// Test out a pod running with an image added by digest only.
 //
-//	Test out a pod running with an image added by digest only.
+// MissingTagPolicy == "insert"
+// DummyTag == "UNKNOWN"
 //
-//	MissingTagPolicy == "insert"
-//	DummyTag == "UNKNOWN"
-//
-//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
-//
+// kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
 func TestAddImageWithDigestNoTagMTPAsInsert(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -304,13 +296,11 @@ func TestAddImageWithDigestNoTagMTPAsInsert(t *testing.T) {
 	}
 }
 
+// Test out a pod running with an image added by digest only.
 //
-//	Test out a pod running with an image added by digest only.
+// MissingTagPolicy == "drop"
 //
-//	MissingTagPolicy == "drop"
-//
-//	kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
-//
+// kubectl run alpiney --image=alpine@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
 func TestAddImageWithDigestNoTagMTPAsDrop(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -353,11 +343,9 @@ func TestAddImageWithDigestNoTagMTPAsDrop(t *testing.T) {
 	}
 }
 
+// Test out a pod running with an image added by tag and digest.
 //
-//	Test out a pod running with an image added by tag and digest.
-//
-//	kubectl run alpiney --image=alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
-//
+// kubectl run alpiney --image=alpine:3.13.6@sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba
 func TestAddImageWithDigestWithTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -406,13 +394,11 @@ func TestAddImageWithDigestWithTag(t *testing.T) {
 	}
 }
 
+// Test out a pod running without a tag or digest (inferred 'latest')
 //
-//	Test out a pod running without a tag or digest (inferred 'latest')
+// kubectl run alpiney --image=alpine
 //
-//	kubectl run alpiney --image=alpine
-//
-//	TODO: Find where in the runtime this is actually inferred as latest
-//
+// TODO: Find where in the runtime this is actually inferred as latest
 func TestAddImageNoDigestNoTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -460,11 +446,9 @@ func TestAddImageNoDigestNoTag(t *testing.T) {
 	}
 }
 
+// Test out a pod running with an image and tag but no digest.
 //
-//	Test out a pod running with an image and tag but no digest.
-//
-//	kubectl run alpiney --image=alpine:3
-//
+// kubectl run alpiney --image=alpine:3
 func TestAddImageNoDigestWithTag(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -512,9 +496,7 @@ func TestAddImageNoDigestWithTag(t *testing.T) {
 	}
 }
 
-//
-//	Test when there is no repo info in the ImageID
-//
+// Test when there is no repo info in the ImageID
 func TestAddImageNoDigestNoRepoInImageID(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -562,9 +544,7 @@ func TestAddImageNoDigestNoRepoInImageID(t *testing.T) {
 	}
 }
 
-//
-//	Test out a pod running with an init container
-//
+// Test out a pod running with an init container
 func TestInitContainer(t *testing.T) {
 	namespace := "default"
 	mockPod := v1.Pod{
@@ -612,10 +592,8 @@ func TestInitContainer(t *testing.T) {
 	}
 }
 
-//
-//	Test out NewReportItem which takes a list of pods. Include pods with init
-//	containers and regular containers.
-//
+// Test out NewReportItem which takes a list of pods. Include pods with init
+// containers and regular containers.
 func TestNewReportItem(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -724,11 +702,9 @@ func TestNewReportItem(t *testing.T) {
 	}
 }
 
-//
-//	Test out NewReportItem which takes a list of pods. Include pods with init
-//	containers and regular containers. Include a pod that is in a Pending state
-//	that should be ignored.
-//
+// Test out NewReportItem which takes a list of pods. Include pods with init
+// containers and regular containers. Include a pod that is in a Pending state
+// that should be ignored.
 func TestNewReportItemNotRunningTrue(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -829,11 +805,9 @@ func TestNewReportItemNotRunningTrue(t *testing.T) {
 	}
 }
 
-//
-//	Test out NewReportItem which takes a list of pods. Include pods with init
-//	containers and regular containers. Include a pod that is in a Pending state
-//	that should still be captured.
-//
+// Test out NewReportItem which takes a list of pods. Include pods with init
+// containers and regular containers. Include a pod that is in a Pending state
+// that should still be captured.
 func TestNewReportItemNotRunningFalse(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -942,9 +916,7 @@ func TestNewReportItemNotRunningFalse(t *testing.T) {
 	}
 }
 
-//
-//	Test out NewReportItem with pods that are for some reason empty
-//
+// Test out NewReportItem with pods that are for some reason empty
 func TestNewReportItemEmptyPods(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{
@@ -998,9 +970,7 @@ func TestNewReportItemEmptyPods(t *testing.T) {
 	}
 }
 
-//
-//	Test out NewReportItem with an empty list of pods
-//
+// Test out NewReportItem with an empty list of pods
 func TestNewReportItemEmptyPodList(t *testing.T) {
 	namespace := "default"
 	mockPods := []v1.Pod{}

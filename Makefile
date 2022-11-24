@@ -19,7 +19,7 @@ COVERAGE_THRESHOLD := 50
 
 CLUSTER_NAME=kai-testing
 
-GOLANG_CI_VERSION=v1.45.0
+GOLANG_CI_VERSION=v1.50.1
 GOBOUNCER_VERSION=v0.3.0
 GORELEASER_VERSION=v1.4.1
 
@@ -93,9 +93,6 @@ static-analysis: lint check-licenses
 .PHONY: lint
 lint: ## Run gofmt + golangci lint checks
 	$(call title,Running linters)
-	# ensure there are no go fmt differences
-	@printf "files with gofmt issues: [$(shell gofmt -l -s .)]\n"
-	@test -z "$(shell gofmt -l -s .)"
 
 	# run all golangci-lint rules
 	$(LINTCMD)

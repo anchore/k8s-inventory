@@ -123,7 +123,6 @@ func TestIsUpdateAvailable(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestFetchLatestApplicationVersion(t *testing.T) {
@@ -205,5 +204,4 @@ func TestFetchLatestApplicationVersion(t *testing.T) {
 			}
 		})
 	}
-
 }

@@ -15,7 +15,6 @@ import (
 var update = flag.Bool("update", false, "update the *.golden files for json presenters")
 
 func TestTablePresenter(t *testing.T) {
-
 	var buffer bytes.Buffer
 
 	var item1 = inventory.ReportItem{
@@ -120,5 +119,4 @@ func TestEmptyTablePresenter(t *testing.T) {
 		diffs := dmp.DiffMain(string(expected), string(actual), true)
 		t.Errorf("mismatched output:\n%s", dmp.DiffPrettyText(diffs))
 	}
-
 }
