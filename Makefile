@@ -158,20 +158,20 @@ linux-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
-.PHONY: linux-binary-aarch64
-linux-binary-aarch64: clean bootstrap
+.PHONY: linux-binary-arm64
+linux-binary-arm64: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=aarch64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
 .PHONY: mac-binary
 mac-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
-.PHONY: mac-binary-aarch64
-mac-binary-aarch64: clean bootstrap
+.PHONY: mac-binary-arm64
+mac-binary-arm64: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=aarch64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
 $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 	$(call title,Building snapshot artifacts)
