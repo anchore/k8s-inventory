@@ -158,6 +158,11 @@ linux-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
+.PHONY: linux-binary-fips
+linux-binary-fips: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOEXPERIMENT=boringcrypto go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
 .PHONY: linux-binary-arm64
 linux-binary-arm64: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
@@ -167,6 +172,11 @@ linux-binary-arm64: clean bootstrap
 mac-binary: clean bootstrap
 	mkdir -p $(SNAPSHOTDIR)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
+
+.PHONY: mac-binary-fips
+mac-binary-fips: clean bootstrap
+	mkdir -p $(SNAPSHOTDIR)
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 GOEXPERIMENT=boringcrypto go build -a -installsuffix cgo -o $(SNAPSHOTDIR)/kai .
 
 .PHONY: mac-binary-arm64
 mac-binary-arm64: clean bootstrap

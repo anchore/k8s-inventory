@@ -429,13 +429,27 @@ in favor of `namespace-selectors`
 **Note:** This will drop the binary in the `./snapshot/` directory
 
 **On Mac**
+
 ```sh
 make mac-binary
 ```
 
+To use FIPS boringcrypto:
+
+```sh
+make mac-binary-fips
+```
+
 **On Linux**
+
 ```sh
 make linux-binary
+```
+
+To use FIPS boringcrypto:
+
+```sh
+make linux-binary-fips
 ```
 
 ### Testing
