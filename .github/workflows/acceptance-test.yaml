@@ -41,10 +41,10 @@ jobs:
 
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v2
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ secrets.DEV_SIGNING_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.DEV_SIGNING_GPG_PASSPHRASE }}
 
       - name: GPG signing info
         run: |
@@ -56,8 +56,8 @@ jobs:
       - name: Build snapshot artifacts
         run: make snapshot
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.SIGNING_GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.SIGNING_GPG_PASSPHRASE }}
+          GPG_PRIVATE_KEY: ${{ secrets.DEV_SIGNING_GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.DEV_SIGNING_GPG_PASSPHRASE }}
 
       - uses: actions/upload-artifact@v2
         with:
