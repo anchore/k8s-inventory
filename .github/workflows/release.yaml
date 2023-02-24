@@ -39,8 +39,8 @@ jobs:
         id: static-analysis
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Static-Analysis (1.x, ubuntu-latest)"
+          # This check name is defined as the github actions job name (in .github/workflows/static-analysis-integration.yaml)
+          checkName: "Static-Analysis (1.19.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check unit, and integration test results
@@ -48,8 +48,8 @@ jobs:
         id: tests-unit-int
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # This check name is defined as the github actions job name (in .github/workflows/acceptance-test.yaml)
-          checkName: "Tests (1.x, ubuntu-latest)"
+          # This check name is defined as the github actions job name (in .github/workflows/static-analysis-integration.yaml)
+          checkName: "Tests (1.19.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check acceptance test results (helm v1.13.12)
