@@ -34,7 +34,7 @@ type channels struct {
 
 func HandleReport(report inventory.Report, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
-		if err := reporter.Post(report, cfg.AnchoreDetails, cfg); err != nil {
+		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
 			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
 		}
 	} else {
