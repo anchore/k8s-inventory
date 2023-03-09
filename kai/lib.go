@@ -34,15 +34,24 @@ type channels struct {
 
 func HandleReport(report inventory.Report, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
-		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
+		t := time.Now()
+		err := reporter.Post(report, cfg.AnchoreDetails)
+		t2 := time.Now()
+		timeDeltaMillis := t2.UnixMilli() - t.UnixMilli()
+		log.Infof("Sending inventory report to Anchore took %d ms", timeDeltaMillis)
+		if err != nil {
 			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
 		}
 	} else {
-		log.Debug("Anchore details not specified, not reporting inventory")
+		log.Info("Anchore details not specified, not reporting inventory")
 	}
 
-	if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
-		return fmt.Errorf("unable to show inventory: %w", err)
+	// Don't write the inventory report to stdout if "QuietInventoryReports" is on, this intended for large systems
+	// where the log output could be huge if logging the full report
+	if !cfg.QuietInventoryReports {
+		if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
+			return fmt.Errorf("unable to show inventory: %w", err)
+		}
 	}
 	return nil
 }
@@ -54,10 +63,12 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
+		log.Info("Getting inventory from k8s api")
 		report, err := GetInventoryReport(cfg)
 		if err != nil {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
+			log.Info("Got inventory report from k8s, sending to Anchore")
 			err := HandleReport(report, cfg)
 			if err != nil {
 				log.Errorf("Failed to handle Inventory Report: %w", err)
@@ -86,7 +97,12 @@ func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch ch
 				case <-ch.stopper:
 					return
 				default:
+					log.Info("fetching pods for namespace ", namespace)
+					t := time.Now()
 					fetchPodsInNamespace(clientset, cfg, namespace, ch)
+					t2 := time.Now()
+					timeDeltaMillis := t2.UnixMilli() - t.UnixMilli()
+					log.Infof("fetching pods in namespace %s took %d ms", namespace, timeDeltaMillis)
 				}
 			}
 		}()
@@ -106,10 +122,15 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		stopper:    make(chan struct{}, 1),
 	}
 
+	log.Info("loading namespaces from kubernetes")
+	t := time.Now()
 	namespaces, err := fetchNamespaces(kubeconfig, cfg)
 	if err != nil {
 		return inventory.Report{}, err
 	}
+	t2 := time.Now()
+	timeDeltaMilis := t2.UnixMilli() - t.UnixMilli()
+	log.Infof("namespace fetch and processing took %d ms: ", timeDeltaMilis)
 
 	// fill the queue of namespaces to process
 	queue := make(chan string, len(namespaces))

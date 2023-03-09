@@ -56,6 +56,7 @@ type Application struct {
 	IgnoreNotRunning                bool        `mapstructure:"ignore-not-running"`
 	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
 	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
+	QuietInventoryReports           bool        `mapstructure:"quiet-inventory-reports"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
