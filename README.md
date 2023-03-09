@@ -462,6 +462,17 @@ KAI comes with shell completion for specifying namespaces, it can be enabled as 
 kai completion <zsh|bash|fish>
 ```
 
+### Using Skaffold
+You can use skaffold for dev. The 'bootstrap-skaffold' make target will clone the chart into the current directory to wire
+it up for skaffold to use. To trigger redeployments you'll need to run `make linux-binary` and skaffold will rebuild the image
+and update the helm release.
+
+```sh
+make bootstrap-skaffold
+make linux-binary
+skaffold dev
+```
+
 ## Releasing
 To create a release of kai, a tag needs to be created that points to a commit in `main`
 that we want to release. This tag shall be a semver prefixed with a `v`, e.g. `v0.2.7`.
