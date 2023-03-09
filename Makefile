@@ -208,3 +208,8 @@ clean-snapshot:
 .PHONY: clean-dist
 clean-dist:
 	rm -rf $(DISTDIR) $(TEMPDIR)/goreleaser.yaml
+
+.PHONY: bootstrap-skaffold
+bootstrap-skaffold:
+	$(call title, Cloning chart for local skaffold dev)
+	git clone https://github.com/anchore/anchore-charts.git

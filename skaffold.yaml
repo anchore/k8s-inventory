@@ -1,0 +1,22 @@
+apiVersion: skaffold/v4beta2
+kind: Config
+metadata:
+  name: kai
+build:
+  artifacts:
+  - image: local/kai
+    docker:
+      dockerfile: Dockerfile.skaffold
+deploy:
+  helm:
+    releases:
+    - name: kai
+      chartPath: anchore-charts/stable/kai
+      setValueTemplates:
+        image.repository: "{{.IMAGE_REPO_local_kai}}"
+        image.tag: "{{.IMAGE_TAG_local_kai}}"
+      setValues:
+        kai.log.level: debug
+        kai.log.structured: false
+        kai.quiet: false
+        kai.quietReports: false
