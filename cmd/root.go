@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
     Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Info("KAI is starting up...")
 		if appConfig.Dev.ProfileCPU {
 			f, err := os.Create("cpu.profile")
 			if err != nil {

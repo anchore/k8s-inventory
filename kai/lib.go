@@ -37,8 +37,9 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
 			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
 		}
+		log.Info("Inventory report sent to Anchore")
 	} else {
-		log.Debug("Anchore details not specified, not reporting inventory")
+		log.Info("Anchore details not specified, not reporting inventory")
 	}
 
 	if cfg.VerboseInventoryReports {
@@ -65,6 +66,8 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 				log.Errorf("Failed to handle Inventory Report: %w", err)
 			}
 		}
+
+		log.Infof("Waiting %d seconds for next poll...", cfg.PollingIntervalSeconds)
 
 		// Wait at least as long as the ticker
 		log.Debugf("Start new gather: %s", <-ticker.C)
@@ -95,8 +98,18 @@ func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch ch
 	}
 }
 
+func getImageCountFromResults(results []inventory.ReportItem) int {
+	imageCount := 0
+	for _, result := range results {
+		imageCount += len(result.Images)
+	}
+	return imageCount
+}
+
 // GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
 func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
+	log.Info("Starting image inventory collection")
+
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
 		return inventory.Report{}, err
@@ -153,6 +166,11 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
 
+	log.Infof(
+		"Got Inventory Report with %d images running across %d namespaces",
+		getImageCountFromResults(results),
+		len(results),
+	)
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Results:               results,
@@ -303,7 +321,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Applicati
 		}
 	}
 
-	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
+	log.Infof("There are %d pods in namespace \"%s\"", len(pods), ns)
 	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning, cfg.MissingTagPolicy.Policy, cfg.MissingTagPolicy.Tag)
 }
 
