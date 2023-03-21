@@ -1,8 +1,7 @@
 /*
 Package kai retrieves Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the
 k8s go SDK
-*/
-package kai
+*/package kai
 
 import (
 	"context"
@@ -41,8 +40,10 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 		log.Debug("Anchore details not specified, not reporting inventory")
 	}
 
-	if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
-		return fmt.Errorf("unable to show inventory: %w", err)
+	if cfg.VerboseInventoryReports {
+		if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
+			return fmt.Errorf("unable to show inventory: %w", err)
+		}
 	}
 	return nil
 }

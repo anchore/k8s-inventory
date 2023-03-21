@@ -19,4 +19,5 @@ deploy:
         kai.log.level: debug
         kai.log.structured: false
         kai.quiet: false
-        kai.quietReports: false
+        kai.verboseInventoryReports: false
+        kai.pollingIntervalSeconds: 60

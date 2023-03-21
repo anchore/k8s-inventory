@@ -18,7 +18,7 @@ By default, KAI will look for a Kubeconfig in the home directory to use to authe
 
 ### CLI
 ```shell script
-$ kai
+$ kai --verbose-inventory-reports
 {
   "timestamp": "2021-11-17T18:47:36Z",
   "results": [
@@ -88,7 +88,7 @@ $ kai
 
 In order to run kai as a container, it needs a kubeconfig
 ```sh
-~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.3.0
+~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.5.0 --verbose-inventory-reports
 {
   "timestamp": "2021-11-17T18:47:36Z",
   "results": [
@@ -231,6 +231,9 @@ kubeconfig:
     client-cert:
     private-key:
     token:
+
+# enable/disable printing inventory reports to stdout
+verbose-inventory-reports: false
 ```
 
 ### Namespace selection
@@ -378,6 +381,13 @@ anchore:
     insecure: true
     timeout-seconds: 10
 ```
+
+## Behavior change (v0.5.0)
+
+In versions of KAI < v0.5.0 the default behavior was to output the inventory report
+to stdout every time it was generated. KAI v0.5.0 changes this so it will not print
+to stdout unless `verbose-inventory-reports: true` is set in the config file or
+KAI is called with the `--verbose-inventory-reports` flag.
 
 ## Configuration Changes (v0.2.2 -> v0.3.0)
 

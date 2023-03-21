@@ -47,3 +47,4 @@ anchoredetails:
   http:
     insecure: false
     timeoutseconds: 0
+verboseinventoryreports: false

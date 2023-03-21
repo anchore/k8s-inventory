@@ -96,4 +96,11 @@ func init() {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)
 	}
+
+	opt = "verbose-inventory-reports"
+	rootCmd.Flags().BoolP(opt, "i", false, "If true, will print the full inventory report to stdout")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
 }
