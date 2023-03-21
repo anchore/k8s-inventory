@@ -12,6 +12,8 @@ package config
 
 import (
 	"fmt"
+	"path"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -23,9 +25,6 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"path"
-	"strings"
 )
 
 const redacted = "******"
@@ -201,7 +200,7 @@ func (cfg *Application) Build() error {
 			case v >= 2:
 				cfg.Log.LevelOpt = logrus.DebugLevel
 			default:
-				cfg.Log.LevelOpt = logrus.ErrorLevel
+				cfg.Log.LevelOpt = logrus.InfoLevel
 			}
 		}
 	}
@@ -320,7 +319,6 @@ func (cfg Application) String() string {
 
 	// yaml is pretty human friendly (at least when compared to json)
 	appCfgStr, err := yaml.Marshal(&cfg)
-
 	if err != nil {
 		return err.Error()
 	}
