@@ -18,6 +18,7 @@ import (
 
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
+	"github.com/anchore/kai/internal/tracker"
 	"github.com/anchore/kai/kai/client"
 	"github.com/anchore/kai/kai/inventory"
 	"github.com/anchore/kai/kai/logger"
@@ -224,6 +225,7 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 // OR if there are no namespaces listed in the configuration then it will
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
+	defer tracker.TrackFunctionTime(time.Now(), "Fetching namespaces")
 	namespaces := make([]string, 0)
 
 	exclusionChecklist := buildExclusionChecklist(cfg.NamespaceSelectors.Exclude)
@@ -275,6 +277,7 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
 func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Application, ns string, ch channels) {
+	defer tracker.TrackFunctionTime(time.Now(), "Fetching pods in namespace: "+ns)
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {

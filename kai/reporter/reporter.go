@@ -12,6 +12,7 @@ import (
 
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
+	"github.com/anchore/kai/internal/tracker"
 	"github.com/anchore/kai/kai/inventory"
 )
 
@@ -21,6 +22,7 @@ const ReportAPIPath = "v1/enterprise/inventories"
 //
 //nolint:gosec
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
+	defer tracker.TrackFunctionTime(time.Now(), "Reporting results to Anchore for cluster: "+report.ClusterName+"")
 	log.Debug("Reporting results to Anchore")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
