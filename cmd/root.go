@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
     Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Info("KAI is starting up...")
 		if appConfig.Dev.ProfileCPU {
 			f, err := os.Create("cpu.profile")
 			if err != nil {
@@ -92,6 +93,13 @@ func init() {
 
 	opt = "polling-interval-seconds"
 	rootCmd.Flags().StringP(opt, "p", "300", "If mode is 'periodic', this specifies the interval")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "verbose-inventory-reports"
+	rootCmd.Flags().BoolP(opt, "i", false, "If true, will print the full inventory report to stdout")
 	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)

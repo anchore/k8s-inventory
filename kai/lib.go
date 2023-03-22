@@ -1,8 +1,7 @@
 /*
 Package kai retrieves Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the
 k8s go SDK
-*/
-package kai
+*/package kai
 
 import (
 	"context"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/anchore/kai/internal/config"
 	"github.com/anchore/kai/internal/log"
+	"github.com/anchore/kai/internal/tracker"
 	"github.com/anchore/kai/kai/client"
 	"github.com/anchore/kai/kai/inventory"
 	"github.com/anchore/kai/kai/logger"
@@ -37,12 +37,15 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
 			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
 		}
+		log.Info("Inventory report sent to Anchore")
 	} else {
-		log.Debug("Anchore details not specified, not reporting inventory")
+		log.Info("Anchore details not specified, not reporting inventory")
 	}
 
-	if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
-		return fmt.Errorf("unable to show inventory: %w", err)
+	if cfg.VerboseInventoryReports {
+		if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
+			return fmt.Errorf("unable to show inventory: %w", err)
+		}
 	}
 	return nil
 }
@@ -63,6 +66,8 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 				log.Errorf("Failed to handle Inventory Report: %w", err)
 			}
 		}
+
+		log.Infof("Waiting %d seconds for next poll...", cfg.PollingIntervalSeconds)
 
 		// Wait at least as long as the ticker
 		log.Debugf("Start new gather: %s", <-ticker.C)
@@ -93,8 +98,18 @@ func launchPodWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch ch
 	}
 }
 
+func getImageCountFromResults(results []inventory.ReportItem) int {
+	imageCount := 0
+	for _, result := range results {
+		imageCount += len(result.Images)
+	}
+	return imageCount
+}
+
 // GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
 func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
+	log.Info("Starting image inventory collection")
+
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
 		return inventory.Report{}, err
@@ -151,6 +166,11 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
 
+	log.Infof(
+		"Got Inventory Report with %d images running across %d namespaces",
+		getImageCountFromResults(results),
+		len(results),
+	)
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Results:               results,
@@ -223,6 +243,7 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 // OR if there are no namespaces listed in the configuration then it will
 // return every namespace in the cluster.
 func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string, error) {
+	defer tracker.TrackFunctionTime(time.Now(), "Fetching namespaces")
 	namespaces := make([]string, 0)
 
 	exclusionChecklist := buildExclusionChecklist(cfg.NamespaceSelectors.Exclude)
@@ -274,6 +295,7 @@ func fetchNamespaces(kubeconfig *rest.Config, cfg *config.Application) ([]string
 
 // Atomic Function that gets all the Namespace Images for a given searchNamespace and reports them to the unbuffered results channel
 func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Application, ns string, ch channels) {
+	defer tracker.TrackFunctionTime(time.Now(), "Fetching pods in namespace: "+ns)
 	pods := make([]v1.Pod, 0)
 	cont := ""
 	for {
@@ -299,7 +321,7 @@ func fetchPodsInNamespace(clientset *kubernetes.Clientset, cfg *config.Applicati
 		}
 	}
 
-	log.Debugf("There are %d pods in namespace \"%s\"", len(pods), ns)
+	log.Infof("There are %d pods in namespace \"%s\"", len(pods), ns)
 	ch.reportItem <- inventory.NewReportItem(pods, ns, cfg.IgnoreNotRunning, cfg.MissingTagPolicy.Policy, cfg.MissingTagPolicy.Tag)
 }
 
