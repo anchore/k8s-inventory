@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anchore/kai/kai/inventory"
+	"github.com/anchore/k8s-inventory/pkg/inventory"
 	"k8s.io/apimachinery/pkg/version"
 
 	"github.com/anchore/go-testutils"
@@ -18,7 +18,7 @@ var update = flag.Bool("update", false, "update the *.golden files for json pres
 func TestJsonPresenter(t *testing.T) {
 	var buffer bytes.Buffer
 
-	var item1 = inventory.ReportItem{
+	item1 := inventory.ReportItem{
 		Namespace: "docker",
 		Images: []inventory.ReportImage{
 			{
@@ -32,7 +32,7 @@ func TestJsonPresenter(t *testing.T) {
 		},
 	}
 
-	var item2 = inventory.ReportItem{
+	item2 := inventory.ReportItem{
 		Namespace: "kube-system",
 		Images: []inventory.ReportImage{
 			{
@@ -70,8 +70,8 @@ func TestJsonPresenter(t *testing.T) {
 		},
 	}
 
-	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
-	var mockReport = inventory.Report{
+	testTime := time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
+	mockReport := inventory.Report{
 		Timestamp: testTime.Format(time.RFC3339),
 		Results:   []inventory.ReportItem{item1, item2},
 		ServerVersionMetadata: &version.Info{
@@ -100,7 +100,7 @@ func TestJsonPresenter(t *testing.T) {
 		testutils.UpdateGoldenFileContents(t, actual)
 	}
 
-	var expected = testutils.GetGoldenFileContents(t)
+	expected := testutils.GetGoldenFileContents(t)
 
 	if !bytes.Equal(expected, actual) {
 		dmp := diffmatchpatch.New()
@@ -125,7 +125,7 @@ func TestEmptyJsonPresenter(t *testing.T) {
 		testutils.UpdateGoldenFileContents(t, actual)
 	}
 
-	var expected = testutils.GetGoldenFileContents(t)
+	expected := testutils.GetGoldenFileContents(t)
 
 	if !bytes.Equal(expected, actual) {
 		dmp := diffmatchpatch.New()
@@ -138,7 +138,7 @@ func TestNoResultsJsonPresenter(t *testing.T) {
 	// Expected to have an empty JSON object back
 	var buffer bytes.Buffer
 
-	var testTime = time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
+	testTime := time.Date(2020, time.September, 18, 11, 00, 49, 0, time.UTC)
 	pres := NewPresenter(inventory.Report{
 		Timestamp:     testTime.Format(time.RFC3339),
 		Results:       []inventory.ReportItem{},
@@ -156,7 +156,7 @@ func TestNoResultsJsonPresenter(t *testing.T) {
 		testutils.UpdateGoldenFileContents(t, actual)
 	}
 
-	var expected = testutils.GetGoldenFileContents(t)
+	expected := testutils.GetGoldenFileContents(t)
 
 	if !bytes.Equal(expected, actual) {
 		dmp := diffmatchpatch.New()

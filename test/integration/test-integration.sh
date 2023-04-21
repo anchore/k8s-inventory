@@ -3,9 +3,9 @@
 set -eux
 
 LATEST_COMMIT_HASH=$(git rev-parse HEAD | cut -c 1-8)
-RELEASE="integration-kai-$LATEST_COMMIT_HASH"
+RELEASE="integration-k8s-inventory-$LATEST_COMMIT_HASH"
 ## Note: if you change this value, get_images_test.go must be updated
-NAMESPACE="kai-integration-test"
+NAMESPACE="k8s-inventory-integration-test"
 CLUSTER_NAME=$1
 
 function cleanup () {

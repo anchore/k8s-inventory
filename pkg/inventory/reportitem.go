@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/anchore/kai/internal/log"
+	"github.com/anchore/k8s-inventory/internal/log"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -22,7 +22,13 @@ type ReportImage struct {
 }
 
 // NewReportItem parses a list of pods into a ReportItem full of unique images
-func NewReportItem(pods []v1.Pod, namespace string, ignoreNotRunning bool, missingTagPolicy string, dummyTag string) ReportItem {
+func NewReportItem(
+	pods []v1.Pod,
+	namespace string,
+	ignoreNotRunning bool,
+	missingTagPolicy string,
+	dummyTag string,
+) ReportItem {
 	reportItem := ReportItem{
 		Namespace: namespace,
 		Images:    []ReportImage{},
@@ -108,8 +114,10 @@ type image struct {
 }
 
 // Compile the regexes used for parsing once so they can be reused without having to recompile
-var digestRegex = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
-var tagRegex = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
+var (
+	digestRegex = regexp.MustCompile(`@(sha[[:digit:]]{3}:[[:alnum:]]{32,})`)
+	tagRegex    = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
+)
 
 // extractImageDetails extracts the repo, tag, and digest of an image out of the fields
 // grabbed from the pod.

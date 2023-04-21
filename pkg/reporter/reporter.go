@@ -10,10 +10,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/anchore/kai/internal/config"
-	"github.com/anchore/kai/internal/log"
-	"github.com/anchore/kai/internal/tracker"
-	"github.com/anchore/kai/kai/inventory"
+	"github.com/anchore/k8s-inventory/internal/config"
+	"github.com/anchore/k8s-inventory/internal/log"
+	"github.com/anchore/k8s-inventory/internal/tracker"
+	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
 const ReportAPIPath = "v1/enterprise/inventories"

@@ -1,4 +1,4 @@
-module github.com/anchore/kai
+module github.com/anchore/k8s-inventory
 
 go 1.19
 

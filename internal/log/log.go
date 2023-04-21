@@ -1,7 +1,7 @@
 // Kai's log wrapper
 package log
 
-import "github.com/anchore/kai/kai/logger"
+import "github.com/anchore/k8s-inventory/pkg/logger"
 
 var Log logger.Logger = &nopLogger{}
 

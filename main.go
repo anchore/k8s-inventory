@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/anchore/kai/cmd"
+import "github.com/anchore/k8s-inventory/cmd"
 
 func main() {
 	cmd.Execute()

@@ -5,17 +5,17 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/anchore/kai/kai/mode"
+	"github.com/anchore/k8s-inventory/pkg/mode"
 
-	"github.com/anchore/kai/kai"
-	"github.com/anchore/kai/kai/presenter"
+	"github.com/anchore/k8s-inventory/pkg"
+	"github.com/anchore/k8s-inventory/pkg/presenter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "kai",
+	Use:   "anchore-k8s-inventory",
 	Short: "KAI tells Anchore which images are in use in your Kubernetes Cluster",
 	Long: `KAI (Kubernetes Automated Inventory) can poll
     Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
@@ -45,9 +45,9 @@ var rootCmd = &cobra.Command{
 
 		switch appConfig.RunMode {
 		case mode.PeriodicPolling:
-			kai.PeriodicallyGetInventoryReport(appConfig)
+			pkg.PeriodicallyGetInventoryReport(appConfig)
 		default:
-			report, err := kai.GetInventoryReport(appConfig)
+			report, err := pkg.GetInventoryReport(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -55,7 +55,7 @@ var rootCmd = &cobra.Command{
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
 			} else {
-				err := kai.HandleReport(report, appConfig)
+				err := pkg.HandleReport(report, appConfig)
 				if err != nil {
 					log.Errorf("Failed to handle Image Results: %+v", err)
 					os.Exit(1)

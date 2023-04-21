@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/anchore/kai/internal"
-	"github.com/anchore/kai/internal/version"
+	"github.com/anchore/k8s-inventory/internal"
+	"github.com/anchore/k8s-inventory/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,8 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	versionCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "format to show version information (available=[text, json])")
+	versionCmd.Flags().
+		StringVarP(&outputFormat, "output", "o", "text", "format to show version information (available=[text, json])")
 
 	rootCmd.AddCommand(versionCmd)
 }
