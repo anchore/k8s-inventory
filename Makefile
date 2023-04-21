@@ -194,9 +194,6 @@ release: clean-dist ## Build and publish final binaries and packages
 	BUILD_GIT_TREE_STATE=$(GITTREESTATE) \
 	$(TEMPDIR)/goreleaser --rm-dist --config $(TEMPDIR)/goreleaser.yaml
 
-	# verify checksum signatures
-	.github/scripts/verify-signature.sh "$(DISTDIR)"
-
 .PHONY: clean
 clean: clean-dist clean-snapshot  ## Remove previous builds and result reports
 	rm -rf $(RESULTSDIR)/*
