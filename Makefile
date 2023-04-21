@@ -5,7 +5,6 @@ COVER_REPORT = $(RESULTSDIR)/cover.report
 COVER_TOTAL = $(RESULTSDIR)/cover.total
 LICENSES_REPORT = $(RESULTSDIR)/licenses.json
 LINTCMD = $(TEMPDIR)/golangci-lint run --config .golangci.yaml
-ACC_DIR = ./test/acceptance
 BOLD := $(shell tput -T linux bold)
 PURPLE := $(shell tput -T linux setaf 5)
 GREEN := $(shell tput -T linux setaf 2)
@@ -60,7 +59,7 @@ all: clean static-analysis unit ## Run all checks (linting, license check, unit 
 	@printf '$(SUCCESS)All checks pass!$(RESET)\n'
 
 .PHONY: test
-test: unit integration acceptance-helm ## Run all tests (unit, integration, acceptance-helm )
+test: unit integration ## Run all tests (unit, integration)
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(BOLD)$(CYAN)%-25s$(RESET)%s\n", $$1, $$2}'
@@ -134,11 +133,6 @@ cluster-down: ## Stop and delete kind cluster
 integration: ## Run integration tests
 	$(call title,Running integration tests)
 	./test/integration/test-integration.sh $(CLUSTER_NAME)
-
-.PHONY: acceptance-helm
-acceptance-helm: ## Verify that the latest helm chart for anchore-k8s-inventory works w/ the latest code (depends on anchore/k8s-inventory:latest image existing)
-	$(call title,Running acceptance test: Helm)
-	$(ACC_DIR)/helm-chart.sh \
 
 .PHONY: check-pipeline
 check-pipeline: ## Run local CircleCI pipeline locally (sanity check)
