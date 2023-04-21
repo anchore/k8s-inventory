@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/anchore/kai/kai/inventory"
+	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
 // Presenter is a generic struct for holding fields needed for reporting

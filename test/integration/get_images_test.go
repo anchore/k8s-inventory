@@ -4,17 +4,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anchore/kai/cmd"
-	"github.com/anchore/kai/kai"
+	"github.com/anchore/k8s-inventory/cmd"
+	"github.com/anchore/k8s-inventory/pkg"
 )
 
-const IntegrationTestNamespace = "kai-integration-test"
-const IntegrationTestImageTag = "nginx:latest"
+const (
+	IntegrationTestNamespace = "k8s-inventory-integration-test"
+	IntegrationTestImageTag  = "nginx:latest"
+)
 
 // Assumes that the hello-world helm chart in ./fixtures was installed (basic nginx container)
 func TestGetImageResults(t *testing.T) {
 	cmd.InitAppConfig()
-	report, err := kai.GetInventoryReport(cmd.GetAppConfig())
+	report, err := pkg.GetInventoryReport(cmd.GetAppConfig())
 	if err != nil {
 		t.Fatalf("failed to get image results: %v", err)
 	}

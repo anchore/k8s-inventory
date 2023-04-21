@@ -4,9 +4,9 @@ package presenter
 import (
 	"io"
 
-	"github.com/anchore/kai/kai/inventory"
-	"github.com/anchore/kai/kai/presenter/json"
-	"github.com/anchore/kai/kai/presenter/table"
+	"github.com/anchore/k8s-inventory/pkg/inventory"
+	"github.com/anchore/k8s-inventory/pkg/presenter/json"
+	"github.com/anchore/k8s-inventory/pkg/presenter/table"
 )
 
 // Presenter is the main interface other Presenters need to implement

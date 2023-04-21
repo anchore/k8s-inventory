@@ -9,7 +9,7 @@ signs:
     args: ["--output", "${signature}", "--detach-sign", "${artifact}"]
 
 builds:
-  - binary: kai
+  - binary: anchore-k8s-inventory
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,10 +24,10 @@ builds:
       -w
       -s
       -extldflags '-static'
-      -X github.com/anchore/kai/internal/version.version={{.Version}}
-      -X github.com/anchore/kai/internal/version.gitCommit={{.Commit}}
-      -X github.com/anchore/kai/internal/version.buildDate={{.Date}}
-      -X github.com/anchore/kai/internal/version.gitTreeState={{.Env.BUILD_GIT_TREE_STATE}}
+      -X github.com/anchore/k8s-inventory/internal/version.version={{.Version}}
+      -X github.com/anchore/k8s-inventory/internal/version.gitCommit={{.Commit}}
+      -X github.com/anchore/k8s-inventory/internal/version.buildDate={{.Date}}
+      -X github.com/anchore/k8s-inventory/internal/version.gitTreeState={{.Env.BUILD_GIT_TREE_STATE}}
 
 archives:
   - format: tar.gz
@@ -37,10 +37,10 @@ archives:
 
 dockers:
   - image_templates:
-      - "anchore/kai:latest"
-      - "anchore/kai:{{ .Tag }}-amd64"
-      - "anchore/kai:v{{ .Major }}-amd64"
-      - "anchore/kai:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "anchore/k8s-inventory:latest"
+      - "anchore/k8s-inventory:{{ .Tag }}-amd64"
+      - "anchore/k8s-inventory:v{{ .Major }}-amd64"
+      - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -51,9 +51,9 @@ dockers:
       - "--build-arg=VCS_URL={{.GitURL}}"
 
   - image_templates:
-      - "anchore/kai:{{ .Tag }}-arm64v8"
-      - "anchore/kai:v{{ .Major }}-arm64v8"
-      - "anchore/kai:v{{ .Major }}.{{ .Minor }}-arm64v8"
+      - "anchore/k8s-inventory:{{ .Tag }}-arm64v8"
+      - "anchore/k8s-inventory:v{{ .Major }}-arm64v8"
+      - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8"
     goarch: arm64
     dockerfile: Dockerfile
     use: buildx
@@ -65,20 +65,20 @@ dockers:
       - "--build-arg=VCS_URL={{.GitURL}}"
 
 docker_manifests:
-  - name_template: anchore/kai:{{ .Tag }}
+  - name_template: anchore/k8s-inventory:{{ .Tag }}
     image_templates:
-      - anchore/kai:{{ .Tag }}-amd64
-      - anchore/kai:v{{ .Major }}-amd64
-      - anchore/kai:v{{ .Major }}.{{ .Minor }}-amd64
-      - anchore/kai:{{ .Tag }}-arm64v8
-      - anchore/kai:v{{ .Major }}-arm64v8
-      - anchore/kai:v{{ .Major }}.{{ .Minor }}-arm64v8
-  - name_template: anchore/kai:latest
+      - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:v{{ .Major }}-amd64
+      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-arm64v8
+      - anchore/k8s-inventory:v{{ .Major }}-arm64v8
+      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8
+  - name_template: anchore/k8s-inventory:latest
     image_templates:
-      - anchore/kai:{{ .Tag }}-amd64
-      - anchore/kai:v{{ .Major }}-amd64
-      - anchore/kai:v{{ .Major }}.{{ .Minor }}-amd64
-      - anchore/kai:{{ .Tag }}-arm64v8
-      - anchore/kai:v{{ .Major }}-arm64v8
-      - anchore/kai:v{{ .Major }}.{{ .Minor }}-arm64v8
+      - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:v{{ .Major }}-amd64
+      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-arm64v8
+      - anchore/k8s-inventory:v{{ .Major }}-arm64v8
+      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8
       

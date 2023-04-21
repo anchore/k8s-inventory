@@ -3,7 +3,7 @@ package reporter
 import (
 	"testing"
 
-	"github.com/anchore/kai/internal/config"
+	"github.com/anchore/k8s-inventory/internal/config"
 )
 
 func TestBuildUrl(t *testing.T) {

@@ -4,17 +4,19 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/anchore/kai/internal/config"
-	"github.com/anchore/kai/internal/logger"
-	"github.com/anchore/kai/kai"
+	"github.com/anchore/k8s-inventory/internal/config"
+	"github.com/anchore/k8s-inventory/internal/logger"
+	"github.com/anchore/k8s-inventory/pkg"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var appConfig *config.Application
-var log *logrus.Logger
-var cliOnlyOpts config.CliOnlyOptions
+var (
+	appConfig   *config.Application
+	log         *logrus.Logger
+	cliOnlyOpts config.CliOnlyOptions
+)
 
 func init() {
 	setGlobalCliOptions()
@@ -74,7 +76,7 @@ func initLogging() {
 
 	logWrapper := logger.NewLogrusLogger(cfg)
 	log = logWrapper.Logger
-	kai.SetLogger(logWrapper)
+	pkg.SetLogger(logWrapper)
 }
 
 func logAppConfig() {

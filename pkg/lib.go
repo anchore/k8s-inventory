@@ -1,7 +1,7 @@
 /*
-Package kai retrieves Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the
+Package retrieves Kubernetes In-Use Image data from the Kubernetes API. Runs adhoc and periodically, using the
 k8s go SDK
-*/package kai
+*/package pkg
 
 import (
 	"context"
@@ -10,18 +10,18 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/anchore/kai/kai/presenter"
-	"github.com/anchore/kai/kai/reporter"
+	"github.com/anchore/k8s-inventory/pkg/presenter"
+	"github.com/anchore/k8s-inventory/pkg/reporter"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/anchore/kai/internal/config"
-	"github.com/anchore/kai/internal/log"
-	"github.com/anchore/kai/internal/tracker"
-	"github.com/anchore/kai/kai/client"
-	"github.com/anchore/kai/kai/inventory"
-	"github.com/anchore/kai/kai/logger"
+	"github.com/anchore/k8s-inventory/internal/config"
+	"github.com/anchore/k8s-inventory/internal/log"
+	"github.com/anchore/k8s-inventory/internal/tracker"
+	"github.com/anchore/k8s-inventory/pkg/client"
+	"github.com/anchore/k8s-inventory/pkg/inventory"
+	"github.com/anchore/k8s-inventory/pkg/logger"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

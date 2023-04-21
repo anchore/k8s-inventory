@@ -1,5 +1,5 @@
 
 image:
-  repository: anchore/kai
+  repository: anchore/k8s-inventory
   pullPolicy: IfNotPresent
   tag: "latest"

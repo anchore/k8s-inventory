@@ -17,11 +17,11 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/anchore/kai/kai/mode"
+	"github.com/anchore/k8s-inventory/pkg/mode"
 
 	"github.com/adrg/xdg"
-	"github.com/anchore/kai/internal"
-	"github.com/anchore/kai/kai/presenter"
+	"github.com/anchore/k8s-inventory/internal"
+	"github.com/anchore/k8s-inventory/pkg/presenter"
 	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"

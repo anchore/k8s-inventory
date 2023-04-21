@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/anchore/kai/internal/log"
+	"github.com/anchore/k8s-inventory/internal/log"
 
-	"github.com/anchore/kai/internal/config"
+	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/mitchellh/go-homedir"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
