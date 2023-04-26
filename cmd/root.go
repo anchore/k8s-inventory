@@ -54,12 +54,11 @@ var rootCmd = &cobra.Command{
 			if err != nil {
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
-			} else {
-				err := pkg.HandleReport(report, appConfig)
-				if err != nil {
-					log.Errorf("Failed to handle Image Results: %+v", err)
-					os.Exit(1)
-				}
+			}
+			err = pkg.HandleReport(report, appConfig)
+			if err != nil {
+				log.Errorf("Failed to handle Image Results: %+v", err)
+				os.Exit(1)
 			}
 		}
 	},
