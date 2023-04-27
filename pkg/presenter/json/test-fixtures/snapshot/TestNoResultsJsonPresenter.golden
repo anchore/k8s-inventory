@@ -1,7 +1,0 @@
-{
- "timestamp": "2020-09-18T11:00:49Z",
- "results": [],
- "serverVersionMetadata": null,
- "cluster_name": "docker-desktop",
- "inventory_type": "kubernetes"
-}

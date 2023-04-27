@@ -1,6 +1,3 @@
-# same as -o ; the output format (options: table, json)
-output: "json"
-
 # same as -q ; suppress all output (except for the inventory results)
 quiet: false
 

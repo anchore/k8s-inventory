@@ -1,6 +1,4 @@
 configpath: ""
-presenteropt: 0
-output: ""
 quiet: false
 log:
   structured: false

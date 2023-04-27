@@ -5,12 +5,12 @@ k8s go SDK
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
 	"time"
 
-	"github.com/anchore/k8s-inventory/pkg/presenter"
 	"github.com/anchore/k8s-inventory/pkg/reporter"
 
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +32,17 @@ type channels struct {
 	stopper    chan struct{}
 }
 
+func reportToStdout(report inventory.Report) error {
+	enc := json.NewEncoder(os.Stdout)
+	// prevent > and < from being escaped in the payload
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(report); err != nil {
+		return fmt.Errorf("unable to show inventory: %w", err)
+	}
+	return nil
+}
+
 func HandleReport(report inventory.Report, cfg *config.Application) error {
 	if cfg.AnchoreDetails.IsValid() {
 		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
@@ -43,9 +54,7 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 	}
 
 	if cfg.VerboseInventoryReports {
-		if err := presenter.GetPresenter(cfg.PresenterOpt, report).Present(os.Stdout); err != nil {
-			return fmt.Errorf("unable to show inventory: %w", err)
-		}
+		return reportToStdout(report)
 	}
 	return nil
 }

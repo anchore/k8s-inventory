@@ -21,7 +21,6 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/anchore/k8s-inventory/internal"
-	"github.com/anchore/k8s-inventory/pkg/presenter"
 	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -38,8 +37,6 @@ type CliOnlyOptions struct {
 // All Application configurations
 type Application struct {
 	ConfigPath                      string
-	PresenterOpt                    presenter.Option
-	Output                          string  `mapstructure:"output"`
 	Quiet                           bool    `mapstructure:"quiet"`
 	Log                             Logging `mapstructure:"log"`
 	CliOptions                      CliOnlyOptions
@@ -162,13 +159,6 @@ func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, 
 
 // Build the configuration object (to be used as a singleton)
 func (cfg *Application) Build() error {
-	// set the presenter
-	presenterOption := presenter.ParseOption(cfg.Output)
-	if presenterOption == presenter.UnknownPresenter {
-		return fmt.Errorf("bad --output value '%s'", cfg.Output)
-	}
-	cfg.PresenterOpt = presenterOption
-
 	runMode := mode.ParseMode(cfg.Mode)
 	cfg.RunMode = runMode
 

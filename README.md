@@ -202,9 +202,6 @@ A basic values file can always be found [here](https://github.com/anchore/anchor
 
 ## Configuration
 ```yaml
-# same as -o ; the output format (options: table, json)
-output: "json"
-
 # same as -q ; suppress all output (except for the inventory results)
 quiet: false
 
