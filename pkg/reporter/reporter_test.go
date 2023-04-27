@@ -13,7 +13,7 @@ func TestBuildUrl(t *testing.T) {
 		Password: "foobar",
 	}
 
-	expectedURL := "https://ancho.re/v1/enterprise/inventories"
+	expectedURL := "https://ancho.re/v1/enterprise/kubernetes-inventory"
 	actualURL, err := buildURL(anchoreDetails)
 	if err != nil || expectedURL != actualURL {
 		t.Errorf("Failed to build URL:\nexpected=%s\nactual=%s", expectedURL, actualURL)

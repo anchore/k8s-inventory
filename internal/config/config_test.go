@@ -4,8 +4,9 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/anchore/go-testutils"
 	"github.com/spf13/viper"
+
+	"github.com/anchore/go-testutils"
 )
 
 var update = flag.Bool("update", false, "update the *.golden files for config string output")

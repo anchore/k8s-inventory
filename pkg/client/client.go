@@ -7,14 +7,19 @@ import (
 
 	"github.com/anchore/k8s-inventory/internal/log"
 
-	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/mitchellh/go-homedir"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/anchore/k8s-inventory/internal/config"
 )
 
 const UseInCluster = "use-in-cluster"
+
+type Client struct {
+	Clientset kubernetes.Interface
+}
 
 // Based on the application configuration, retrieve the k8s clientset
 func GetClientSet(kubeConfig *rest.Config) (*kubernetes.Clientset, error) {
