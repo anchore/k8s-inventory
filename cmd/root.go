@@ -8,7 +8,6 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/mode"
 
 	"github.com/anchore/k8s-inventory/pkg"
-	"github.com/anchore/k8s-inventory/pkg/presenter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -65,18 +64,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	// output & formatting options
-	opt := "output"
-	rootCmd.Flags().StringP(
-		opt, "o", presenter.JSONPresenter.String(),
-		fmt.Sprintf("report output formatter, options=%v", presenter.Options),
-	)
-	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
-		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
-		os.Exit(1)
-	}
-
-	opt = "kubeconfig"
+	opt := "kubeconfig"
 	rootCmd.Flags().StringP(opt, "k", "", "(optional) absolute path to the kubeconfig file")
 	if err := viper.BindPFlag(opt+".path", rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)

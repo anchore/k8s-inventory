@@ -1,6 +1,4 @@
 configpath: ../../anchore-k8s-inventory.yaml
-presenteropt: 1
-output: json
 quiet: false
 log:
   structured: false
