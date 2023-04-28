@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -13,31 +14,20 @@ var (
 	tagRegex    = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 )
 
-func getImageTagFromContainer(image string) string {
-	tag := ""
-	minusSha := strings.Split(image, "@")[0]
-	tagresult := tagRegex.FindStringSubmatchIndex(minusSha)
-	if len(tagresult) > 0 {
-		tag = minusSha
-	}
-	return tag
-}
-
-func getContainersInPod(pod v1.Pod) []Container {
+func getContainersInPod(pod v1.Pod, missingTagPolicy, dummyTag string) []Container {
 	// Look at both status/spec for init and regular containers
 	// Must use status when looking at containers in order to obtain the container ID
 	// from the Status and the Image tag from the Spec
 	containers := make(map[string]Container, 0)
 
 	processPodSpec := func(c v1.Container) {
-		tag := getImageTagFromContainer(c.Image)
 		if containerFound, ok := containers[c.Name]; ok {
-			containerFound.ImageTag = tag
+			containerFound.ImageTag = strings.Split(c.Image, "@")[0]
 			containerFound.PodUID = string(pod.UID)
 		} else {
 			containers[c.Name] = Container{
 				PodUID:   string(pod.UID),
-				ImageTag: tag,
+				ImageTag: strings.Split(c.Image, "@")[0],
 				Name:     c.Name,
 			}
 		}
@@ -59,7 +49,7 @@ func getContainersInPod(pod v1.Pod) []Container {
 			containers[c.Name] = Container{
 				ID:          c.ContainerID,
 				PodUID:      string(pod.UID),
-				ImageTag:    getImageTagFromContainer(c.Image),
+				ImageTag:    strings.Split(c.Image, "@")[0],
 				ImageDigest: digest,
 				Name:        c.Name,
 			}
@@ -81,20 +71,41 @@ func getContainersInPod(pod v1.Pod) []Container {
 
 	var containerList []Container
 	for _, c := range containers {
+		tagFound := tagRegex.FindStringSubmatchIndex(c.ImageTag)
+		if len(tagFound) == 0 {
+			switch missingTagPolicy {
+			case "dummy":
+				c.ImageTag = fmt.Sprintf("%s:%s", c.ImageTag, dummyTag)
+			case "digest":
+				digest := strings.Split(c.ImageDigest, ":")
+				c.ImageTag = fmt.Sprintf("%s:%s", c.ImageTag, digest[len(digest)-1])
+			}
+		}
+
 		containerList = append(containerList, c)
 	}
 	return containerList
 }
 
-func GetContainersFromPods(pods []v1.Pod, ignoreNotRunning bool) []Container {
+func GetContainersFromPods(pods []v1.Pod, ignoreNotRunning bool, missingTagPolicy, dummyTag string) []Container {
 	var containers []Container
 
 	for _, pod := range pods {
 		if ignoreNotRunning && pod.Status.Phase != v1.PodRunning {
 			continue
 		}
-		containers = append(containers, getContainersInPod(pod)...)
+		containers = append(containers, getContainersInPod(pod, missingTagPolicy, dummyTag)...)
 	}
 
-	return containers
+	// Handle missing tags
+	var finalContainers []Container
+	for _, c := range containers {
+		tagFound := tagRegex.FindStringSubmatchIndex(c.ImageTag)
+		if len(tagFound) == 0 && missingTagPolicy == "drop" {
+			continue
+		}
+		finalContainers = append(finalContainers, c)
+	}
+
+	return finalContainers
 }

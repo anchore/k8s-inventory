@@ -194,7 +194,12 @@ func processNamespace(clientset *kubernetes.Clientset, cfg *config.Application, 
 	}
 
 	pods := inventory.ProcessPods(v1pods, ns.UID)
-	containers := inventory.GetContainersFromPods(v1pods, cfg.IgnoreNotRunning)
+	containers := inventory.GetContainersFromPods(
+		v1pods,
+		cfg.IgnoreNotRunning,
+		cfg.MissingTagPolicy.Policy,
+		cfg.MissingTagPolicy.Tag,
+	)
 
 	reportItem := ReportItem{
 		Pods:       pods,
