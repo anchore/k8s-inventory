@@ -86,10 +86,13 @@ func getContainersInPod(pod v1.Pod) []Container {
 	return containerList
 }
 
-func GetContainersFromPods(pods []v1.Pod) []Container {
+func GetContainersFromPods(pods []v1.Pod, ignoreNotRunning bool) []Container {
 	var containers []Container
 
 	for _, pod := range pods {
+		if ignoreNotRunning && pod.Status.Phase != v1.PodRunning {
+			continue
+		}
 		containers = append(containers, getContainersInPod(pod)...)
 	}
 
