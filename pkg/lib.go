@@ -194,7 +194,7 @@ func processNamespace(clientset *kubernetes.Clientset, cfg *config.Application, 
 	}
 
 	pods := inventory.ProcessPods(v1pods, ns.UID)
-	containers := inventory.GetContainersFromPods(v1pods)
+	containers := inventory.GetContainersFromPods(v1pods, cfg.IgnoreNotRunning)
 
 	reportItem := ReportItem{
 		Pods:       pods,
