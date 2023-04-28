@@ -7,9 +7,10 @@ import (
 
 	"github.com/anchore/k8s-inventory/pkg/mode"
 
-	"github.com/anchore/k8s-inventory/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/anchore/k8s-inventory/pkg"
 )
 
 // rootCmd represents the base command when called without any subcommands

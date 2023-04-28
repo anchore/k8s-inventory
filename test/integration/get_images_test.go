@@ -30,18 +30,18 @@ func TestGetImageResults(t *testing.T) {
 	}
 
 	foundIntegrationTestNamespace := false
-	for _, item := range report.Results {
-		if item.Namespace != IntegrationTestNamespace {
+	for _, item := range report.Namespaces {
+		if item.Name != IntegrationTestNamespace {
 			continue
 		}
 		foundIntegrationTestNamespace = true
 		foundIntegrationTestImage := false
-		for _, image := range item.Images {
-			if !strings.Contains(image.Tag, IntegrationTestImageTag) {
+		for _, image := range report.Containers {
+			if !strings.Contains(image.ImageTag, IntegrationTestImageTag) {
 				continue
 			}
 			foundIntegrationTestImage = true
-			if image.RepoDigest == "" {
+			if image.ImageDigest == "" {
 				t.Logf("Image Found, but no digest located: %v", image)
 			}
 		}

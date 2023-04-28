@@ -16,7 +16,7 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
-const ReportAPIPath = "v1/enterprise/inventories"
+const ReportAPIPath = "v1/enterprise/kubernetes-inventory"
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //
@@ -54,7 +54,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		return fmt.Errorf("failed to report data to Anchore: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
 	}
 	log.Debug("Successfully reported results to Anchore")

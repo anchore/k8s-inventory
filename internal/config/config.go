@@ -20,10 +20,11 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/mode"
 
 	"github.com/adrg/xdg"
-	"github.com/anchore/k8s-inventory/internal"
 	"github.com/mitchellh/go-homedir"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
+	"github.com/anchore/k8s-inventory/internal"
 )
 
 const redacted = "******"
