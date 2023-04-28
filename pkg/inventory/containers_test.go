@@ -82,6 +82,31 @@ func Test_getContainersInPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "successfully returns with an image tag if spec is missing",
+			args: args{
+				pod: v1.Pod{
+					Status: v1.PodStatus{
+						InitContainerStatuses: []v1.ContainerStatus{
+							{
+								Name:        "test-container",
+								Image:       "anchore/test:v1.0.0",
+								ImageID:     "docker-pullable://anchore/test@sha256:2e500d29e9d5f4a086b908eb8dfe7ecac57d2ab09d65b24f588b1d449841ef93",
+								ContainerID: "docker://a9cd75ad99dd4363bbd882b40e753b58c62bfd7b03cabeb764c1dac97568ad26",
+							},
+						},
+					},
+				},
+			},
+			want: []Container{
+				{
+					Name:        "test-container",
+					ImageTag:    "anchore/test:v1.0.0",
+					ImageDigest: "sha256:2e500d29e9d5f4a086b908eb8dfe7ecac57d2ab09d65b24f588b1d449841ef93",
+					ID:          "docker://a9cd75ad99dd4363bbd882b40e753b58c62bfd7b03cabeb764c1dac97568ad26",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
