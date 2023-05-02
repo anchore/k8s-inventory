@@ -18,6 +18,7 @@ func Test_fetchNamespaces(t *testing.T) {
 		timeout   int64
 		excludes  []string
 		includes  []string
+		metadata  bool
 	}
 	tests := []struct {
 		name    string
@@ -46,6 +47,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				timeout:   10,
 				excludes:  []string{},
 				includes:  []string{},
+				metadata:  true,
 			},
 			want: []Namespace{
 				{
@@ -103,6 +105,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				timeout:   10,
 				excludes:  []string{"excluded-namespace"},
 				includes:  []string{},
+				metadata:  true,
 			},
 			want: []Namespace{
 				{
@@ -159,6 +162,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				timeout:   10,
 				excludes:  []string{"excluded.*"},
 				includes:  []string{},
+				metadata:  true,
 			},
 			want: []Namespace{
 				{
@@ -215,6 +219,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				timeout:   10,
 				excludes:  []string{"exclude.*"},
 				includes:  []string{"test-namespace"},
+				metadata:  true,
 			},
 			want: []Namespace{
 				{
@@ -271,6 +276,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				timeout:   10,
 				excludes:  []string{},
 				includes:  []string{"test-namespace"},
+				metadata:  true,
 			},
 			want: []Namespace{
 				{
@@ -281,10 +287,47 @@ func Test_fetchNamespaces(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "only returns minimal metadata",
+			args: args{
+				c: client.Client{
+					Clientset: fake.NewSimpleClientset(&v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-namespace",
+							UID:  "test-uid",
+							Annotations: map[string]string{
+								"test-annotation": "test-value",
+							},
+							Labels: map[string]string{
+								"test-label": "test-value",
+							},
+						},
+					}),
+				},
+				batchSize: 100,
+				timeout:   10,
+				excludes:  []string{},
+				includes:  []string{},
+				metadata:  false,
+			},
+			want: []Namespace{
+				{
+					Name: "test-namespace",
+					UID:  "test-uid",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FetchNamespaces(tt.args.c, tt.args.batchSize, tt.args.timeout, tt.args.excludes, tt.args.includes)
+			got, err := FetchNamespaces(
+				tt.args.c,
+				tt.args.batchSize,
+				tt.args.timeout,
+				tt.args.excludes,
+				tt.args.includes,
+				tt.args.metadata,
+			)
 			if (err != nil) != tt.wantErr {
 				assert.Error(t, err)
 			}

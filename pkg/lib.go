@@ -132,7 +132,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 
 	namespaces, err := inventory.FetchNamespaces(client,
 		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
-		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include)
+		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include, cfg.Metadata)
 	if err != nil {
 		return inventory.Report{}, err
 	}
@@ -193,7 +193,7 @@ func processNamespace(clientset *kubernetes.Clientset, cfg *config.Application, 
 		return
 	}
 
-	pods := inventory.ProcessPods(v1pods, ns.UID)
+	pods := inventory.ProcessPods(v1pods, ns.UID, cfg.Metadata)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,

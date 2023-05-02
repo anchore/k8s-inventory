@@ -231,6 +231,9 @@ kubeconfig:
 
 # enable/disable printing inventory reports to stdout
 verbose-inventory-reports: false
+
+# collect additional metadata about where a container is running (e.g. namespace labels, namespace annotations, etc.) [defaults to true]
+metadata: true
 ```
 
 ### Namespace selection
