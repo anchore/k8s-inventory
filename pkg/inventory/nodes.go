@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/anchore/k8s-inventory/internal/log"
 	"github.com/anchore/k8s-inventory/pkg/client"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,6 +23,10 @@ func FetchNodes(c client.Client, batchSize, timeout int64) (map[string]Node, err
 
 		list, err := c.Clientset.CoreV1().Nodes().List(context.Background(), opts)
 		if err != nil {
+			if k8sErrors.IsForbidden(err) {
+				log.Warnf("failed to list nodes: %w", err)
+				return nil, nil
+			}
 			return nil, fmt.Errorf("failed to list nodes: %w", err)
 		}
 
