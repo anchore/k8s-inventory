@@ -76,6 +76,7 @@ func TestProcessPods(t *testing.T) {
 		pods         []v1.Pod
 		namespaceUID string
 		metadata     bool
+		nodes        map[string]Node
 	}
 	tests := []struct {
 		name string
@@ -98,10 +99,19 @@ func TestProcessPods(t *testing.T) {
 							},
 							Namespace: "test-namespace",
 						},
+						Spec: v1.PodSpec{
+							NodeName: "test-node",
+						},
 					},
 				},
 				namespaceUID: "namespace-uid-0000",
 				metadata:     true,
+				nodes: map[string]Node{
+					"test-node": {
+						Name: "test-node",
+						UID:  "test-node-uid",
+					},
+				},
 			},
 			want: []Pod{
 				{
@@ -114,6 +124,7 @@ func TestProcessPods(t *testing.T) {
 						"test-label": "test-value",
 					},
 					NamespaceUID: "namespace-uid-0000",
+					NodeUID:      "test-node-uid",
 				},
 			},
 		},
@@ -133,6 +144,9 @@ func TestProcessPods(t *testing.T) {
 							},
 							Namespace: "test-namespace",
 						},
+						Spec: v1.PodSpec{
+							NodeName: "test-node",
+						},
 					},
 				},
 				namespaceUID: "namespace-uid-0000",
@@ -149,7 +163,7 @@ func TestProcessPods(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.metadata)
+			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.metadata, tt.args.nodes)
 			assert.Equal(t, tt.want, got)
 		})
 	}
