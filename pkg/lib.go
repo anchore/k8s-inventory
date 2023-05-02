@@ -85,7 +85,13 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 
 // launchWorkerPool will create a worker pool of goroutines to grab pods/containers
 // from each namespace. This should alleviate the load on the api server
-func launchWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch channels, queue chan inventory.Namespace) {
+func launchWorkerPool(
+	cfg *config.Application,
+	kubeconfig *rest.Config,
+	ch channels,
+	queue chan inventory.Namespace,
+	nodes map[string]inventory.Node,
+) {
 	for i := 0; i < cfg.Kubernetes.WorkerPoolSize; i++ {
 		go func() {
 			// each worker needs its own clientset
@@ -100,7 +106,7 @@ func launchWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch chann
 				case <-ch.stopper:
 					return
 				default:
-					processNamespace(clientset, cfg, namespace, ch)
+					processNamespace(clientset, cfg, namespace, ch, nodes)
 				}
 			}
 		}()
@@ -108,6 +114,8 @@ func launchWorkerPool(cfg *config.Application, kubeconfig *rest.Config, ch chann
 }
 
 // GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
+//
+//nolint:funlen
 func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	log.Info("Starting image inventory collection")
 
@@ -143,7 +151,19 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}
 	close(queue)
 
-	launchWorkerPool(cfg, kubeconfig, ch, queue) // get pods/containers from namespaces using a worker pool pattern
+	var nodeMap map[string]inventory.Node
+	if cfg.Metadata {
+		nodeMap, err = inventory.FetchNodes(
+			client,
+			cfg.Kubernetes.RequestBatchSize,
+			cfg.Kubernetes.RequestTimeoutSeconds,
+		)
+		if err != nil {
+			return inventory.Report{}, err
+		}
+	}
+
+	launchWorkerPool(cfg, kubeconfig, ch, queue, nodeMap) // get pods/containers from namespaces using a worker pool pattern
 
 	results := make([]ReportItem, 0)
 	pods := make([]inventory.Pod, 0)
@@ -170,7 +190,23 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
 
+	var nodes []inventory.Node
+	for _, node := range nodeMap {
+		nodes = append(nodes, node)
+	}
+
 	log.Infof("Got Inventory Report with %d containers running across %d namespaces", len(containers), len(namespaces))
+	if cfg.Metadata {
+		return inventory.Report{
+			Timestamp:             time.Now().UTC().Format(time.RFC3339),
+			Containers:            containers,
+			Pods:                  pods,
+			Namespaces:            namespaces,
+			Nodes:                 nodes,
+			ServerVersionMetadata: serverVersion,
+			ClusterName:           cfg.KubeConfig.Cluster,
+		}, nil
+	}
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Containers:            containers,
@@ -181,7 +217,13 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}, nil
 }
 
-func processNamespace(clientset *kubernetes.Clientset, cfg *config.Application, ns inventory.Namespace, ch channels) {
+func processNamespace(
+	clientset *kubernetes.Clientset,
+	cfg *config.Application,
+	ns inventory.Namespace,
+	ch channels,
+	nodes map[string]inventory.Node,
+) {
 	v1pods, err := inventory.FetchPodsInNamespace(
 		client.Client{Clientset: clientset},
 		cfg.Kubernetes.RequestBatchSize,
@@ -193,7 +235,7 @@ func processNamespace(clientset *kubernetes.Clientset, cfg *config.Application, 
 		return
 	}
 
-	pods := inventory.ProcessPods(v1pods, ns.UID, cfg.Metadata)
+	pods := inventory.ProcessPods(v1pods, ns.UID, cfg.Metadata, nodes)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,

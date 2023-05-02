@@ -26,7 +26,6 @@ type Node struct {
 	KernelVersion           string            `json:"kernel_version,omitempty"`
 	KubeProxyVersion        string            `json:"kube_proxy_version,omitempty"`
 	KubeletVersion          string            `json:"kubelet_version,omitempty"`
-	KubernetesVersion       string            `json:"kubernetes_version,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty"`
 	Name                    string            `json:"name"`
 	OperatingSystem         string            `json:"operating_system,omitempty"`
