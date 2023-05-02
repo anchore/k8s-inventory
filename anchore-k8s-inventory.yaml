@@ -79,8 +79,8 @@ ignore-not-running: true
 polling-interval-seconds: 300
 
 anchore:
-#  url:
-#  user: admin
+  # url: $ANCHORE_K8S_INVENTORY_ANCHORE_URL
+  # user: $ANCHORE_K8S_INVENTORY_ANCHORE_USER
   password: $ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD
 #  http:
 #    insecure: true

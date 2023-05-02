@@ -7,8 +7,7 @@ are listed below in order of precedence:
   - ~/.kai.yaml
   - <XDG_CONFIG_HOME>/kai/config.yaml
   - Environment Variables prefixed with KAI_
-*/
-package config
+*/package config
 
 import (
 	"fmt"
@@ -54,6 +53,7 @@ type Application struct {
 	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
 	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
 	VerboseInventoryReports         bool        `mapstructure:"verbose-inventory-reports"`
+	Metadata                        bool        `mapstructure:"metadata"` // if true, include runtime metadata in the inventory report
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
@@ -129,6 +129,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("namespaces", []string{})
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})
+	v.SetDefault("metadata", true)
 }
 
 // Load the Application Configuration from the Viper specifications

@@ -46,3 +46,4 @@ anchoredetails:
     insecure: false
     timeoutseconds: 0
 verboseinventoryreports: false
+metadata: false

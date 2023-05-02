@@ -71,7 +71,12 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 	return false
 }
 
-func FetchNamespaces(c client.Client, batchSize, timeout int64, excludes, includes []string) ([]Namespace, error) {
+func FetchNamespaces(
+	c client.Client,
+	batchSize, timeout int64,
+	excludes, includes []string,
+	metadata bool,
+) ([]Namespace, error) {
 	defer tracker.TrackFunctionTime(time.Now(), "Fetching namespaces")
 	nsMap := make(map[string]Namespace)
 
@@ -91,11 +96,18 @@ func FetchNamespaces(c client.Client, batchSize, timeout int64, excludes, includ
 		}
 		for _, n := range list.Items {
 			if !excludeNamespace(exclusionChecklist, n.ObjectMeta.Name) {
-				nsMap[n.ObjectMeta.Name] = Namespace{
-					Name:        n.ObjectMeta.Name,
-					UID:         string(n.UID),
-					Annotations: n.Annotations,
-					Labels:      n.Labels,
+				if metadata {
+					nsMap[n.ObjectMeta.Name] = Namespace{
+						Name:        n.ObjectMeta.Name,
+						UID:         string(n.UID),
+						Annotations: n.Annotations,
+						Labels:      n.Labels,
+					}
+				} else {
+					nsMap[n.ObjectMeta.Name] = Namespace{
+						Name: n.ObjectMeta.Name,
+						UID:  string(n.UID),
+					}
 				}
 			}
 		}
