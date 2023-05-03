@@ -1,4 +1,3 @@
-// Kai's Logging implementation via Logrus
 package logger
 
 import (
@@ -13,7 +12,6 @@ import (
 
 const defaultLogPermissions fs.FileMode = 0644
 
-// LogrusConfiguration for Kai
 type LogrusConfig struct {
 	EnableConsole bool
 	EnableFile    bool

@@ -1,176 +1,154 @@
-# KAI (Kubernetes Automated Inventory)
-[![CircleCI](https://circleci.com/gh/anchore/kai.svg?style=svg&circle-token=6f6ffa17b0630e6af622e162d594e2312c136d94)](https://circleci.com/gh/anchore/kai)
-[![Go Report Card](https://goreportcard.com/badge/github.com/anchore/kai)](https://goreportcard.com/report/github.com/anchore/kai)
-[![GitHub release](https://img.shields.io/github/release/anchore/kai.svg)](https://github.com/anchore/kai/releases/latest)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/anchore/kai/blob/main/LICENSE)
+# Anchore Kubernetes Inventory
+[![Go Report Card](https://goreportcard.com/badge/github.com/anchore/k8s-inventory)](https://goreportcard.com/report/github.com/anchore/k8s-inventory)
+[![GitHub release](https://img.shields.io/github/release/anchore/k8s-inventory.svg)](https://github.com/anchore/k8s-inventory/releases/latest)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/anchore/k8s-inventory/blob/main/LICENSE)
 
-KAI polls the Kubernetes API on an interval to retrieve which images are currently in use.
+`anchore-k8s-inventory` polls the Kubernetes API on an interval to retrieve which images are currently in use.
 
-It can be run inside a cluster (under a Service Account) or outside (via any provided Kubeconfig).
+It can be run inside a cluster (under a Service Account) or outside (via any provided kubeconfig).
 
 ## Getting Started
-[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/kai)
+[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/k8s-inventory)
 
 ## Installation
-KAI can be run as a CLI, Docker Container, or Helm Chart
+`anchore-k8s-inventory` can be run as a CLI, Docker Container, or Helm Chart
 
-By default, KAI will look for a Kubeconfig in the home directory to use to authenticate (when run as a CLI).
+By default, `anchore-k8s-inventory` will look for a kubeconfig in the home directory to use to authenticate (when run as a CLI).
 
 ### CLI
 ```shell script
-$ kai --verbose-inventory-reports
+$ anchore-k8s-inventory --verbose-inventory-reports
 {
-  "timestamp": "2021-11-17T18:47:36Z",
-  "results": [
+  "cluster_name": "docker-desktop",
+  "containers": [
     {
-      "namespace": "kube-node-lease",
-      "images": []
+      "id": "docker://911d2cf6351cbafc349f131aeef1b1fb295a889504d38c89a065da1a91d828b9",
+      "image_digest": "sha256:76049887f07a0476dc93efc2d3569b9529bf982b22d29f356092ce206e98765c",
+      "image_tag": "docker.io/kubernetesui/metrics-scraper:v1.0.8",
+      "name": "dashboard-metrics-scraper",
+      "pod_uid": "c5b40099-20a5-4b46-8062-cf84f9d6ac23"
     },
     {
-      "namespace": "kube-public",
-      "images": []
+      "id": "docker://a9cd75ad99dd4363bbd882b40e753b58c62bfd7b03cabeb764c1dac97568ad26",
+      "image_digest": "sha256:2e500d29e9d5f4a086b908eb8dfe7ecac57d2ab09d65b24f588b1d449841ef93",
+      "image_tag": "docker.io/kubernetesui/dashboard:v2.7.0",
+      "name": "kubernetes-dashboard",
+      "pod_uid": "72ba7e4e-6e35-48c0-bff7-558a525074d5"
+    },
+	.....
+  ],
+  "namespaces": [
+    {
+      "labels": {
+        "kubernetes.io/metadata.name": "kube-public"
+      },
+      "name": "kube-public",
+      "uid": "dd561bf1-11ff-4381-8a1f-f156c206fe13"
     },
     {
-      "namespace": "default",
-      "images": [
-        {
-          "tag": "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
-          "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
-        },
-        {
-          "tag": "memcached:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f",
-          "repoDigest": "sha256:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f"
-        },
-        {
-          "tag": "python:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a",
-          "repoDigest": "sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a"
-        }
-      ]
+      "labels": {
+        "kubernetes.io/metadata.name": "kube-system"
+      },
+      "name": "kube-system",
+      "uid": "012ebe67-dd49-4fd9-b604-258385df3957"
     },
+	.....
+  ],
+  "nodes": [
     {
-      "namespace": "kube-system",
-      "images": [
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.7.5-eksbuild.1",
-          "repoDigest": "sha256:d96d712513464de6ce94e422634a25546565418f20d1b28d3bce399d578f3296"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.7.5-eksbuild.1",
-          "repoDigest": "sha256:f310c918ee2b4ebced76d2d64a2ec128dde3b364d1b495f0ae73011f489d474d"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.8.4-eksbuild.1",
-          "repoDigest": "sha256:fcb60ebdb0d8ec23abe46c65d0f650d9e2bf2f803fac004ceb1f0bf348db0fd0"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/kube-proxy:v1.21.2-eksbuild.2",
-          "repoDigest": "sha256:0ea6717ed144c7f04922bf56662d58d5b14b7b62ef78c70e636a02d22052681c"
-        }
-      ]
+      "annotations": {
+        "kubeadm.alpha.kubernetes.io/cri-socket": "unix:///var/run/cri-dockerd.sock",
+        "node.alpha.kubernetes.io/ttl": "0",
+        "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+      },
+      "arch": "arm64",
+      "container_runtime_version": "docker://20.10.23",
+      "kernel_version": "5.15.49-linuxkit",
+      "kube_proxy_version": "v1.26.1",
+      "kubelet_version": "v1.26.1",
+      "labels": {
+        "beta.kubernetes.io/arch": "arm64",
+        "beta.kubernetes.io/os": "linux",
+        "kubernetes.io/arch": "arm64",
+        "kubernetes.io/hostname": "minikube",
+        "kubernetes.io/os": "linux",
+        "minikube.k8s.io/commit": "ddac20b4b34a9c8c857fc602203b6ba2679794d3",
+        "minikube.k8s.io/name": "minikube",
+        "minikube.k8s.io/primary": "true",
+        "minikube.k8s.io/updated_at": "2023_04_11T11_20_54_0700",
+        "minikube.k8s.io/version": "v1.29.0",
+        "node-role.kubernetes.io/control-plane": "",
+        "node.kubernetes.io/exclude-from-external-load-balancers": ""
+      },
+      "name": "minikube",
+      "operating_system": "linux",
+      "uid": "b8334e25-68a5-4cbc-bf7a-fc188f2c6023"
     }
+  ],
+  "pods": [
+    {
+      "annotations": {
+        "seccomp.security.alpha.kubernetes.io/pod": "runtime/default"
+      },
+      "labels": {
+        "k8s-app": "dashboard-metrics-scraper",
+        "pod-template-hash": "5c6664855"
+      },
+      "name": "dashboard-metrics-scraper-5c6664855-s8lpc",
+      "namespace_uid": "c1d98ff5-6689-4016-aef3-8802790c3b10",
+      "node_uid": "b8334e25-68a5-4cbc-bf7a-fc188f2c6023",
+      "uid": "c5b40099-20a5-4b46-8062-cf84f9d6ac23"
+    },
+    {
+      "labels": {
+        "gcp-auth-skip-secret": "true",
+        "k8s-app": "kubernetes-dashboard",
+        "pod-template-hash": "55c4cbbc7c"
+      },
+      "name": "kubernetes-dashboard-55c4cbbc7c-6p28m",
+      "namespace_uid": "c1d98ff5-6689-4016-aef3-8802790c3b10",
+      "node_uid": "b8334e25-68a5-4cbc-bf7a-fc188f2c6023",
+      "uid": "72ba7e4e-6e35-48c0-bff7-558a525074d5"
+    },
+	.....
   ],
   "serverVersionMetadata": {
     "major": "1",
-    "minor": "21+",
-    "gitVersion": "v1.21.2-eks-06eac09",
-    "gitCommit": "5f6d83fe4cb7febb5f4f4e39b3b2b64ebbbe3e97",
+    "minor": "26",
+    "gitVersion": "v1.26.1",
+    "gitCommit": "8f94681cd294aa8cfd3407b8191f6c70214973a4",
     "gitTreeState": "clean",
-    "buildDate": "2021-09-13T14:20:15Z",
-    "goVersion": "go1.16.5",
+    "buildDate": "2023-01-18T15:51:25Z",
+    "goVersion": "go1.19.5",
     "compiler": "gc",
-    "platform": "linux/amd64"
+    "platform": "linux/arm64"
   },
-  "cluster_name": "eks-prod",
-  "inventory_type": "kubernetes"
+  "timestamp": "2023-05-03T12:34:13Z"
 }
 ```
 ### Container
 
-In order to run kai as a container, it needs a kubeconfig
+In order to run `anchore-k8s-inventory` as a container, it needs a kubeconfig
 ```sh
-~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/kai:v0.5.0 --verbose-inventory-reports
-{
-  "timestamp": "2021-11-17T18:47:36Z",
-  "results": [
-    {
-      "namespace": "kube-node-lease",
-      "images": []
-    },
-    {
-      "namespace": "kube-public",
-      "images": []
-    },
-    {
-      "namespace": "default",
-      "images": [
-        {
-          "tag": "alpine:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba",
-          "repoDigest": "sha256:4ed1812024ed78962a34727137627e8854a3b414d19e2c35a1dc727a47e16fba"
-        },
-        {
-          "tag": "memcached:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f",
-          "repoDigest": "sha256:05a8f320f47594e13a995ce6010bf1a1ffefbc0801af3db71a4b307d80507e1f"
-        },
-        {
-          "tag": "python:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a",
-          "repoDigest": "sha256:f0a210a37565286ecaaac0529a6749917e8ea58d3dfc72c84acfbfbe1a64a20a"
-        }
-      ]
-    },
-    {
-      "namespace": "kube-system",
-      "images": [
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.7.5-eksbuild.1",
-          "repoDigest": "sha256:d96d712513464de6ce94e422634a25546565418f20d1b28d3bce399d578f3296"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.7.5-eksbuild.1",
-          "repoDigest": "sha256:f310c918ee2b4ebced76d2d64a2ec128dde3b364d1b495f0ae73011f489d474d"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/coredns:v1.8.4-eksbuild.1",
-          "repoDigest": "sha256:fcb60ebdb0d8ec23abe46c65d0f650d9e2bf2f803fac004ceb1f0bf348db0fd0"
-        },
-        {
-          "tag": "602401143452.dkr.ecr.us-west-2.amazonaws.com/eks/kube-proxy:v1.21.2-eksbuild.2",
-          "repoDigest": "sha256:0ea6717ed144c7f04922bf56662d58d5b14b7b62ef78c70e636a02d22052681c"
-        }
-      ]
-    }
-  ],
-  "serverVersionMetadata": {
-    "major": "1",
-    "minor": "21+",
-    "gitVersion": "v1.21.2-eks-06eac09",
-    "gitCommit": "5f6d83fe4cb7febb5f4f4e39b3b2b64ebbbe3e97",
-    "gitTreeState": "clean",
-    "buildDate": "2021-09-13T14:20:15Z",
-    "goVersion": "go1.16.5",
-    "compiler": "gc",
-    "platform": "linux/amd64"
-  },
-  "cluster_name": "eks-prod",
-  "inventory_type": "kubernetes"
-}
+~ docker run -it --rm -v ~/.kube/config:/.kube/config anchore/k8s-inventory:latest --verbose-inventory-reports
 ```
 
 ### Helm Chart
 
-KAI is the foundation of Anchore Enterprise's Runtime Inventory feature. Running KAI via Helm is a great way to retrieve your Kubernetes Image inventory without providing Cluster Credentials to Anchore.
+Anchore-k8s-inventory is the foundation of Anchore Enterprise's Runtime Inventory feature. Running anchore-k8s-inventory via Helm is a great way to retrieve your Kubernetes Image inventory without providing Cluster Credentials to Anchore.
 
-KAI runs as a read-only service account in the cluster it's deployed to.
+Anchore-k8s-inventory runs as a read-only service account in the cluster it's deployed to.
 
-In order to report the inventory to Anchore, KAI does require authentication material for your Anchore Enterprise deployment.
-KAI's helm chart automatically creates a kubernetes secret for the Anchore Password based on the values file you use, Ex.:
+In order to report the inventory to Anchore, anchore-k8s-inventory does require authentication material for your Anchore Enterprise deployment.
+anchore-k8s-inventory's helm chart automatically creates a kubernetes secret for the Anchore Password based on the values file you use, Ex.:
 
 ```yaml
-kai:
+anchore-k8s-inventory:
   anchore:
     password: foobar
 ```
 
-It will set the following environment variable based on this: `KAI_ANCHORE_PASSWORD=foobar`.
+It will set the following environment variable based on this: `ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD=foobar`.
 
 If you don't want to store your Anchore password in the values file, you can create your own secret to do this:
 
@@ -178,27 +156,27 @@ If you don't want to store your Anchore password in the values file, you can cre
 apiVersion: v1
 kind: Secret
 metadata:
-  name: kai-anchore-password
+  name: anchore-k8s-inventory-anchore-password
 type: Opaque
 stringData:
-  KAI_ANCHORE_PASSWORD: foobar
+  ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD: foobar
 ```
 
 and then provide it to the helm chart via the values file:
 
 ```yaml
-kai:
-  existingSecret: kai-anchore-password
+anchore-k8s-inventory:
+  existingSecret: anchore-k8s-inventory-anchore-password
 ```
 
-KAI's helm chart is part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
+anchore-k8s-inventory's helm chart is part of the [charts.anchore.io](https://charts.anchore.io) repo. You can install it via:
 
 ```sh
 helm repo add anchore https://charts.anchore.io
-helm install <release-name> -f <values.yaml> anchore/kai
+helm install <release-name> -f <values.yaml> anchore/anchore-k8s-inventory
 ```
 
-A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/master/stable/kai/values.yaml)
+A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/master/stable/anchore-k8s-inventory/values.yaml)
 
 ## Configuration
 ```yaml
@@ -213,7 +191,7 @@ log:
   level: "debug"
 
   # location to write the log file (default is not to have a log file)
-  file: "./kai.log"
+  file: "./anchore-k8s-inventory.log"
 
 # enable/disable checking for application updates on startup
 check-for-app-update: true
@@ -238,7 +216,7 @@ metadata: true
 
 ### Namespace selection
 
-Configure which namespaces kai should search.
+Configure which namespaces anchore-k8s-inventory should search.
 
 * `include` section
   * A list of explicit strings that will detail the list of namespaces to capture image data from.
@@ -286,7 +264,7 @@ namespace-selectors:
 
 ### Kubernetes API Parameters
 
-This section will allow users to tune the way kai interacts with the kubernetes API server.
+This section will allow users to tune the way anchore-k8s-inventory interacts with the kubernetes API server.
 
 ```yaml
 # Kubernetes API configuration parameters (should not need tuning)
@@ -301,7 +279,7 @@ kubernetes:
   worker-pool-size: 100
 ```
 
-### KAI mode of operation
+### anchore-k8s-inventory mode of operation
 
 ```yaml
 # Can be one of adhoc, periodic (defaults to adhoc)
@@ -375,21 +353,21 @@ Use this section to configure the Anchore Enterprise API endpoint
 ```yaml
 anchore:
   url: <your anchore api url>
-  user: <kai_inventory_user>
-  password: $KAI_ANCHORE_PASSWORD
+  user: <anchore-k8s-inventory_inventory_user>
+  password: $ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD
   http:
     insecure: true
     timeout-seconds: 10
 ```
 
-## Behavior change (v0.5.0)
+## Behavior change (v0.5.0) (formerly KAI) 
 
-In versions of KAI < v0.5.0 the default behavior was to output the inventory report
-to stdout every time it was generated. KAI v0.5.0 changes this so it will not print
+In versions of anchore-k8s-inventory < v0.5.0 the default behavior was to output the inventory report
+to stdout every time it was generated. anchore-k8s-inventory v0.5.0 changes this so it will not print
 to stdout unless `verbose-inventory-reports: true` is set in the config file or
-KAI is called with the `--verbose-inventory-reports` flag.
+anchore-k8s-inventory is called with the `--verbose-inventory-reports` flag.
 
-## Configuration Changes (v0.2.2 -> v0.3.0)
+## Configuration Changes (v0.2.2 -> v0.3.0) (formerly KAI) 
 
 There are a few configurations that were changed from v0.2.2 to v0.3.0
 
@@ -408,7 +386,7 @@ kubernetes:
   request-timeout-seconds: 60
 ```
 
-KAI will still honor the old configuration. It will prefer the old configuration
+anchore-k8s-inventory will still honor the old configuration. It will prefer the old configuration
 parameter until it is removed from the config entirely. It is safe to remove the
 old configuration in favor of the new config.
 
@@ -462,14 +440,14 @@ To build a docker image, you'll need to provide a kubeconfig.
 Note: Docker build requires files to be within the docker build context
 
 ```sh
-docker build -t localhost/kai:latest --build-arg KUBECONFIG=./kubeconfig .
+docker build -t localhost/anchore-k8s-inventory:latest --build-arg KUBECONFIG=./kubeconfig .
 ```
 
 ### Shell Completion
-KAI comes with shell completion for specifying namespaces, it can be enabled as follows. Run with the `--help` command to get the instructions for the shell of your choice
+anchore-k8s-inventory comes with shell completion for specifying namespaces, it can be enabled as follows. Run with the `--help` command to get the instructions for the shell of your choice
 
 ```sh
-kai completion <zsh|bash|fish>
+anchore-k8s-inventory completion <zsh|bash|fish>
 ```
 
 ### Using Skaffold
@@ -484,10 +462,10 @@ skaffold dev
 ```
 
 ## Releasing
-To create a release of kai, a tag needs to be created that points to a commit in `main`
+To create a release of anchore-k8s-inventory, a tag needs to be created that points to a commit in `main`
 that we want to release. This tag shall be a semver prefixed with a `v`, e.g. `v0.2.7`.
 This will trigger a GitHub Action that will create the release.
 
 After the release has been successfully created, make sure to specify the updated version
-in both Enterprise and the KAI Helm Chart in
+in both Enterprise and the anchore-k8s-inventory Helm Chart in
 [anchore-charts](https://github.com/anchore/anchore-charts).

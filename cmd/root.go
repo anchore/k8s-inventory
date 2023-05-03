@@ -16,12 +16,12 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "anchore-k8s-inventory",
-	Short: "KAI tells Anchore which images are in use in your Kubernetes Cluster",
-	Long: `KAI (Kubernetes Automated Inventory) can poll
+	Short: "anchore-k8s-inventory tells Anchore which images are in use in your Kubernetes Cluster",
+	Long: `Anchore Kubernetes Inventory can poll
     Kubernetes Cluster API(s) to tell Anchore which Images are currently in-use`,
 	Args: cobra.MaximumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info("KAI is starting up...")
+		log.Info("anchore-k8s-inventory is starting up...")
 		if appConfig.Dev.ProfileCPU {
 			f, err := os.Create("cpu.profile")
 			if err != nil {

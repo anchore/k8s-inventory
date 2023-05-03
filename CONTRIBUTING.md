@@ -1,4 +1,4 @@
-# Contributing to `kai`
+# Contributing to `anchore-k8s-inventory`
 
 If you are looking to contribute to this project and want to open a Github pull request ("PR"), there are a few guidelines of what we are looking for in patches. Make sure you go through this document and ensure that your code proposal is aligned.
 

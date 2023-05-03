@@ -1,4 +1,3 @@
-// Kai's log wrapper
 package log
 
 import "github.com/anchore/k8s-inventory/pkg/logger"

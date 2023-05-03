@@ -2,11 +2,11 @@
 The Config package handles the application configuration. Configurations can come from a variety of places, and
 are listed below in order of precedence:
   - Command Line
-  - .kai.yaml
-  - .kai/config.yaml
-  - ~/.kai.yaml
-  - <XDG_CONFIG_HOME>/kai/config.yaml
-  - Environment Variables prefixed with KAI_
+  - .anchore-k8s-inventory.yaml
+  - .anchore-k8s-inventory/config.yaml
+  - ~/.anchore-k8s-inventory.yaml
+  - <XDG_CONFIG_HOME>/anchore-k8s-inventory/config.yaml
+  - Environment Variables prefixed with ANCHORE_K8S_INVENTORY_
 */package config
 
 import (
