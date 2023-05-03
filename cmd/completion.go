@@ -14,13 +14,13 @@ var completionCmd = &cobra.Command{
 
 Bash:
 
-$ source <(kai completion bash)
+$ source <(anchore-k8s-inventory completion bash)
 
 # To load completions for each session, execute once:
 Linux:
-  $ kai completion bash > /etc/bash_completion.d/kai
+  $ anchore-k8s-inventory completion bash > /etc/bash_completion.d/anchore-k8s-inventory
 MacOS:
-  $ kai completion bash > /usr/local/etc/bash_completion.d/kai
+  $ anchore-k8s-inventory completion bash > /usr/local/etc/bash_completion.d/anchore-k8s-inventory
 
 Zsh:
 
@@ -30,16 +30,16 @@ Zsh:
 $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
 # To load completions for each session, execute once:
-$ kai completion zsh > "${fpath[1]}/_kai"
+$ anchore-k8s-inventory completion zsh > "${fpath[1]}/_anchore-k8s-inventory"
 
 # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-$ kai completion fish | source
+$ anchore-k8s-inventory completion fish | source
 
 # To load completions for each session, execute once:
-$ kai completion fish > ~/.config/fish/completions/kai.fish
+$ anchore-k8s-inventory completion fish > ~/.config/fish/completions/anchore-k8s-inventory.fish
 `,
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish"},
