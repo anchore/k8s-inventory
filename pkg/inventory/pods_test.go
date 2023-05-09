@@ -75,7 +75,6 @@ func TestProcessPods(t *testing.T) {
 	type args struct {
 		pods         []v1.Pod
 		namespaceUID string
-		metadata     bool
 		nodes        map[string]Node
 	}
 	tests := []struct {
@@ -105,7 +104,6 @@ func TestProcessPods(t *testing.T) {
 					},
 				},
 				namespaceUID: "namespace-uid-0000",
-				metadata:     true,
 				nodes: map[string]Node{
 					"test-node": {
 						Name: "test-node",
@@ -128,42 +126,10 @@ func TestProcessPods(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "only return minimal metadata",
-			args: args{
-				pods: []v1.Pod{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-pod",
-							UID:  "test-uid",
-							Annotations: map[string]string{
-								"test-annotation": "test-value",
-							},
-							Labels: map[string]string{
-								"test-label": "test-value",
-							},
-							Namespace: "test-namespace",
-						},
-						Spec: v1.PodSpec{
-							NodeName: "test-node",
-						},
-					},
-				},
-				namespaceUID: "namespace-uid-0000",
-				metadata:     false,
-			},
-			want: []Pod{
-				{
-					Name:         "test-pod",
-					UID:          "test-uid",
-					NamespaceUID: "namespace-uid-0000",
-				},
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.metadata, tt.args.nodes)
+			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.nodes)
 			assert.Equal(t, tt.want, got)
 		})
 	}
