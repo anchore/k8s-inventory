@@ -140,7 +140,7 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 
 	namespaces, err := inventory.FetchNamespaces(client,
 		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
-		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include, cfg.Metadata)
+		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include)
 	if err != nil {
 		return inventory.Report{}, err
 	}
@@ -152,15 +152,13 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	close(queue)
 
 	var nodeMap map[string]inventory.Node
-	if cfg.Metadata {
-		nodeMap, err = inventory.FetchNodes(
-			client,
-			cfg.Kubernetes.RequestBatchSize,
-			cfg.Kubernetes.RequestTimeoutSeconds,
-		)
-		if err != nil {
-			return inventory.Report{}, err
-		}
+	nodeMap, err = inventory.FetchNodes(
+		client,
+		cfg.Kubernetes.RequestBatchSize,
+		cfg.Kubernetes.RequestTimeoutSeconds,
+	)
+	if err != nil {
+		return inventory.Report{}, err
 	}
 
 	launchWorkerPool(cfg, kubeconfig, ch, queue, nodeMap) // get pods/containers from namespaces using a worker pool pattern
@@ -196,22 +194,12 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	}
 
 	log.Infof("Got Inventory Report with %d containers running across %d namespaces", len(containers), len(namespaces))
-	if cfg.Metadata {
-		return inventory.Report{
-			Timestamp:             time.Now().UTC().Format(time.RFC3339),
-			Containers:            containers,
-			Pods:                  pods,
-			Namespaces:            namespaces,
-			Nodes:                 nodes,
-			ServerVersionMetadata: serverVersion,
-			ClusterName:           cfg.KubeConfig.Cluster,
-		}, nil
-	}
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Containers:            containers,
 		Pods:                  pods,
 		Namespaces:            namespaces,
+		Nodes:                 nodes,
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
 	}, nil
@@ -235,7 +223,7 @@ func processNamespace(
 		return
 	}
 
-	pods := inventory.ProcessPods(v1pods, ns.UID, cfg.Metadata, nodes)
+	pods := inventory.ProcessPods(v1pods, ns.UID, nodes)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,

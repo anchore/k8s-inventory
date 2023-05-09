@@ -40,30 +40,22 @@ func FetchPodsInNamespace(c client.Client, batchSize, timeout int64, namespace s
 	return podList, nil
 }
 
-func ProcessPods(pods []v1.Pod, namespaceUID string, metadata bool, nodes map[string]Node) []Pod {
+func ProcessPods(pods []v1.Pod, namespaceUID string, nodes map[string]Node) []Pod {
 	var podList []Pod
 
 	for _, p := range pods {
-		if metadata {
-			pod := Pod{
-				Name:         p.ObjectMeta.Name,
-				UID:          string(p.UID),
-				Annotations:  p.Annotations,
-				Labels:       p.Labels,
-				NamespaceUID: namespaceUID,
-			}
-			node, ok := nodes[p.Spec.NodeName]
-			if ok {
-				pod.NodeUID = node.UID
-			}
-			podList = append(podList, pod)
-		} else {
-			podList = append(podList, Pod{
-				Name:         p.ObjectMeta.Name,
-				UID:          string(p.UID),
-				NamespaceUID: namespaceUID,
-			})
+		pod := Pod{
+			Name:         p.ObjectMeta.Name,
+			UID:          string(p.UID),
+			Annotations:  p.Annotations,
+			Labels:       p.Labels,
+			NamespaceUID: namespaceUID,
 		}
+		node, ok := nodes[p.Spec.NodeName]
+		if ok {
+			pod.NodeUID = node.UID
+		}
+		podList = append(podList, pod)
 	}
 
 	return podList
