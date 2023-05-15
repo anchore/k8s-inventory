@@ -6,6 +6,7 @@ release:
 
 builds:
   - binary: anchore-k8s-inventory
+    id: generic
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,12 +25,36 @@ builds:
       -X github.com/anchore/k8s-inventory/internal/version.gitCommit={{.Commit}}
       -X github.com/anchore/k8s-inventory/internal/version.buildDate={{.Date}}
       -X github.com/anchore/k8s-inventory/internal/version.gitTreeState={{.Env.BUILD_GIT_TREE_STATE}}
+  - binary: anchore-k8s-inventory
+    id: fips
+    env:
+      - CGO_ENABLED=1
+      - GOEXPERIMENT=boringcrypto
+    goos:
+      - linux
+    goarch:
+      - amd64
+    # Set the modified timestamp on the output binary to the git timestamp (to ensure a reproducible build)
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags: |
+      -w
+      -extldflags '-static'
+      -X github.com/anchore/k8s-inventory/internal/version.version={{.Version}}
+      -X github.com/anchore/k8s-inventory/internal/version.gitCommit={{.Commit}}
+      -X github.com/anchore/k8s-inventory/internal/version.buildDate={{.Date}}
+      -X github.com/anchore/k8s-inventory/internal/version.gitTreeState={{.Env.BUILD_GIT_TREE_STATE}}
 
 archives:
-  - format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
+  - id: archive-generic
+    format: tar.gz
+    builds:
+      - generic
+    name_template: 'anchore-k8s-inventory_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+  - id: archive-fips
+    format: tar.gz
+    builds:
+      - fips
+    name_template: 'anchore-k8s-inventory-fips_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
 
 changelog:
   sort: asc
@@ -46,6 +71,8 @@ dockers:
       - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64"
     dockerfile: Dockerfile
     use: buildx
+    ids:
+      - generic
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--build-arg=BUILD_DATE={{.Date}}"
@@ -60,8 +87,23 @@ dockers:
     goarch: arm64
     dockerfile: Dockerfile
     use: buildx
+    ids:
+      - generic
     build_flag_templates:
       - "--platform=linux/arm64/v8"
+      - "--build-arg=BUILD_DATE={{.Date}}"
+      - "--build-arg=BUILD_VERSION={{.Version}}"
+      - "--build-arg=VCS_REF={{.FullCommit}}"
+      - "--build-arg=VCS_URL={{.GitURL}}"
+
+  - image_templates:
+      - "anchore/k8s-inventory:{{ .Tag }}-fips-amd64"
+    dockerfile: Dockerfile
+    use: buildx
+    ids:
+      - fips
+    build_flag_templates:
+      - "--platform=linux/amd64"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
@@ -71,6 +113,7 @@ docker_manifests:
   - name_template: anchore/k8s-inventory:{{ .Tag }}
     image_templates:
       - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-fips-amd64
       - anchore/k8s-inventory:v{{ .Major }}-amd64
       - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
       - anchore/k8s-inventory:{{ .Tag }}-arm64v8
@@ -79,6 +122,7 @@ docker_manifests:
   - name_template: anchore/k8s-inventory:latest
     image_templates:
       - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-fips-amd64
       - anchore/k8s-inventory:v{{ .Major }}-amd64
       - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
       - anchore/k8s-inventory:{{ .Tag }}-arm64v8

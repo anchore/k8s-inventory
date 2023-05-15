@@ -20,7 +20,7 @@ CLUSTER_NAME=anchore-k8s-inventory-testing
 
 GOLANG_CI_VERSION=v1.52.2
 GOBOUNCER_VERSION=v0.3.0
-GORELEASER_VERSION=v1.4.1
+GORELEASER_VERSION=v1.18.2
 
 ## Build variables
 DISTDIR=./dist
@@ -175,7 +175,7 @@ $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 
 	# build release snapshots
 	BUILD_GIT_TREE_STATE=$(GITTREESTATE) \
-	$(TEMPDIR)/goreleaser release --skip-publish --rm-dist --snapshot --config $(TEMPDIR)/goreleaser.yaml
+	$(TEMPDIR)/goreleaser release --skip-publish --clean --snapshot --config $(TEMPDIR)/goreleaser.yaml
 
 .PHONY: release
 release: clean-dist ## Build and publish final binaries and packages
@@ -186,7 +186,7 @@ release: clean-dist ## Build and publish final binaries and packages
 
 	# release
 	BUILD_GIT_TREE_STATE=$(GITTREESTATE) \
-	$(TEMPDIR)/goreleaser --rm-dist --config $(TEMPDIR)/goreleaser.yaml
+	$(TEMPDIR)/goreleaser --clean --config $(TEMPDIR)/goreleaser.yaml
 
 .PHONY: clean
 clean: clean-dist clean-snapshot  ## Remove previous builds and result reports
