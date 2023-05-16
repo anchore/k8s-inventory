@@ -8,7 +8,7 @@
 It can be run inside a cluster (under a Service Account) or outside (via any provided kubeconfig).
 
 ## Getting Started
-[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/repository/docker/anchore/k8s-inventory)
+[Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/r/anchore/k8s-inventory/tags)
 
 ## Installation
 `anchore-k8s-inventory` can be run as a CLI, Docker Container, or Helm Chart
