@@ -38,6 +38,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags: |
       -w
+      -linkmode=external
       -extldflags '-static'
       -X github.com/anchore/k8s-inventory/internal/version.version={{.Version}}
       -X github.com/anchore/k8s-inventory/internal/version.gitCommit={{.Commit}}
