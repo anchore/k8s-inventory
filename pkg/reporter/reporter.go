@@ -67,7 +67,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 }
 
 type anchoreVersion struct {
-	Api struct {
+	API struct {
 		Version string `json:"version"`
 	} `json:"api"`
 }
@@ -103,7 +103,7 @@ func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
 		return 0, fmt.Errorf("failed to parse API version: %w", err)
 	}
 
-	return strconv.Atoi(ver.Api.Version)
+	return strconv.Atoi(ver.API.Version)
 }
 
 func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
