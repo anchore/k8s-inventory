@@ -97,13 +97,18 @@ func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
 		return 0, fmt.Errorf("failed to read API version: %w", err)
 	}
 
-	ver := anchoreVersion{}
-	err = json.Unmarshal(body, &ver)
+	parsedResp := anchoreVersion{}
+	err = json.Unmarshal(body, &parsedResp)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse API version: %w", err)
 	}
 
-	return strconv.Atoi(ver.API.Version)
+	// If parsed response does not include {api: {version: "x"}} then assume V1
+	if parsedResp.API.Version == "" {
+		return 1, nil
+	} else {
+		return strconv.Atoi(parsedResp.API.Version)
+	}
 }
 
 func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
