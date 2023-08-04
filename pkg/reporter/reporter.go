@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/anchore/k8s-inventory/internal/config"
@@ -18,10 +17,10 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
-const ReportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
-const ReportAPIPathV2 = "v2/kubernetes-inventory"
+const reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
+const reportAPIPathV2 = "v2/kubernetes-inventory"
 
-var Version = 0
+var cachedVersion = 0
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //
@@ -37,7 +36,12 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
-	anchoreURL, err := buildURL(anchoreDetails)
+	version, err := getVersion(anchoreDetails)
+	if err != nil {
+		return err
+	}
+
+	anchoreURL, err := buildURL(anchoreDetails, version)
 	if err != nil {
 		return fmt.Errorf("failed to build url: %w", err)
 	}
@@ -66,16 +70,15 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	return nil
 }
 
-type anchoreVersion struct {
-	API struct {
-		Version string `json:"version"`
-	} `json:"api"`
-}
-
 // This method retrieves the API version from Anchore
+// and caches the response if parsed successfully
 //
 //nolint:gosec
 func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
+	if cachedVersion > 0 {
+		return cachedVersion, nil
+	}
+
 	log.Debug("Detecting Anchore API version")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -84,50 +87,41 @@ func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
-	resp, err := client.Get(anchoreDetails.URL + "/version")
+	resp, err := client.Get(anchoreDetails.URL)
 	if err != nil {
-		return 0, fmt.Errorf("failed to request API version: %w", err)
+		return 0, fmt.Errorf("failed to contact Anchore API: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return 0, fmt.Errorf("failed to retrieve API version: %+v", resp)
+	if resp.StatusCode != 200 {
+		return 0, fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read API version: %w", err)
+		return 0, fmt.Errorf("failed to read Anchore API version: %w", err)
 	}
 
-	parsedResp := anchoreVersion{}
-	err = json.Unmarshal(body, &parsedResp)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse API version: %w", err)
-	}
-
-	// If parsed response does not include {api: {version: "x"}} then assume V1
-	if parsedResp.API.Version == "" {
+	switch version := string(body); version {
+	case "v1":
+		cachedVersion = 1
 		return 1, nil
-	} else {
-		return strconv.Atoi(parsedResp.API.Version)
+	case "v2":
+		cachedVersion = 2
+		return 2, nil
+	default:
+		return 0, fmt.Errorf("unexpected Anchore API version: %s", version)
 	}
 }
 
-func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
+func buildURL(anchoreDetails config.AnchoreInfo, version int) (string, error) {
 	anchoreURL, err := url.Parse(anchoreDetails.URL)
 	if err != nil {
 		return "", err
 	}
 
-	if Version == 0 {
-		Version, err = getVersion(anchoreDetails)
-		if err != nil {
-			return "", fmt.Errorf("failed to retrieve API version: %w", err)
-		}
-	}
-
-	if Version == 1 {
-		anchoreURL.Path += ReportAPIPathV1
+	if version == 1 {
+		anchoreURL.Path += reportAPIPathV1
 	} else {
-		anchoreURL.Path += ReportAPIPathV2
+		anchoreURL.Path += reportAPIPathV2
 	}
 
 	return anchoreURL.String(), nil
