@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,7 +17,10 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
-const ReportAPIPath = "v1/enterprise/kubernetes-inventory"
+const reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
+const reportAPIPathV2 = "v2/kubernetes-inventory"
+
+var cachedVersion = 0
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //
@@ -32,7 +36,12 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
-	anchoreURL, err := buildURL(anchoreDetails)
+	version, err := getVersion(anchoreDetails)
+	if err != nil {
+		return err
+	}
+
+	anchoreURL, err := buildURL(anchoreDetails, version)
 	if err != nil {
 		return fmt.Errorf("failed to build url: %w", err)
 	}
@@ -61,13 +70,59 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	return nil
 }
 
-func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
+// This method retrieves the API version from Anchore
+// and caches the response if parsed successfully
+//
+//nolint:gosec
+func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
+	if cachedVersion > 0 {
+		return cachedVersion, nil
+	}
+
+	log.Debug("Detecting Anchore API version")
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
+	}
+	resp, err := client.Get(anchoreDetails.URL)
+	if err != nil {
+		return 0, fmt.Errorf("failed to contact Anchore API: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return 0, fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read Anchore API version: %w", err)
+	}
+
+	switch version := string(body); version {
+	case "v1":
+		cachedVersion = 1
+		return 1, nil
+	case "v2":
+		cachedVersion = 2
+		return 2, nil
+	default:
+		return 0, fmt.Errorf("unexpected Anchore API version: %s", version)
+	}
+}
+
+func buildURL(anchoreDetails config.AnchoreInfo, version int) (string, error) {
 	anchoreURL, err := url.Parse(anchoreDetails.URL)
 	if err != nil {
 		return "", err
 	}
 
-	anchoreURL.Path += ReportAPIPath
+	if version == 1 {
+		anchoreURL.Path += reportAPIPathV1
+	} else {
+		anchoreURL.Path += reportAPIPathV2
+	}
 
 	return anchoreURL.String(), nil
 }
