@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -87,29 +86,29 @@ func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
-	resp, err := client.Get(anchoreDetails.URL)
+
+	// attempt to retrieve v2/ endpoint, if successful we are V2
+	anchoreURL, err := url.Parse(anchoreDetails.URL)
+	if err != nil {
+		return 0, err
+	}
+	anchoreURL.Path += "v2/"
+
+	resp, err := client.Get(anchoreURL.String())
 	if err != nil {
 		return 0, fmt.Errorf("failed to contact Anchore API: %w", err)
 	}
+
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read Anchore API version: %w", err)
+	if resp.StatusCode == 200 {
+		log.Debug("Detected Anchore APIv2")
+		cachedVersion = 2
+	} else {
+		log.Debug("Detected Anchore APIv1")
+		cachedVersion = 1
 	}
 
-	switch version := string(body); version {
-	case "v1":
-		cachedVersion = 1
-		return 1, nil
-	case "v2":
-		cachedVersion = 2
-		return 2, nil
-	default:
-		return 0, fmt.Errorf("unexpected Anchore API version: %s", version)
-	}
+	return cachedVersion, nil
 }
 
 func buildURL(anchoreDetails config.AnchoreInfo, version int) (string, error) {
