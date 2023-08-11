@@ -20,7 +20,7 @@ import (
 const reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
 const reportAPIPathV2 = "v2/kubernetes-inventory"
 
-var cachedVersion = 0
+var enterpriseEndpoint = reportAPIPathV1 // Default to V1 API for now.
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //
@@ -36,12 +36,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
-	version, err := getVersion(anchoreDetails)
-	if err != nil {
-		return err
-	}
-
-	anchoreURL, err := buildURL(anchoreDetails, version)
+	anchoreURL, err := buildURL(anchoreDetails)
 	if err != nil {
 		return fmt.Errorf("failed to build url: %w", err)
 	}
@@ -53,7 +48,12 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 
 	req, err := http.NewRequest("POST", anchoreURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		return fmt.Errorf("failed to build request to report data to Anchore: %w", err)
+		// We failed to send the inventory.  We need to check the version of Enterprise.
+		versionError := checkVersion(anchoreDetails)
+		if versionError != nil {
+			return fmt.Errorf("failed to validate Enterprise API: %w", versionError)
+		}
+		return fmt.Errorf("failed to send data to Anchore: %w", err)
 	}
 	req.SetBasicAuth(anchoreDetails.User, anchoreDetails.Password)
 	req.Header.Set("Content-Type", "application/json")
@@ -74,11 +74,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 // and caches the response if parsed successfully
 //
 //nolint:gosec
-func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
-	if cachedVersion > 0 {
-		return cachedVersion, nil
-	}
-
+func checkVersion(anchoreDetails config.AnchoreInfo) error {
 	log.Debug("Detecting Anchore API version")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -89,40 +85,37 @@ func getVersion(anchoreDetails config.AnchoreInfo) (int, error) {
 	}
 	resp, err := client.Get(anchoreDetails.URL)
 	if err != nil {
-		return 0, fmt.Errorf("failed to contact Anchore API: %w", err)
+		return fmt.Errorf("failed to contact Anchore API: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
+		return fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read Anchore API version: %w", err)
+		return fmt.Errorf("failed to read Anchore API version: %w", err)
 	}
 
 	switch version := string(body); version {
 	case "v1":
-		cachedVersion = 1
-		return 1, nil
+		enterpriseEndpoint = reportAPIPathV1
 	case "v2":
-		cachedVersion = 2
-		return 2, nil
+		enterpriseEndpoint = reportAPIPathV2
 	default:
-		return 0, fmt.Errorf("unexpected Anchore API version: %s", version)
+		return fmt.Errorf("unexpected Anchore API version: %s", version)
 	}
+
+	log.Info("Using enterprise endpoint %s", enterpriseEndpoint)
+	return nil
 }
 
-func buildURL(anchoreDetails config.AnchoreInfo, version int) (string, error) {
+func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
 	anchoreURL, err := url.Parse(anchoreDetails.URL)
 	if err != nil {
 		return "", err
 	}
 
-	if version == 1 {
-		anchoreURL.Path += reportAPIPathV1
-	} else {
-		anchoreURL.Path += reportAPIPathV2
-	}
+	anchoreURL.Path += enterpriseEndpoint
 
 	return anchoreURL.String(), nil
 }
