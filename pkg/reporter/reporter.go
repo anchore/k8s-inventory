@@ -36,7 +36,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
 
-	anchoreURL, err := buildURL(anchoreDetails)
+	anchoreURL, err := buildURL(anchoreDetails, enterpriseEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to build url: %w", err)
 	}
@@ -109,13 +109,13 @@ func checkVersion(anchoreDetails config.AnchoreInfo) error {
 	return nil
 }
 
-func buildURL(anchoreDetails config.AnchoreInfo) (string, error) {
+func buildURL(anchoreDetails config.AnchoreInfo, path string) (string, error) {
 	anchoreURL, err := url.Parse(anchoreDetails.URL)
 	if err != nil {
 		return "", err
 	}
 
-	anchoreURL.Path += enterpriseEndpoint
+	anchoreURL.Path += path
 
 	return anchoreURL.String(), nil
 }
