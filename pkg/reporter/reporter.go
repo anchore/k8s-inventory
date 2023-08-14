@@ -15,6 +15,7 @@ import (
 	"github.com/anchore/k8s-inventory/internal/log"
 	"github.com/anchore/k8s-inventory/internal/tracker"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
+	"github.com/h2non/gock"
 )
 
 const (
@@ -37,6 +38,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
+	gock.InterceptClient(client) // Required to use gock for testing custom client
 
 	anchoreURL, err := buildURL(anchoreDetails, enterpriseEndpoint)
 	if err != nil {
@@ -50,11 +52,6 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 
 	req, err := http.NewRequest("POST", anchoreURL, bytes.NewBuffer(reqBody))
 	if err != nil {
-		// We failed to send the inventory.  We need to check the version of Enterprise.
-		versionError := checkVersion(anchoreDetails)
-		if versionError != nil {
-			return fmt.Errorf("failed to validate Enterprise API: %w", versionError)
-		}
 		return fmt.Errorf("failed to send data to Anchore: %w", err)
 	}
 	req.SetBasicAuth(anchoreDetails.User, anchoreDetails.Password)
@@ -66,7 +63,19 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
+		fmt.Println(anchoreURL)
+
+		previousVersion := enterpriseEndpoint
+		// We failed to send the inventory.  We need to check the version of Enterprise.
+		versionError := checkVersion(anchoreDetails)
+		if versionError != nil {
+			return fmt.Errorf("failed to validate Enterprise API: %w", versionError)
+		}
+		if previousVersion != enterpriseEndpoint {
+			// We need to re-send the inventory with the new endpoint
+			log.Info("Retrying inventory report with new endpoint: %s", enterpriseEndpoint)
+			return Post(report, anchoreDetails)
+		}
 	}
 	log.Debug("Successfully reported results to Anchore")
 	return nil
@@ -85,6 +94,8 @@ func checkVersion(anchoreDetails config.AnchoreInfo) error {
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
 	}
+	gock.InterceptClient(client) // Required to use gock for testing custom client
+
 	resp, err := client.Get(anchoreDetails.URL)
 	if err != nil {
 		return fmt.Errorf("failed to contact Anchore API: %w", err)
