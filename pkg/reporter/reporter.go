@@ -17,10 +17,12 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
-const reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
-const reportAPIPathV2 = "v2/kubernetes-inventory"
+const (
+	reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
+	reportAPIPathV2 = "v2/kubernetes-inventory"
+)
 
-var enterpriseEndpoint = reportAPIPathV1 // Default to V1 API for now.
+var enterpriseEndpoint = reportAPIPathV2
 
 // This method does the actual Reporting (via HTTP) to Anchore
 //
