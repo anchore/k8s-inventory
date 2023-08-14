@@ -138,3 +138,53 @@ func TestPost(t *testing.T) {
 		})
 	}
 }
+
+// Simulate a handover from Enterprise 4.x to 5.x
+// In this case v1 should be used initially instead of v2 then when v1 is no longer available v2 should be used
+func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
+	defer gock.Off()
+
+	testReport := inventory.Report{}
+	testAnchoreDetails := config.AnchoreInfo{
+		URL:      "https://ancho.re",
+		User:     "admin",
+		Password: "foobar",
+		Account:  "test",
+		HTTP: config.HTTPConfig{
+			TimeoutSeconds: 10,
+			Insecure:       true,
+		},
+	}
+
+	enterpriseEndpoint = reportAPIPathV2
+
+	// After the first post to default v2, the enterpriseEndpoint should be set to v1
+	gock.New("https://ancho.re").
+		Post(reportAPIPathV2).
+		Reply(404)
+	gock.New("https://ancho.re").
+		Get("/").
+		Reply(200).
+		BodyString("v1")
+	gock.New("https://ancho.re").
+		Post(reportAPIPathV1).
+		Reply(200)
+	err := Post(testReport, testAnchoreDetails)
+	assert.NoError(t, err)
+	assert.Equal(t, reportAPIPathV1, enterpriseEndpoint)
+
+	// Simulate upgrade to Enterprise 5.x, v1 should no longer be available
+	gock.New("https://ancho.re").
+		Post(reportAPIPathV1).
+		Reply(404)
+	gock.New("https://ancho.re").
+		Get("/").
+		Reply(200).
+		BodyString("v2")
+	gock.New("https://ancho.re").
+		Post(reportAPIPathV2).
+		Reply(200)
+	err = Post(testReport, testAnchoreDetails)
+	assert.NoError(t, err)
+	assert.Equal(t, reportAPIPathV2, enterpriseEndpoint)
+}
