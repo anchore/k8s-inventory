@@ -30,7 +30,7 @@ var enterpriseEndpoint = reportAPIPathV2
 //nolint:gosec
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	defer tracker.TrackFunctionTime(time.Now(), "Reporting results to Anchore for cluster: "+report.ClusterName+"")
-	log.Debug("Reporting results to Anchore")
+	log.Debug("Reporting results to Anchore using endpoint: ", enterpriseEndpoint)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
 	}
@@ -82,6 +82,18 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	return nil
 }
 
+type AnchoreVersion struct {
+	API struct {
+		Version string `json:"version"`
+	} `json:"api"`
+	DB struct {
+		SchemaVersion string `json:"schema_version"`
+	} `json:"db"`
+	Service struct {
+		Version string `json:"version"`
+	} `json:"service"`
+}
+
 // This method retrieves the API version from Anchore
 // and caches the response if parsed successfully
 //
@@ -97,12 +109,13 @@ func checkVersion(anchoreDetails config.AnchoreInfo) error {
 	}
 	gock.InterceptClient(client) // Required to use gock for testing custom client
 
-	resp, err := client.Get(anchoreDetails.URL)
+	resp, err := client.Get(anchoreDetails.URL + "/version")
 	if err != nil {
 		return fmt.Errorf("failed to contact Anchore API: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		fmt.Println("fff")
 		return fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
 	}
 	body, err := io.ReadAll(resp.Body)
@@ -110,16 +123,21 @@ func checkVersion(anchoreDetails config.AnchoreInfo) error {
 		return fmt.Errorf("failed to read Anchore API version: %w", err)
 	}
 
-	switch version := string(body); version {
-	case "v1":
-		enterpriseEndpoint = reportAPIPathV1
-	case "v2":
-		enterpriseEndpoint = reportAPIPathV2
-	default:
-		return fmt.Errorf("unexpected Anchore API version: %s", version)
+	ver := AnchoreVersion{}
+	err = json.Unmarshal(body, &ver)
+	if err != nil {
+		return fmt.Errorf("failed to parse API version: %w", err)
 	}
 
-	log.Info("Using enterprise endpoint %s", enterpriseEndpoint)
+	log.Debug("Anchore API version: ", ver)
+	if ver.API.Version == "2" {
+		enterpriseEndpoint = reportAPIPathV2
+	} else {
+		// If we can't parse the version, we'll assume it's v1 as 4.X does not include the version in the API version response
+		enterpriseEndpoint = reportAPIPathV1
+	}
+
+	log.Info("Using enterprise endpoint ", enterpriseEndpoint)
 	return nil
 }
 

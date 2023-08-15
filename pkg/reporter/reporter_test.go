@@ -111,15 +111,19 @@ func TestPost(t *testing.T) {
 				Post(reportAPIPathV1).
 				Reply(200)
 			gock.New("https://ancho.re").
-				Get("/").
+				Get("/version").
 				Reply(200).
-				BodyString("v1")
+				JSON(map[string]interface{}{
+					"api":     map[string]interface{}{},
+					"db":      map[string]interface{}{"schema_version": "400"},
+					"service": map[string]interface{}{"version": "4.8.0"},
+				})
 		case "error when v1 and v2 are not found":
 			gock.New("https://ancho.re").
-				Post(enterpriseEndpoint).
+				Post(reportAPIPathV2).
 				Reply(404)
 			gock.New("https://ancho.re").
-				Get("/").
+				Get("/version").
 				Reply(404)
 		}
 
@@ -163,9 +167,13 @@ func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
 		Post(reportAPIPathV2).
 		Reply(404)
 	gock.New("https://ancho.re").
-		Get("/").
+		Get("/version").
 		Reply(200).
-		BodyString("v1")
+		JSON(map[string]interface{}{
+			"api":     map[string]interface{}{},
+			"db":      map[string]interface{}{"schema_version": "400"},
+			"service": map[string]interface{}{"version": "4.8.0"},
+		})
 	gock.New("https://ancho.re").
 		Post(reportAPIPathV1).
 		Reply(200)
@@ -178,9 +186,13 @@ func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
 		Post(reportAPIPathV1).
 		Reply(404)
 	gock.New("https://ancho.re").
-		Get("/").
+		Get("/version").
 		Reply(200).
-		BodyString("v2")
+		JSON(map[string]interface{}{
+			"api":     map[string]interface{}{"version": "2"},
+			"db":      map[string]interface{}{"schema_version": "400"},
+			"service": map[string]interface{}{"version": "4.8.0"},
+		})
 	gock.New("https://ancho.re").
 		Post(reportAPIPathV2).
 		Reply(200)
