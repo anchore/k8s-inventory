@@ -128,7 +128,6 @@ func checkVersion(anchoreDetails config.AnchoreInfo) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		fmt.Println("fff")
 		return fmt.Errorf("failed to retrieve Anchore API version: %+v", resp)
 	}
 	body, err := io.ReadAll(resp.Body)
