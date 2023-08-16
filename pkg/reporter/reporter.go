@@ -71,7 +71,7 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		}
 		if previousVersion != enterpriseEndpoint {
 			// We need to re-send the inventory with the new endpoint
-			log.Info("Retrying inventory report with new endpoint: %s", enterpriseEndpoint)
+			log.Info("Retrying inventory report with new endpoint: ", enterpriseEndpoint)
 			return Post(report, anchoreDetails)
 		}
 	}
