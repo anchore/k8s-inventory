@@ -96,6 +96,24 @@ func TestPost(t *testing.T) {
 			wantErr:         true,
 			expectedAPIPath: reportAPIPathV1,
 		},
+		{
+			name: "error when api response is not JSON",
+			args: args{
+				report: inventory.Report{},
+				anchoreDetails: config.AnchoreInfo{
+					URL:      "https://ancho.re",
+					User:     "admin",
+					Password: "foobar",
+					Account:  "test",
+					HTTP: config.HTTPConfig{
+						TimeoutSeconds: 10,
+						Insecure:       true,
+					},
+				},
+			},
+			wantErr:         true,
+			expectedAPIPath: reportAPIPathV2,
+		},
 	}
 	for _, tt := range tests {
 		switch tt.name {
@@ -127,6 +145,11 @@ func TestPost(t *testing.T) {
 			gock.New("https://ancho.re").
 				Get("/version").
 				Reply(404)
+		case "error when api response is not JSON":
+			gock.New("https://ancho.re").
+				Post(reportAPIPathV2).
+				Reply(200).
+				BodyString("not json")
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
