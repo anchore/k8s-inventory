@@ -102,14 +102,16 @@ func TestPost(t *testing.T) {
 		case "default post to v2":
 			gock.New("https://ancho.re").
 				Post(reportAPIPathV2).
-				Reply(200)
+				Reply(200).
+				JSON(map[string]interface{}{})
 		case "post to v1 when v2 is not found":
 			gock.New("https://ancho.re").
 				Post(reportAPIPathV2).
 				Reply(404)
 			gock.New("https://ancho.re").
 				Post(reportAPIPathV1).
-				Reply(200)
+				Reply(200).
+				JSON(map[string]interface{}{})
 			gock.New("https://ancho.re").
 				Get("/version").
 				Reply(200).
@@ -176,7 +178,8 @@ func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
 		})
 	gock.New("https://ancho.re").
 		Post(reportAPIPathV1).
-		Reply(200)
+		Reply(200).
+		JSON(map[string]interface{}{})
 	err := Post(testReport, testAnchoreDetails)
 	assert.NoError(t, err)
 	assert.Equal(t, reportAPIPathV1, enterpriseEndpoint)
@@ -195,7 +198,8 @@ func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
 		})
 	gock.New("https://ancho.re").
 		Post(reportAPIPathV2).
-		Reply(200)
+		Reply(200).
+		JSON(map[string]interface{}{})
 	err = Post(testReport, testAnchoreDetails)
 	assert.NoError(t, err)
 	assert.Equal(t, reportAPIPathV2, enterpriseEndpoint)

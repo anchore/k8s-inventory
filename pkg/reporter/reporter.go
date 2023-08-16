@@ -74,9 +74,22 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 			log.Info("Retrying inventory report with new endpoint: ", enterpriseEndpoint)
 			return Post(report, anchoreDetails)
 		}
+		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
+	}
+
+	// Check we received a valid JSON response from Anchore, this will help catch
+	// any redirect responses where it returns HTML login pages e.g. Enterprise
+	// running behind cloudflare where a login page is returned with the status 200
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response from Anchore: %w", err)
+	}
+	if len(respBody) > 0 && !json.Valid(respBody) {
+		log.Debug("Anchore response body: ", string(respBody))
+		return fmt.Errorf("failed to report data to Anchore not a valid json response: %+v", resp)
 	}
 	log.Debug("Successfully reported results to Anchore")
 	return nil
