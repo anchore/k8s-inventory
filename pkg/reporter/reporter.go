@@ -26,14 +26,12 @@ const (
 var enterpriseEndpoint = reportAPIPathV2
 
 // This method does the actual Reporting (via HTTP) to Anchore
-//
-//nolint:gosec
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	defer tracker.TrackFunctionTime(time.Now(), "Reporting results to Anchore for cluster: "+report.ClusterName+"")
 	log.Debug("Reporting results to Anchore using endpoint: ", enterpriseEndpoint)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
-	}
+	} // #nosec G402
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
@@ -109,13 +107,11 @@ type AnchoreVersion struct {
 
 // This method retrieves the API version from Anchore
 // and caches the response if parsed successfully
-//
-//nolint:gosec
 func checkVersion(anchoreDetails config.AnchoreInfo) error {
 	log.Debug("Detecting Anchore API version")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
-	}
+	} // #nosec G402
 	client := &http.Client{
 		Transport: tr,
 		Timeout:   time.Duration(anchoreDetails.HTTP.TimeoutSeconds) * time.Second,
