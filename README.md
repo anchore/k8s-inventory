@@ -176,7 +176,7 @@ helm repo add anchore https://charts.anchore.io
 helm install <release-name> -f <values.yaml> anchore/anchore-k8s-inventory
 ```
 
-A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/master/stable/anchore-k8s-inventory/values.yaml)
+A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/main/stable/k8s-inventory/values.yaml)
 
 ## Configuration
 ```yaml
