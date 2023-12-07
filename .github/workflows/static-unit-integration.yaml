@@ -11,15 +11,15 @@ jobs:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 #v5.0.0
         with:
           go-version: ${{ matrix.go-version }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
 
       - name: Restore bootstrap cache
         id: bootstrap-cache
-        uses: actions/cache@v3
+        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 #v3.3.2
         with:
           path: |
             ~/go/pkg/mod
@@ -47,15 +47,15 @@ jobs:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 #v5.0.0
         with:
           go-version: ${{ matrix.go-version }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
 
       - name: Restore bootstrap cache
         id: bootstrap-cache
-        uses: actions/cache@v3
+        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 #v3.3.2
         with:
           path: |
             ~/go/pkg/mod
@@ -76,7 +76,7 @@ jobs:
         run: make unit
 
       - name: Install kind
-        uses: helm/kind-action@v1.8.0
+        uses: helm/kind-action@dda0770415bac9fc20092cacbc54aa298604d140 #v1.8.0
         with:
           config: kind-config.yaml
 
@@ -84,7 +84,7 @@ jobs:
         run: make install-cluster-deps
 
       - name: Restore integration test cache
-        uses: actions/cache@v3
+        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84 #v3.3.2
         with:
           path: ${{ github.workspace }}/integration/test-fixtures/cache
           key: ${{ runner.os }}-integration-test-cache-${{ hashFiles('integration/test-fixtures/cache.fingerprint') }}
