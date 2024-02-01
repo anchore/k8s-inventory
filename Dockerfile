@@ -1,8 +1,11 @@
-FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static-debian11:debug@sha256:a0a404776dec98be120089ae42bbdfbe48c177921d856937d124d48eb8c0b951 AS build
 
-COPY anchore-k8s-inventory /usr/bin
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-USER nonroot:nobody
+WORKDIR /tmp
+
+COPY anchore-k8s-inventory /
 
 ARG BUILD_DATE
 ARG BUILD_VERSION
@@ -18,4 +21,4 @@ LABEL org.opencontainers.image.vendor="Anchore, Inc."
 LABEL org.opencontainers.image.version=$BUILD_VERSION
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-ENTRYPOINT ["anchore-k8s-inventory"]
+ENTRYPOINT ["/anchore-k8s-inventory"]
