@@ -1,23 +1,29 @@
-apiVersion: skaffold/v4beta2
+apiVersion: skaffold/v3
 kind: Config
 metadata:
-  name: kai
+  name: k8s-inventory
 build:
   artifacts:
-  - image: local/kai
+  - image: local/k8sinv
     docker:
       dockerfile: Dockerfile.skaffold
+  local:
+    push: false
 deploy:
   helm:
     releases:
-    - name: kai
-      chartPath: anchore-charts/stable/kai
+    - name: k8s-inventory-dev
+      chartPath: anchore-charts/stable/k8s-inventory
       setValueTemplates:
-        image.repository: "{{.IMAGE_REPO_local_kai}}"
-        image.tag: "{{.IMAGE_TAG_local_kai}}"
+        image.repository: "{{.IMAGE_REPO_local_k8sinv}}"
+        image.tag: "{{.IMAGE_TAG}}"
       setValues:
-        kai.log.level: debug
-        kai.log.structured: false
-        kai.quiet: false
-        kai.verboseInventoryReports: false
-        kai.pollingIntervalSeconds: 60
+        k8sInventory.log.level: debug
+        k8sInventory.log.structured: false
+        k8sInventory.quiet: false
+        k8sInventory.verboseInventoryReports: true
+        k8sInventory.pollingIntervalSeconds: 60
+        k8sInventory.anchore.url: "http://host.docker.internal:8228"
+        k8sInventory.anchore.user: "admin"
+        k8sInventory.anchore.password: "foobar"
+        k8sInventory.anchore.http.insecure: true
