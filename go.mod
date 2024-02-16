@@ -13,7 +13,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.29.1
+	k8s.io/api v0.29.2
 	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.1
 )
