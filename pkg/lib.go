@@ -44,6 +44,13 @@ func reportToStdout(report inventory.Report) error {
 }
 
 func HandleReport(report inventory.Report, cfg *config.Application) error {
+	if cfg.VerboseInventoryReports {
+		err := reportToStdout(report)
+		if err != nil {
+			log.Errorf("Failed to output Inventory Report: %w", err)
+		}
+	}
+
 	if cfg.AnchoreDetails.IsValid() {
 		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
 			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
@@ -51,10 +58,6 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 		log.Info("Inventory report sent to Anchore")
 	} else {
 		log.Info("Anchore details not specified, not reporting inventory")
-	}
-
-	if cfg.VerboseInventoryReports {
-		return reportToStdout(report)
 	}
 	return nil
 }
