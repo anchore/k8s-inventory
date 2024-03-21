@@ -354,7 +354,7 @@ anchore:
   password: $ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD
   http:
     insecure: true
-    timeout-seconds: 60
+    timeout-seconds: 10
 ```
 
 ## Behavior change (v0.5.0) (formerly KAI) 

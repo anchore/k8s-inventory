@@ -44,5 +44,5 @@ anchoredetails:
   account: admin
   http:
     insecure: false
-    timeoutseconds: 60
+    timeoutseconds: 10
 verboseinventoryreports: false

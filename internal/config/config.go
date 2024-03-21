@@ -117,7 +117,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("anchore.account", "admin")
 	v.SetDefault("kubeconfig.anchore.account", "admin")
 	v.SetDefault("anchore.http.insecure", false)
-	v.SetDefault("anchore.http.timeout-seconds", 60)
+	v.SetDefault("anchore.http.timeout-seconds", 10)
 	v.SetDefault("kubernetes-request-timeout-seconds", -1)
 	v.SetDefault("kubernetes.request-timeout-seconds", 60)
 	v.SetDefault("kubernetes.request-batch-size", 100)
