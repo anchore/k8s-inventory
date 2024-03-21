@@ -84,7 +84,7 @@ jobs:
         run: |
           echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
         env:
-          DOCKER_USER: ${{ secrets.ANCHOREENTERPRISEWRITE_DH_USERNAME }}
+          DOCKER_USER: ${{ secrets.ANCHOREINTEGRATIONSWRITE_DH_USERNAME }}
           DOCKER_PASS: ${{ secrets.ANCHOREINTEGRATIONSWRITE_DH_PAT }}
 
       - name: Build snapshot artifacts
