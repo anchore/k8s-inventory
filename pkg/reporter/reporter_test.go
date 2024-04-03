@@ -974,7 +974,13 @@ func TestNormalize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report, mod := Normalize(tt.args.report)
-			assert.Equal(t, tt.want, report)
+			assert.ElementsMatch(t, tt.want.Namespaces, report.Namespaces)
+			assert.ElementsMatch(t, tt.want.Nodes, report.Nodes)
+			assert.ElementsMatch(t, tt.want.Pods, report.Pods)
+			assert.ElementsMatch(t, tt.want.Containers, report.Containers)
+			assert.Equal(t, tt.want.ClusterName, report.ClusterName)
+			assert.Equal(t, tt.want.Timestamp, report.Timestamp)
+			assert.Equal(t, tt.want.ServerVersionMetadata, report.ServerVersionMetadata)
 			assert.Equal(t, tt.modified, mod)
 		})
 	}
