@@ -257,6 +257,9 @@ namespace-selectors:
   #
   # Will exclude the default, kube-system, and kube-public namespaces
   exclude: []
+
+  # If true then namespaces containing 0 pods will be omitted from the report sent to Anchore Enterprise
+  ignore-empty: false
 ```
 
 ### Kubernetes API Parameters

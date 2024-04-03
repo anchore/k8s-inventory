@@ -63,8 +63,9 @@ type MissingTagConf struct {
 
 // NamespaceSelector details the inclusion/exclusion rules for namespaces
 type NamespaceSelector struct {
-	Include []string `mapstructure:"include"`
-	Exclude []string `mapstructure:"exclude"`
+	Include     []string `mapstructure:"include"`
+	Exclude     []string `mapstructure:"exclude"`
+	IgnoreEmpty bool     `mapstructure:"ignore-empty"`
 }
 
 // KubernetesAPI details the configuration for interacting with the k8s api server
@@ -128,6 +129,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("namespaces", []string{})
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})
+	v.SetDefault("namespace-selectors.ignore-empty", false)
 }
 
 // Load the Application Configuration from the Viper specifications
