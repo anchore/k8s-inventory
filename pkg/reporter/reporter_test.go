@@ -227,3 +227,755 @@ func TestPostSimulateV1ToV2HandoverFromEnterprise4Xto5X(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, reportAPIPathV2, enterpriseEndpoint)
 }
+
+func TestNormalize(t *testing.T) {
+	type args struct {
+		report inventory.Report
+	}
+	tests := []struct {
+		name     string
+		args     args
+		want     inventory.Report
+		modified bool
+	}{
+		{
+			name: "no modifications",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont1",
+						Name:        "testContainer",
+						PodUID:      "pod1",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod",
+						NamespaceUID: "ns1",
+						UID:          "pod1",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: false,
+		},
+		{
+			name: "namespace missing UID",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "namespace missing",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "node missing UID",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont1",
+						Name:        "testContainer",
+						PodUID:      "pod1",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod",
+						NamespaceUID: "ns1",
+						UID:          "pod1",
+					},
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "node missing",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont1",
+						Name:        "testContainer",
+						PodUID:      "pod1",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod",
+						NamespaceUID: "ns1",
+						UID:          "pod1",
+					},
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "container missing UID",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							UID:          "pod1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod",
+						NamespaceUID: "ns1",
+						UID:          "pod1",
+						NodeUID:      "node1",
+					},
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "pod missing UID",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod",
+							NamespaceUID: "ns1",
+							NodeUID:      "node1",
+						},
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+		{
+			name: "pod missing",
+			args: args{
+				report: inventory.Report{
+					ClusterName: "test",
+					Containers: []inventory.Container{
+						{
+							ID:          "cont1",
+							Name:        "testContainer",
+							PodUID:      "pod1",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+						{
+							ID:          "cont2",
+							Name:        "testContainer2",
+							PodUID:      "pod2",
+							ImageDigest: "sha256:123456",
+							ImageTag:    "myimage:latest",
+						},
+					},
+					Namespaces: []inventory.Namespace{
+						{
+							Name: "testNamespace",
+							UID:  "ns1",
+						},
+						{
+							Name: "testNamespace2",
+							UID:  "ns2",
+						},
+					},
+					Nodes: []inventory.Node{
+						{
+							Name: "testNode",
+							UID:  "node1",
+						},
+					},
+					Pods: []inventory.Pod{
+						{
+							Name:         "testPod2",
+							NamespaceUID: "ns2",
+							UID:          "pod2",
+							NodeUID:      "node1",
+						},
+					},
+					ServerVersionMetadata: nil,
+					Timestamp:             "2021-01-01T00:00:00Z",
+				},
+			},
+			want: inventory.Report{
+				ClusterName: "test",
+				Containers: []inventory.Container{
+					{
+						ID:          "cont2",
+						Name:        "testContainer2",
+						PodUID:      "pod2",
+						ImageDigest: "sha256:123456",
+						ImageTag:    "myimage:latest",
+					},
+				},
+				Namespaces: []inventory.Namespace{
+					{
+						Name: "testNamespace",
+						UID:  "ns1",
+					},
+					{
+						Name: "testNamespace2",
+						UID:  "ns2",
+					},
+				},
+				Nodes: []inventory.Node{
+					{
+						Name: "testNode",
+						UID:  "node1",
+					},
+				},
+				Pods: []inventory.Pod{
+					{
+						Name:         "testPod2",
+						NamespaceUID: "ns2",
+						UID:          "pod2",
+						NodeUID:      "node1",
+					},
+				},
+				ServerVersionMetadata: nil,
+				Timestamp:             "2021-01-01T00:00:00Z",
+			},
+			modified: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report, mod := Normalize(tt.args.report)
+			assert.Equal(t, tt.want, report)
+			assert.Equal(t, tt.modified, mod)
+		})
+	}
+}
