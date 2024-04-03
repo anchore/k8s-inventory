@@ -30,6 +30,7 @@ kubernetesrequesttimeoutseconds: -1
 namespaceselectors:
   include: []
   exclude: []
+  ignoreempty: false
 missingtagpolicy:
   policy: digest
   tag: UNKNOWN

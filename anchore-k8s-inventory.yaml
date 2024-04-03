@@ -41,6 +41,8 @@ namespace-selectors:
   # Will exclude the default, kube-system, and kube-public namespaces
   exclude: []
 
+  ignore-empty: false
+
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:
   # Sets the request timeout for kubernetes API requests

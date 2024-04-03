@@ -22,6 +22,7 @@ import (
 )
 
 type ReportItem struct {
+	Namespace  inventory.Namespace
 	Pods       []inventory.Pod
 	Containers []inventory.Container
 }
@@ -169,10 +170,16 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 	results := make([]ReportItem, 0)
 	pods := make([]inventory.Pod, 0)
 	containers := make([]inventory.Container, 0)
+	processedNamespaces := make([]inventory.Namespace, 0)
 	for len(results) < len(namespaces) {
 		select {
 		case item := <-ch.reportItem:
 			results = append(results, item)
+			if cfg.NamespaceSelectors.IgnoreEmpty && len(item.Pods) == 0 {
+				log.Debugf("Ignoring namespace \"%s\" as it has no pods", item.Namespace.Name)
+				continue
+			}
+			processedNamespaces = append(processedNamespaces, item.Namespace)
 			pods = append(pods, item.Pods...)
 			containers = append(containers, item.Containers...)
 		case err := <-ch.errors:
@@ -196,12 +203,12 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		nodes = append(nodes, node)
 	}
 
-	log.Infof("Got Inventory Report with %d containers running across %d namespaces", len(containers), len(namespaces))
+	log.Infof("Got Inventory Report with %d containers running across %d namespaces", len(containers), len(processedNamespaces))
 	return inventory.Report{
 		Timestamp:             time.Now().UTC().Format(time.RFC3339),
 		Containers:            containers,
 		Pods:                  pods,
-		Namespaces:            namespaces,
+		Namespaces:            processedNamespaces,
 		Nodes:                 nodes,
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
@@ -226,6 +233,14 @@ func processNamespace(
 		return
 	}
 
+	if len(v1pods) == 0 {
+		log.Infof("No pods found in namespace \"%s\"", ns.Name)
+		ch.reportItem <- ReportItem{
+			Namespace: ns,
+		}
+		return
+	}
+
 	pods := inventory.ProcessPods(v1pods, ns.UID, nodes)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
@@ -235,6 +250,7 @@ func processNamespace(
 	)
 
 	reportItem := ReportItem{
+		Namespace:  ns,
 		Pods:       pods,
 		Containers: containers,
 	}
