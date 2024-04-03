@@ -28,6 +28,12 @@ var enterpriseEndpoint = reportAPIPathV2
 // This method does the actual Reporting (via HTTP) to Anchore
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	defer tracker.TrackFunctionTime(time.Now(), "Reporting results to Anchore for cluster: "+report.ClusterName+"")
+	log.Debug("Validating and normalizing report before sending to Anchore")
+	report, modified := Normalize(report)
+	if modified {
+		log.Warnf("Report was modified during normalization, some data may be missing")
+	}
+
 	log.Debug("Reporting results to Anchore using endpoint: ", enterpriseEndpoint)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -91,6 +97,109 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	}
 	log.Debug("Successfully reported results to Anchore")
 	return nil
+}
+
+// Only send a report that contains all required references in the report. E.g. if a container references a pod that is not in the report, remove the container from the report and log it.
+// This is likely due to timing issues gathering the inventory but we should not send incomplete data to Anchore.
+// Returns the normalized report and a boolean indicating if the report was modified.
+//
+//nolint:funlen
+func Normalize(report inventory.Report) (inventory.Report, bool) {
+	modified := false
+
+	namespaces := make(map[string]inventory.Namespace)
+	for _, ns := range report.Namespaces {
+		if ns.UID == "" {
+			modified = true
+			log.Warnf("Namespace has no UID omitting from report: %s", ns.Name)
+			continue
+		}
+		namespaces[ns.UID] = ns
+	}
+
+	nodes := make(map[string]inventory.Node)
+	for _, node := range report.Nodes {
+		if node.UID == "" {
+			modified = true
+			log.Warnf("Node has no UID omitting from report: %s", node.Name)
+			continue
+		}
+		nodes[node.UID] = node
+	}
+
+	pods := make(map[string]inventory.Pod)
+	for _, pod := range report.Pods {
+		if pod.UID == "" {
+			modified = true
+			log.Warnf("Pod has no UID omitting from report: %s", pod.Name)
+			continue
+		}
+		if _, ok := namespaces[pod.NamespaceUID]; !ok {
+			modified = true
+			log.Warnf(
+				"Pod references a namespace that is not in the report, omitting from final report: %s, %s",
+				pod.UID,
+				pod.Name,
+			)
+			continue
+		}
+		if _, ok := nodes[pod.NodeUID]; !ok {
+			modified = true
+			log.Warnf(
+				"Pod references a node that is not in the report, omitting Node field from final report: %s, %s",
+				pod.NodeUID,
+				pod.Name,
+			)
+			oldPod := pod
+			pod = inventory.Pod{
+				Annotations:  oldPod.Annotations,
+				Labels:       oldPod.Labels,
+				Name:         oldPod.Name,
+				NamespaceUID: oldPod.NamespaceUID,
+				UID:          oldPod.UID,
+			}
+		}
+
+		pods[pod.UID] = pod
+	}
+
+	containers := make([]inventory.Container, 0)
+	for _, container := range report.Containers {
+		if container.ID == "" {
+			modified = true
+			log.Warnf("Container has no ID omitting from report: %s", container.Name)
+			continue
+		}
+		if _, ok := pods[container.PodUID]; !ok {
+			modified = true
+			log.Warnf("Container references a pod that is not in the report: %s, %s", container.ID, container.Name)
+			continue
+		}
+
+		containers = append(containers, container)
+	}
+
+	// Create a new report with only the objects that have all references in the report
+	newReport := inventory.Report{
+		ClusterName:           report.ClusterName,
+		Containers:            containers,
+		Namespaces:            make([]inventory.Namespace, 0),
+		Nodes:                 make([]inventory.Node, 0),
+		Pods:                  make([]inventory.Pod, 0),
+		ServerVersionMetadata: report.ServerVersionMetadata,
+		Timestamp:             report.Timestamp,
+	}
+
+	for _, ns := range namespaces {
+		newReport.Namespaces = append(newReport.Namespaces, ns)
+	}
+	for _, node := range nodes {
+		newReport.Nodes = append(newReport.Nodes, node)
+	}
+	for _, pod := range pods {
+		newReport.Pods = append(newReport.Pods, pod)
+	}
+	return newReport, modified
 }
 
 type AnchoreVersion struct {
