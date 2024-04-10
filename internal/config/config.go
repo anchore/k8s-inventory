@@ -46,6 +46,7 @@ type Application struct {
 	Namespaces                      []string          `mapstructure:"namespaces"`
 	KubernetesRequestTimeoutSeconds int64             `mapstructure:"kubernetes-request-timeout-seconds"`
 	NamespaceSelectors              NamespaceSelector `mapstructure:"namespace-selectors"`
+	MissingRegistryOverride         string            `mapstructure:"missing-registry-override"`
 	MissingTagPolicy                MissingTagConf    `mapstructure:"missing-tag-policy"`
 	RunMode                         mode.Mode
 	Mode                            string      `mapstructure:"mode"`
@@ -124,6 +125,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
 	v.SetDefault("ignore-not-running", true)
+	v.SetDefault("missing-registry-override", "")
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
 	v.SetDefault("namespaces", []string{})

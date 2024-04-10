@@ -14,20 +14,33 @@ var (
 	tagRegex    = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 )
 
-func getContainersInPod(pod v1.Pod, missingTagPolicy, dummyTag string) []Container {
+func getRegistryOverrideNormalisedImageTag(imageTag, missingRegistryOverride string) string {
+	if missingRegistryOverride != "" {
+		parts := strings.Split(imageTag, "/")
+		if len(parts) <= 2 {
+			// Assume no registry is present and only image and/or repo
+			return fmt.Sprintf("%s/%s", missingRegistryOverride, imageTag)
+		}
+	}
+	return imageTag
+}
+
+//nolint:funlen
+func getContainersInPod(pod v1.Pod, missingRegistryOverride, missingTagPolicy, dummyTag string) []Container {
 	// Look at both status/spec for init and regular containers
 	// Must use status when looking at containers in order to obtain the container ID
 	// from the Status and the Image tag from the Spec
 	containers := make(map[string]Container, 0)
 
 	processPodSpec := func(c v1.Container) {
+		imageTag := getRegistryOverrideNormalisedImageTag(strings.Split(c.Image, "@")[0], missingRegistryOverride)
 		if containerFound, ok := containers[c.Name]; ok {
-			containerFound.ImageTag = strings.Split(c.Image, "@")[0]
+			containerFound.ImageTag = imageTag
 			containerFound.PodUID = string(pod.UID)
 		} else {
 			containers[c.Name] = Container{
 				PodUID:   string(pod.UID),
-				ImageTag: strings.Split(c.Image, "@")[0],
+				ImageTag: imageTag,
 				Name:     c.Name,
 			}
 		}
@@ -46,10 +59,11 @@ func getContainersInPod(pod v1.Pod, missingTagPolicy, dummyTag string) []Contain
 			containerFound.ImageDigest = digest
 			containers[c.Name] = containerFound
 		} else {
+			imageTag := getRegistryOverrideNormalisedImageTag(strings.Split(c.Image, "@")[0], missingRegistryOverride)
 			containers[c.Name] = Container{
 				ID:          c.ContainerID,
 				PodUID:      string(pod.UID),
-				ImageTag:    strings.Split(c.Image, "@")[0],
+				ImageTag:    imageTag,
 				ImageDigest: digest,
 				Name:        c.Name,
 			}
@@ -87,14 +101,18 @@ func getContainersInPod(pod v1.Pod, missingTagPolicy, dummyTag string) []Contain
 	return containerList
 }
 
-func GetContainersFromPods(pods []v1.Pod, ignoreNotRunning bool, missingTagPolicy, dummyTag string) []Container {
+func GetContainersFromPods(
+	pods []v1.Pod,
+	ignoreNotRunning bool,
+	missingRegistryOverride, missingTagPolicy, dummyTag string,
+) []Container {
 	var containers []Container
 
 	for _, pod := range pods {
 		if ignoreNotRunning && pod.Status.Phase != v1.PodRunning {
 			continue
 		}
-		containers = append(containers, getContainersInPod(pod, missingTagPolicy, dummyTag)...)
+		containers = append(containers, getContainersInPod(pod, missingRegistryOverride, missingTagPolicy, dummyTag)...)
 	}
 
 	// Handle missing tags
