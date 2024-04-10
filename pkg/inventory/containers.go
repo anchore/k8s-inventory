@@ -18,6 +18,10 @@ func getRegistryOverrideNormalisedImageTag(imageTag, missingRegistryOverride str
 	if missingRegistryOverride != "" {
 		parts := strings.Split(imageTag, "/")
 		if len(parts) <= 2 {
+			// Check if the first part is a registry by seeing if it is a domain
+			if len(parts) > 1 && strings.Contains(parts[0], ".") {
+				return imageTag
+			}
 			// Assume no registry is present and only image and/or repo
 			return fmt.Sprintf("%s/%s", missingRegistryOverride, imageTag)
 		}
