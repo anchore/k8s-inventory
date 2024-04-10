@@ -542,6 +542,30 @@ func Test_getRegistryOverrideNormalisedImageTag(t *testing.T) {
 			},
 			want: "library/reponame/myimage:0.0.1",
 		},
+		{
+			name: "returns image tag without overridden registry if only registry and image are given, and it can be determined that registry is a domain name not a repo/library",
+			args: args{
+				imageTag:                "docker.io/myimage:0.0.1",
+				missingRegistryOverride: "custom.registry.io",
+			},
+			want: "docker.io/myimage:0.0.1",
+		},
+		{
+			name: "returns image tag without overridden registry if only registry and image are given, and it can be determined that registry is a domain name not a repo/library",
+			args: args{
+				imageTag:                "localhost:1234/myimage:0.0.1",
+				missingRegistryOverride: "custom.registry.io",
+			},
+			want: "localhost:1234/myimage:0.0.1",
+		},
+		{
+			name: "returns image tag without overridden registry if only registry and image are given, and it can be determined that registry is a domain name not a repo/library",
+			args: args{
+				imageTag:                "my.registry:1234/myimage:0.0.1",
+				missingRegistryOverride: "custom.registry.io",
+			},
+			want: "my.registry:1234/myimage:0.0.1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
