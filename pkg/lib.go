@@ -245,6 +245,7 @@ func processNamespace(
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,
+		cfg.MissingRegistryOverride,
 		cfg.MissingTagPolicy.Policy,
 		cfg.MissingTagPolicy.Tag,
 	)

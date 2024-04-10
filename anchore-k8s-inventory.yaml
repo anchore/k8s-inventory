@@ -57,6 +57,15 @@ kubernetes:
 # Can be one of adhoc, periodic (defaults to adhoc)
 mode: adhoc
 
+# If no registry information can be found by a `pod describe` you can use this
+# field to override the registry for images where no registry is found. This
+# can happen when the cluster is configured to use a specific private repo.
+# However, kubernetes does not represent this in the pod describe output other
+# than as the default 'docker.io' registry in the Image ID and a blank registry
+# in the Image field. This should be set to match the private registry
+# configuration of the cluster.
+missing-registry-override:  # ex. myregistry.io
+
 # Handle cases where a tag is missing. For example - images designated by digest
 missing-tag-policy:
   # One of the following options [digest, insert, drop]. Default is 'digest'
