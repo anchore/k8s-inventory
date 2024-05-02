@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-GO_VERSION="1.15.7"
+GO_VERSION="1.22.2"
 ARCH=$(uname | tr '[:upper:]' '[:lower:]')
 GO_ARTIFACT="go$GO_VERSION.$ARCH-amd64.tar.gz"
 wget "https://dl.google.com/go/$GO_ARTIFACT"
