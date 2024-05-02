@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
 		case mode.PeriodicPolling:
 			pkg.PeriodicallyGetInventoryReport(appConfig)
 		default:
-			report, err := pkg.GetInventoryReport(appConfig)
+			reports, err := pkg.GetInventoryReports(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -55,10 +55,12 @@ var rootCmd = &cobra.Command{
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
 			}
-			err = pkg.HandleReport(report, appConfig)
-			if err != nil {
-				log.Errorf("Failed to handle Image Results: %+v", err)
-				os.Exit(1)
+			for account, report := range reports {
+				err = pkg.HandleReport(report, appConfig, account)
+				if err != nil {
+					log.Errorf("Failed to handle Image Results: %+v", err)
+					os.Exit(1)
+				}
 			}
 		}
 	},

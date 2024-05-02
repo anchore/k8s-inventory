@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/anchore/k8s-inventory/pkg/reporter"
@@ -33,6 +34,8 @@ type channels struct {
 	stopper    chan struct{}
 }
 
+type AccountRoutedReports map[string]inventory.Report
+
 func reportToStdout(report inventory.Report) error {
 	enc := json.NewEncoder(os.Stdout)
 	// prevent > and < from being escaped in the payload
@@ -44,7 +47,7 @@ func reportToStdout(report inventory.Report) error {
 	return nil
 }
 
-func HandleReport(report inventory.Report, cfg *config.Application) error {
+func HandleReport(report inventory.Report, cfg *config.Application, account string) error {
 	if cfg.VerboseInventoryReports {
 		err := reportToStdout(report)
 		if err != nil {
@@ -52,11 +55,29 @@ func HandleReport(report inventory.Report, cfg *config.Application) error {
 		}
 	}
 
-	if cfg.AnchoreDetails.IsValid() {
-		if err := reporter.Post(report, cfg.AnchoreDetails); err != nil {
-			return fmt.Errorf("unable to report Inventory to Anchore: %w", err)
+	anchoreDetails := cfg.AnchoreDetails
+	// Look for account credentials in the account routes first then fall back to the global anchore credentials
+	if account == "" {
+		return fmt.Errorf("account name is required")
+	}
+	anchoreDetails.Account = account
+	if cfg.AccountRoutes != nil {
+		if route, ok := cfg.AccountRoutes[account]; ok {
+			log.Debugf("Using account details specified from account-routes config for account %s", account)
+			anchoreDetails.User = route.User
+			anchoreDetails.Password = route.Password
+		} else {
+			log.Debugf("Using default account details for account %s", account)
 		}
-		log.Info("Inventory report sent to Anchore")
+	} else {
+		log.Debugf("Using default account details for account %s", account)
+	}
+
+	if anchoreDetails.IsValid() {
+		if err := reporter.Post(report, anchoreDetails); err != nil {
+			return fmt.Errorf("unable to report Inventory to Anchore account %s: %w", account, err)
+		}
+		log.Infof("Inventory report sent to Anchore account %s", account)
 	} else {
 		log.Info("Anchore details not specified, not reporting inventory")
 	}
@@ -70,13 +91,15 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
-		report, err := GetInventoryReport(cfg)
+		reports, err := GetInventoryReports(cfg)
 		if err != nil {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
-			err := HandleReport(report, cfg)
-			if err != nil {
-				log.Errorf("Failed to handle Inventory Report: %w", err)
+			for account, report := range reports {
+				err := HandleReport(report, cfg, account)
+				if err != nil {
+					log.Errorf("Failed to handle Inventory Report: %w", err)
+				}
 			}
 		}
 
@@ -117,21 +140,19 @@ func launchWorkerPool(
 	}
 }
 
-// GetInventoryReport is an atomic method for getting in-use image results, in parallel for multiple namespaces
+// GetInventoryReportForNamespaces is an atomic method for getting in-use image results, in parallel for multiple namespaces
 //
 //nolint:funlen
-func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
-	log.Info("Starting image inventory collection")
+func GetInventoryReportForNamespaces(
+	cfg *config.Application,
+	namespaces []inventory.Namespace,
+) (inventory.Report, error) {
+	log.Info("Starting image inventory collection for specific namespaces")
+	log.Debugf("Namespaces: %v", namespaces)
 
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
 		return inventory.Report{}, err
-	}
-
-	ch := channels{
-		reportItem: make(chan ReportItem),
-		errors:     make(chan error),
-		stopper:    make(chan struct{}, 1),
 	}
 
 	clientset, err := client.GetClientSet(kubeconfig)
@@ -142,11 +163,10 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		Clientset: clientset,
 	}
 
-	namespaces, err := inventory.FetchNamespaces(client,
-		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
-		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include)
-	if err != nil {
-		return inventory.Report{}, err
+	ch := channels{
+		reportItem: make(chan ReportItem),
+		errors:     make(chan error),
+		stopper:    make(chan struct{}, 1),
 	}
 
 	queue := make(chan inventory.Namespace, len(namespaces)) // fill the queue of namespaces to process
@@ -213,6 +233,93 @@ func GetInventoryReport(cfg *config.Application) (inventory.Report, error) {
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
 	}, nil
+}
+
+func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {
+	kubeconfig, err := client.GetKubeConfig(cfg)
+	if err != nil {
+		return []inventory.Namespace{}, err
+	}
+
+	clientset, err := client.GetClientSet(kubeconfig)
+	if err != nil {
+		return []inventory.Namespace{}, fmt.Errorf("failed to get k8s client set: %w", err)
+	}
+	client := client.Client{
+		Clientset: clientset,
+	}
+
+	namespaces, err := inventory.FetchNamespaces(client,
+		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
+		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include)
+	if err != nil {
+		return []inventory.Namespace{}, err
+	}
+
+	log.Infof("Found %d namespaces", len(namespaces))
+
+	return namespaces, nil
+}
+
+func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Namespace, accountRoutes config.AccountRoutes) map[string][]inventory.Namespace {
+	accountRoutesForAllNamespaces := make(map[string][]inventory.Namespace)
+
+	accountNamespaces := make(map[string]struct{})
+	for routeNS, route := range accountRoutes {
+		for _, ns := range namespaces {
+			for _, namespaceRegex := range route.Namespaces {
+				if regexp.MustCompile(namespaceRegex).MatchString(ns.Name) {
+					accountNamespaces[ns.Name] = struct{}{}
+					accountRoutesForAllNamespaces[routeNS] = append(accountRoutesForAllNamespaces[routeNS], ns)
+				}
+			}
+		}
+	}
+	// Add namespaces that are not in any account route to the default account
+	for _, ns := range namespaces {
+		if _, ok := accountNamespaces[ns.Name]; !ok {
+			accountRoutesForAllNamespaces[defaultAccount] = append(accountRoutesForAllNamespaces[defaultAccount], ns)
+		}
+	}
+
+	return accountRoutesForAllNamespaces
+}
+
+func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) {
+	log.Info("Starting image inventory collection")
+
+	reports := AccountRoutedReports{}
+
+	namespaces, _ := GetAllNamespaces(cfg)
+
+	if len(cfg.AccountRoutes) == 0 {
+		allNamespacesReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
+		if err != nil {
+			return AccountRoutedReports{}, err
+		}
+		reports[cfg.AnchoreDetails.Account] = allNamespacesReport
+	} else {
+		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(cfg.AnchoreDetails.Account, namespaces, cfg.AccountRoutes)
+
+		for account, namespaces := range accountRoutesForAllNamespaces {
+			nsNames := make([]string, 0)
+			for _, ns := range namespaces {
+				nsNames = append(nsNames, ns.Name)
+			}
+			log.Infof("Namespaces for account %s : %s", account, nsNames)
+		}
+
+		// Get inventory reports for each account
+		for account, namespaces := range accountRoutesForAllNamespaces {
+			accountReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
+			if err != nil {
+				return AccountRoutedReports{}, err
+			}
+			reports[account] = accountReport
+		}
+	}
+
+	return reports, nil
 }
 
 func processNamespace(
