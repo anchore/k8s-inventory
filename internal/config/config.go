@@ -46,6 +46,7 @@ type Application struct {
 	Namespaces                      []string          `mapstructure:"namespaces"`
 	KubernetesRequestTimeoutSeconds int64             `mapstructure:"kubernetes-request-timeout-seconds"`
 	NamespaceSelectors              NamespaceSelector `mapstructure:"namespace-selectors"`
+	AccountRoutes                   AccountRoutes     `mapstructure:"account-routes"`
 	MissingRegistryOverride         string            `mapstructure:"missing-registry-override"`
 	MissingTagPolicy                MissingTagConf    `mapstructure:"missing-tag-policy"`
 	RunMode                         mode.Mode
@@ -67,6 +68,14 @@ type NamespaceSelector struct {
 	Include     []string `mapstructure:"include"`
 	Exclude     []string `mapstructure:"exclude"`
 	IgnoreEmpty bool     `mapstructure:"ignore-empty"`
+}
+
+type AccountRoutes map[string]AccountRouteDetails
+
+type AccountRouteDetails struct {
+	User       string   `mapstructure:"user"`
+	Password   string   `mapstructure:"password"`
+	Namespaces []string `mapstructure:"namespaces"`
 }
 
 // KubernetesAPI details the configuration for interacting with the k8s api server
@@ -128,6 +137,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("missing-registry-override", "")
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
+	v.SetDefault("account-routes", AccountRoutes{})
 	v.SetDefault("namespaces", []string{})
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})

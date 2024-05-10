@@ -43,6 +43,15 @@ namespace-selectors:
 
   ignore-empty: false
 
+account-routes:
+   # Example
+   # account:
+   #   user: username
+   #   password: password
+   #   namespaces:
+   #     - default
+   #     - ^kube-*
+
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:
   # Sets the request timeout for kubernetes API requests

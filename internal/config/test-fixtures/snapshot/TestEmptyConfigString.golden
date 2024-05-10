@@ -31,6 +31,7 @@ namespaceselectors:
   include: []
   exclude: []
   ignoreempty: false
+accountroutes: {}
 missingregistryoverride: ""
 missingtagpolicy:
   policy: ""
