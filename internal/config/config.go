@@ -40,15 +40,16 @@ type Application struct {
 	Quiet                           bool    `mapstructure:"quiet"`
 	Log                             Logging `mapstructure:"log"`
 	CliOptions                      CliOnlyOptions
-	Dev                             Development       `mapstructure:"dev"`
-	KubeConfig                      KubeConf          `mapstructure:"kubeconfig"`
-	Kubernetes                      KubernetesAPI     `mapstructure:"kubernetes"`
-	Namespaces                      []string          `mapstructure:"namespaces"`
-	KubernetesRequestTimeoutSeconds int64             `mapstructure:"kubernetes-request-timeout-seconds"`
-	NamespaceSelectors              NamespaceSelector `mapstructure:"namespace-selectors"`
-	AccountRoutes                   AccountRoutes     `mapstructure:"account-routes"`
-	MissingRegistryOverride         string            `mapstructure:"missing-registry-override"`
-	MissingTagPolicy                MissingTagConf    `mapstructure:"missing-tag-policy"`
+	Dev                             Development                  `mapstructure:"dev"`
+	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig"`
+	Kubernetes                      KubernetesAPI                `mapstructure:"kubernetes"`
+	Namespaces                      []string                     `mapstructure:"namespaces"`
+	KubernetesRequestTimeoutSeconds int64                        `mapstructure:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors              NamespaceSelector            `mapstructure:"namespace-selectors"`
+	AccountRoutes                   AccountRoutes                `mapstructure:"account-routes"`
+	AccountRouteByNamespaceLabel    AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label"`
+	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override"`
+	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy"`
 	RunMode                         mode.Mode
 	Mode                            string      `mapstructure:"mode"`
 	IgnoreNotRunning                bool        `mapstructure:"ignore-not-running"`
@@ -76,6 +77,12 @@ type AccountRouteDetails struct {
 	User       string   `mapstructure:"user"`
 	Password   string   `mapstructure:"password"`
 	Namespaces []string `mapstructure:"namespaces"`
+}
+
+type AccountRouteByNamespaceLabel struct {
+	LabelKey           string `mapstructure:"key"`
+	DefaultAccount     string `mapstructure:"default-account"`
+	IgnoreMissingLabel bool   `mapstructure:"ignore-missing-label"`
 }
 
 // KubernetesAPI details the configuration for interacting with the k8s api server
@@ -138,6 +145,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")
 	v.SetDefault("account-routes", AccountRoutes{})
+	v.SetDefault("account-route-by-namespace-label", AccountRouteByNamespaceLabel{})
 	v.SetDefault("namespaces", []string{})
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})

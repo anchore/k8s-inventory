@@ -52,6 +52,17 @@ account-routes:
    #     - default
    #     - ^kube-*
 
+# Route namespaces to anchore accounts by a label on the namespace
+account-route-by-namespace-label:
+  # The name of the namespace label that will be used to route the contents of
+  # that namespace to the Anchore account matching the value of the label
+  key:  # e.g anchore.io/account.name
+  # The name of the account to route inventory to for a namespace that is missing the label
+  # If not set then it will default to the account specified in the anchore credentials
+  default-account:  # e.g. admin
+  # If true will exclude inventorying namespaces that are missing the specified label
+  ignore-namespace-missing-label: false
+
 # Kubernetes API configuration parameters (should not need tuning)
 kubernetes:
   # Sets the request timeout for kubernetes API requests

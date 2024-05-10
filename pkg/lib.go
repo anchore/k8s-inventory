@@ -261,8 +261,13 @@ func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {
 	return namespaces, nil
 }
 
-func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Namespace, accountRoutes config.AccountRoutes) map[string][]inventory.Namespace {
+func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Namespace,
+	accountRoutes config.AccountRoutes, namespaceLabelRouting config.AccountRouteByNamespaceLabel) map[string][]inventory.Namespace {
 	accountRoutesForAllNamespaces := make(map[string][]inventory.Namespace)
+
+	if namespaceLabelRouting.DefaultAccount != "" {
+		defaultAccount = namespaceLabelRouting.DefaultAccount
+	}
 
 	accountNamespaces := make(map[string]struct{})
 	for routeNS, route := range accountRoutes {
@@ -275,9 +280,19 @@ func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Na
 			}
 		}
 	}
-	// Add namespaces that are not in any account route to the default account
+	// If there is a namespace label routing, add namespaces to the account routes based on the label,
+	// if the namespace has not already been added to an account route set via explicit configuration in
+	// accountRoutes config. (This overrides the label routing for the case where the label cannot be changed).
+	// Otherwise, add namespaces that are not in any account route to the default account unless disabled.
 	for _, ns := range namespaces {
-		if _, ok := accountNamespaces[ns.Name]; !ok {
+		_, namespaceRouted := accountNamespaces[ns.Name]
+		if namespaceLabelRouting.LabelKey != "" && !namespaceRouted {
+			if account, ok := ns.Labels[namespaceLabelRouting.LabelKey]; ok {
+				accountRoutesForAllNamespaces[account] = append(accountRoutesForAllNamespaces[account], ns)
+			} else if !namespaceLabelRouting.IgnoreMissingLabel {
+				accountRoutesForAllNamespaces[defaultAccount] = append(accountRoutesForAllNamespaces[defaultAccount], ns)
+			}
+		} else if !namespaceRouted {
 			accountRoutesForAllNamespaces[defaultAccount] = append(accountRoutesForAllNamespaces[defaultAccount], ns)
 		}
 	}
@@ -292,14 +307,14 @@ func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) 
 
 	namespaces, _ := GetAllNamespaces(cfg)
 
-	if len(cfg.AccountRoutes) == 0 {
+	if len(cfg.AccountRoutes) == 0 && cfg.AccountRouteByNamespaceLabel.LabelKey == "" {
 		allNamespacesReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
 		if err != nil {
 			return AccountRoutedReports{}, err
 		}
 		reports[cfg.AnchoreDetails.Account] = allNamespacesReport
 	} else {
-		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(cfg.AnchoreDetails.Account, namespaces, cfg.AccountRoutes)
+		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(cfg.AnchoreDetails.Account, namespaces, cfg.AccountRoutes, cfg.AccountRouteByNamespaceLabel)
 
 		for account, namespaces := range accountRoutesForAllNamespaces {
 			nsNames := make([]string, 0)

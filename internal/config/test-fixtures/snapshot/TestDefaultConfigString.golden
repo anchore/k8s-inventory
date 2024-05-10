@@ -32,6 +32,10 @@ namespaceselectors:
   exclude: []
   ignoreempty: false
 accountroutes: {}
+accountroutebynamespacelabel:
+  labelkey: ""
+  defaultaccount: ""
+  ignoremissinglabel: false
 missingregistryoverride: ""
 missingtagpolicy:
   policy: digest
