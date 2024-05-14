@@ -274,12 +274,14 @@ func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Na
 		for _, ns := range namespaces {
 			for _, namespaceRegex := range route.Namespaces {
 				if regexp.MustCompile(namespaceRegex).MatchString(ns.Name) {
+					log.Debugf("Namespace %s matched route from config %s", ns.Name, routeNS)
 					accountNamespaces[ns.Name] = struct{}{}
 					accountRoutesForAllNamespaces[routeNS] = append(accountRoutesForAllNamespaces[routeNS], ns)
 				}
 			}
 		}
 	}
+
 	// If there is a namespace label routing, add namespaces to the account routes based on the label,
 	// if the namespace has not already been added to an account route set via explicit configuration in
 	// accountRoutes config. (This overrides the label routing for the case where the label cannot be changed).
@@ -288,12 +290,16 @@ func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Na
 		_, namespaceRouted := accountNamespaces[ns.Name]
 		if namespaceLabelRouting.LabelKey != "" && !namespaceRouted {
 			if account, ok := ns.Labels[namespaceLabelRouting.LabelKey]; ok {
+				log.Debugf("Namespace %s matched route from label %s", ns.Name, account)
 				accountRoutesForAllNamespaces[account] = append(accountRoutesForAllNamespaces[account], ns)
 			} else if !namespaceLabelRouting.IgnoreMissingLabel {
 				accountRoutesForAllNamespaces[defaultAccount] = append(accountRoutesForAllNamespaces[defaultAccount], ns)
+			} else {
+				log.Infof("Ignoring namespace %s because it does not have the label %s", ns.Name, namespaceLabelRouting.LabelKey)
 			}
 		} else if !namespaceRouted {
 			accountRoutesForAllNamespaces[defaultAccount] = append(accountRoutesForAllNamespaces[defaultAccount], ns)
+			log.Debugf("Namespace %s added to default account %s", ns.Name, defaultAccount)
 		}
 	}
 
