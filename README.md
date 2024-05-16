@@ -262,6 +262,54 @@ namespace-selectors:
   ignore-empty: false
 ```
 
+### Account Routing
+
+The following configuration options can determine which Anchore account
+inventory reports are sent to. Without any of the following configuration the
+account set in the `anchore` section will be used.
+
+If a mixture of static account routing and account routing by namespace label
+is used then the static account routes configured in k8s-inventory config will
+take precedence over any account that is specified by namespace label.
+
+#### Static account routing config
+
+Set a list of accounts and what namespaces inventory should be sent to that
+account. You can override the default credentials on a per account basis, if
+not set then the global credentials set in the `anchore` section will be used.
+
+```yaml
+account-routes:
+   # Example
+   # account: # (this is the name of the anchore account e.g. admin)
+   #   user: username
+   #   password: password
+   #   namespaces: # Can be a list of explicit namespaces matches or regex patterns
+   #     - default
+   #     - ^kube-*
+```
+
+#### Account routing by namespace label
+
+In this mode use a label set on a kubernetes namespace to determine which
+Anchore account inventory data for that namespace should be sent to. It is
+assumed that the credentials set in the `anchore` section can post to all
+accounts.
+
+```yaml
+# Route namespaces to anchore accounts by a label on the namespace
+account-route-by-namespace-label:
+  # The name of the namespace label that will be used to route the contents of
+  # that namespace to the Anchore account matching the value of the label
+  key:  # e.g anchore.io/account.name
+  # The name of the account to route inventory to for a namespace that is
+  # missing the label or if the anchore account is not found.
+  # If not set then it will default to the account specified in the anchore credentials
+  default-account:  # e.g. admin
+  # If true will exclude inventorying namespaces that are missing the specified label
+  ignore-namespace-missing-label: false
+```
+
 ### Kubernetes API Parameters
 
 This section will allow users to tune the way anchore-k8s-inventory interacts with the kubernetes API server.
@@ -355,6 +403,7 @@ anchore:
   url: <your anchore api url>
   user: <anchore-k8s-inventory_inventory_user>
   password: $ANCHORE_K8S_INVENTORY_ANCHORE_PASSWORD
+  account: <anchore account to send inventory reports>
   http:
     insecure: true
     timeout-seconds: 10
