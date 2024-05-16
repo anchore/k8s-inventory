@@ -5,6 +5,7 @@ k8s go SDK
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -75,6 +76,9 @@ func HandleReport(report inventory.Report, cfg *config.Application, account stri
 
 	if anchoreDetails.IsValid() {
 		if err := reporter.Post(report, anchoreDetails); err != nil {
+			if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+				return err
+			}
 			return fmt.Errorf("unable to report Inventory to Anchore account %s: %w", account, err)
 		}
 		log.Infof("Inventory report sent to Anchore account %s", account)
@@ -97,6 +101,15 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 		} else {
 			for account, report := range reports {
 				err := HandleReport(report, cfg, account)
+				if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+					// Retry with default account
+					retryAccount := cfg.AnchoreDetails.Account
+					if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
+						retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
+					}
+					log.Warnf("Anchore Account %s does not exist, sending to default account", account)
+					err = HandleReport(report, cfg, retryAccount)
+				}
 				if err != nil {
 					log.Errorf("Failed to handle Inventory Report: %w", err)
 				}

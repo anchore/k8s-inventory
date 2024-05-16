@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/anchore/k8s-inventory/internal/config"
@@ -19,13 +20,26 @@ import (
 )
 
 const (
-	reportAPIPathV1 = "v1/enterprise/kubernetes-inventory"
-	reportAPIPathV2 = "v2/kubernetes-inventory"
+	reportAPIPathV1            = "v1/enterprise/kubernetes-inventory"
+	reportAPIPathV2            = "v2/kubernetes-inventory"
+	AnchoreAccountMissingError = "User account not found"
 )
 
-var enterpriseEndpoint = reportAPIPathV2
+var (
+	ErrAnchoreAccountDoesNotExist = fmt.Errorf("user account not found")
+	enterpriseEndpoint            = reportAPIPathV2
+)
+
+type AnchoreResponse struct {
+	Message          string      `json:"message"`
+	Httpcode         int         `json:"httpcode"`
+	Detail           interface{} `json:"detail"`
+	AnchoreRequestID string      `json:"anchore_request_id"`
+}
 
 // This method does the actual Reporting (via HTTP) to Anchore
+//
+//nolint:funlen
 func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 	defer tracker.TrackFunctionTime(time.Now(), "Reporting results to Anchore for cluster: "+report.ClusterName+"")
 	log.Debug("Validating and normalizing report before sending to Anchore")
@@ -78,7 +92,21 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 			log.Info("Retrying inventory report with new endpoint: ", enterpriseEndpoint)
 			return Post(report, anchoreDetails)
 		}
-		return fmt.Errorf("failed to report data to Anchore: %+v", resp)
+
+		// Check if account is correct
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response from Anchore: %w", err)
+		}
+		anchoreResponse := &AnchoreResponse{}
+		err = json.Unmarshal(respBody, anchoreResponse)
+		if err != nil {
+			return fmt.Errorf("failed to parse response from Anchore: %w", err)
+		}
+		if strings.Contains(anchoreResponse.Message, AnchoreAccountMissingError) {
+			return ErrAnchoreAccountDoesNotExist
+		}
+		return fmt.Errorf("failed to report data to Anchore: %s", string(respBody))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("failed to report data to Anchore: %+v", resp)

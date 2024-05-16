@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime/pprof"
 
 	"github.com/anchore/k8s-inventory/pkg/mode"
+	"github.com/anchore/k8s-inventory/pkg/reporter"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -55,12 +57,25 @@ var rootCmd = &cobra.Command{
 				log.Errorf("Failed to get Image Results: %+v", err)
 				os.Exit(1)
 			}
+			anErrorOccurred := false
 			for account, report := range reports {
 				err = pkg.HandleReport(report, appConfig, account)
+				if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+					// Retry with default account
+					retryAccount := appConfig.AnchoreDetails.Account
+					if appConfig.AccountRouteByNamespaceLabel.DefaultAccount != "" {
+						retryAccount = appConfig.AccountRouteByNamespaceLabel.DefaultAccount
+					}
+					log.Warnf("Anchore Account %s does not exist, sending to default account", account)
+					err = pkg.HandleReport(report, appConfig, retryAccount)
+				}
 				if err != nil {
 					log.Errorf("Failed to handle Image Results: %+v", err)
-					os.Exit(1)
+					anErrorOccurred = true
 				}
+			}
+			if anErrorOccurred {
+				os.Exit(1)
 			}
 		}
 	},
