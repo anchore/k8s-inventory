@@ -115,7 +115,9 @@ func FetchNamespaces(
 	// Only return namespaces that are explicitly included if set
 	if len(includes) > 0 {
 		for _, ns := range includes {
-			nsList = append(nsList, nsMap[ns])
+			if _, exists := nsMap[ns]; exists {
+				nsList = append(nsList, nsMap[ns])
+			}
 		}
 		return nsList, nil
 	}
