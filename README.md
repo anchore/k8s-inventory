@@ -274,7 +274,7 @@ take precedence over any account that is specified by namespace label.
 
 #### Static account routing config
 
-Set a list of accounts and what namespaces inventory should be sent to that
+Set a list of accounts and which namespaces inventory should be sent to that
 account. You can override the default credentials on a per account basis, if
 not set then the global credentials set in the `anchore` section will be used.
 
