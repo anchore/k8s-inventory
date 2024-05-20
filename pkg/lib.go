@@ -107,7 +107,7 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 					if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
 						retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
 					}
-					log.Warnf("Anchore Account %s does not exist, sending to default account", account)
+					log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
 					err = HandleReport(report, cfg, retryAccount)
 				}
 				if err != nil {

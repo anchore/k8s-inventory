@@ -80,7 +80,11 @@ func Post(report inventory.Report, anchoreDetails config.AnchoreInfo) error {
 		return fmt.Errorf("failed to report data to Anchore: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 404 {
+	switch {
+	case resp.StatusCode == 403:
+		log.Debug("Forbidden response (403) from Anchore")
+		return ErrAnchoreAccountDoesNotExist
+	case resp.StatusCode == 404:
 		previousVersion := enterpriseEndpoint
 		// We failed to send the inventory.  We need to check the version of Enterprise.
 		versionError := checkVersion(anchoreDetails)

@@ -66,7 +66,7 @@ var rootCmd = &cobra.Command{
 					if appConfig.AccountRouteByNamespaceLabel.DefaultAccount != "" {
 						retryAccount = appConfig.AccountRouteByNamespaceLabel.DefaultAccount
 					}
-					log.Warnf("Anchore Account %s does not exist, sending to default account", account)
+					log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
 					err = pkg.HandleReport(report, appConfig, retryAccount)
 				}
 				if err != nil {
