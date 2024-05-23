@@ -280,11 +280,18 @@ not set then the global credentials set in the `anchore` section will be used.
 
 ```yaml
 account-routes:
+   # <Anchore Account Name>: # (this is the name of the anchore account e.g. admin)
+   #   user: <username> <OPTIONAL>
+   #   password: <password> <OPTIONAL>
+   #   namespaces: # Can be a list of explicit namespaces matches or regex patterns
+   #     - <namespace>
+   #     - <regex pattern>
+   #
    # Example
-   # account: # (this is the name of the anchore account e.g. admin)
+   # admin:
    #   user: username
    #   password: password
-   #   namespaces: # Can be a list of explicit namespaces matches or regex patterns
+   #   namespaces:
    #     - default
    #     - ^kube-*
 ```
