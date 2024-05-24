@@ -40,16 +40,18 @@ func FetchPodsInNamespace(c client.Client, batchSize, timeout int64, namespace s
 	return podList, nil
 }
 
-func ProcessPods(pods []v1.Pod, namespaceUID string, nodes map[string]Node) []Pod {
+func ProcessPods(pods []v1.Pod, namespaceUID string, nodes map[string]Node, disableMetadata bool) []Pod {
 	var podList []Pod
 
 	for _, p := range pods {
 		pod := Pod{
 			Name:         p.ObjectMeta.Name,
 			UID:          string(p.UID),
-			Annotations:  p.Annotations,
-			Labels:       p.Labels,
 			NamespaceUID: namespaceUID,
+		}
+		if !disableMetadata {
+			pod.Labels = p.Labels
+			pod.Annotations = p.Annotations
 		}
 		node, ok := nodes[p.Spec.NodeName]
 		if ok {

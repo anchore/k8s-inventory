@@ -412,6 +412,26 @@ inventory-report-limits:
     namespaces: 0 # default of 0 means no limit
 ```
 
+### Metadata configuration
+
+Include only a subset of annotations/labels for each resource type or disable metadata entirely
+
+```yaml
+metadata-collection:
+  nodes:
+    include-annotations: [] # List of annotations to include (explicit or regex)
+    include-labels: [] # List of labels to include (explicit or regex)
+    disable: false # Remove all optional node metadata from the inventory report
+  namespaces:
+    include-annotations: [] # List of annotations to include (explicit or regex)
+    include-labels: [] # List of labels to include (explicit or regex)
+    disable: false # Remove all optional namespace metadata from the inventory report
+  pods:
+    include-annotations: [] # List of annotations to include (explicit or regex)
+    include-labels: [] # List of labels to include (explicit or regex)
+    disable: false # Remove all optional pod metadata from the inventory report
+```
+
 ### Anchore API configuration
 
 Use this section to configure the Anchore Enterprise API endpoint

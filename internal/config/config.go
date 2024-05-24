@@ -55,6 +55,7 @@ type Application struct {
 	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running"`
 	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds"`
 	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits"`
+	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection"`
 	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore"`
 	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports"`
 }
@@ -96,6 +97,18 @@ type KubernetesAPI struct {
 // Details upper limits for the inventory report contents before splitting into batches
 type InventoryReportLimits struct {
 	Namespaces int `mapstructure:"namespaces"`
+}
+
+type ResourceMetadata struct {
+	Annotations []string `json:"include-annotations"`
+	Labels      []string `json:"include-labels"`
+	Disable     bool     `json:"disable-all-metadata"`
+}
+
+type MetadataCollection struct {
+	Nodes     ResourceMetadata `mapstructure:"nodes"`
+	Namespace ResourceMetadata `mapstructure:"namespaces"`
+	Pods      ResourceMetadata `mapstructure:"pods"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)
