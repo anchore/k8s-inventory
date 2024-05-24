@@ -353,9 +353,10 @@ func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) 
 	namespaces, _ := GetAllNamespaces(cfg)
 
 	if len(cfg.AccountRoutes) == 0 && cfg.AccountRouteByNamespaceLabel.LabelKey == "" {
+		totalExpectedBatches := int(math.Ceil(float64(len(namespaces)) / float64(batchSize)))
 		for batchCount, batch := range GetNamespacesBatches(namespaces, batchSize) {
 			if batchSize > 0 {
-				log.Infof("Collecting batch %d of %d for account %s", batchCount+1, int(math.Ceil(float64(len(namespaces))/float64(batchSize))), cfg.AnchoreDetails.Account)
+				log.Infof("Collecting batch %d of %d for account %s", batchCount+1, totalExpectedBatches, cfg.AnchoreDetails.Account)
 			}
 			batchNamespacesReport, err := GetInventoryReportForNamespaces(cfg, batch)
 			if err != nil {
@@ -376,9 +377,10 @@ func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) 
 
 		// Get inventory reports for each account
 		for account, namespaces := range accountRoutesForAllNamespaces {
+			totalExpectedBatches := int(math.Ceil(float64(len(namespaces)) / float64(batchSize)))
 			for batchCount, batch := range GetNamespacesBatches(namespaces, batchSize) {
 				if batchSize > 0 {
-					log.Infof("Collecting inventory batch %d of %d for account %s", batchCount+1, int(math.Ceil(float64(len(namespaces))/float64(batchSize))), account)
+					log.Infof("Collecting inventory batch %d of %d for account %s", batchCount+1, totalExpectedBatches, account)
 				}
 				accountReport, err := GetInventoryReportForNamespaces(cfg, batch)
 				if err != nil {
