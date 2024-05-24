@@ -46,6 +46,19 @@ ignorenotrunning: true
 pollingintervalseconds: 300
 inventoryreportlimits:
   namespaces: 0
+metadatacollection:
+  nodes:
+    annotations: []
+    labels: []
+    disable: false
+  namespace:
+    annotations: []
+    labels: []
+    disable: false
+  pods:
+    annotations: []
+    labels: []
+    disable: false
 anchoredetails:
   url: ""
   user: ""

@@ -13,11 +13,12 @@ import (
 
 func Test_fetchNamespaces(t *testing.T) {
 	type args struct {
-		c         client.Client
-		batchSize int64
-		timeout   int64
-		excludes  []string
-		includes  []string
+		c               client.Client
+		batchSize       int64
+		timeout         int64
+		excludes        []string
+		includes        []string
+		disableMetadata bool
 	}
 	tests := []struct {
 		name    string
@@ -42,10 +43,11 @@ func Test_fetchNamespaces(t *testing.T) {
 						},
 					}),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{},
-				includes:  []string{},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{},
+				includes:        []string{},
+				disableMetadata: false,
 			},
 			want: []Namespace{
 				{
@@ -62,10 +64,11 @@ func Test_fetchNamespaces(t *testing.T) {
 				c: client.Client{
 					Clientset: fake.NewSimpleClientset(),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{},
-				includes:  []string{},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{},
+				includes:        []string{},
+				disableMetadata: false,
 			},
 			want: nil,
 		},
@@ -99,10 +102,11 @@ func Test_fetchNamespaces(t *testing.T) {
 							},
 						}),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{"excluded-namespace"},
-				includes:  []string{},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{"excluded-namespace"},
+				includes:        []string{},
+				disableMetadata: false,
 			},
 			want: []Namespace{
 				{
@@ -155,10 +159,11 @@ func Test_fetchNamespaces(t *testing.T) {
 							},
 						}),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{"excluded.*"},
-				includes:  []string{},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{"excluded.*"},
+				includes:        []string{},
+				disableMetadata: false,
 			},
 			want: []Namespace{
 				{
@@ -211,10 +216,11 @@ func Test_fetchNamespaces(t *testing.T) {
 							},
 						}),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{"exclude.*"},
-				includes:  []string{"test-namespace"},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{"exclude.*"},
+				includes:        []string{"test-namespace"},
+				disableMetadata: false,
 			},
 			want: []Namespace{
 				{
@@ -267,10 +273,11 @@ func Test_fetchNamespaces(t *testing.T) {
 							},
 						}),
 				},
-				batchSize: 100,
-				timeout:   10,
-				excludes:  []string{},
-				includes:  []string{"test-namespace"},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{},
+				includes:        []string{"test-namespace"},
+				disableMetadata: false,
 			},
 			want: []Namespace{
 				{
@@ -278,6 +285,61 @@ func Test_fetchNamespaces(t *testing.T) {
 					UID:         "test-uid",
 					Annotations: map[string]string{"test-annotation": "test-value"},
 					Labels:      map[string]string{"test-label": "test-value"},
+				},
+			},
+		},
+		{
+			name: "omits metadata when disabled",
+			args: args{
+				c: client.Client{
+					Clientset: fake.NewSimpleClientset(
+						&v1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "test-namespace",
+								UID:  "test-uid",
+								Annotations: map[string]string{
+									"test-annotation": "test-value",
+								},
+								Labels: map[string]string{
+									"test-label": "test-value",
+								},
+							},
+						},
+						&v1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "excluded-namespace",
+								UID:  "test-excluded-uid",
+								Annotations: map[string]string{
+									"test-annotation": "test-value",
+								},
+								Labels: map[string]string{
+									"test-label": "test-value",
+								},
+							},
+						},
+						&v1.Namespace{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "excluded-namespace2",
+								UID:  "test-excluded-uid2",
+								Annotations: map[string]string{
+									"test-annotation": "test-value",
+								},
+								Labels: map[string]string{
+									"test-label": "test-value",
+								},
+							},
+						}),
+				},
+				batchSize:       100,
+				timeout:         10,
+				excludes:        []string{},
+				includes:        []string{"test-namespace"},
+				disableMetadata: true,
+			},
+			want: []Namespace{
+				{
+					Name: "test-namespace",
+					UID:  "test-uid",
 				},
 			},
 		},
@@ -290,6 +352,7 @@ func Test_fetchNamespaces(t *testing.T) {
 				tt.args.timeout,
 				tt.args.excludes,
 				tt.args.includes,
+				tt.args.disableMetadata,
 			)
 			if (err != nil) != tt.wantErr {
 				assert.Error(t, err)
