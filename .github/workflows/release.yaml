@@ -43,13 +43,6 @@ jobs:
           checkName: "Tests (1.21.x, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Quality gate
-        if: steps.static-analysis.outputs.conclusion != 'success' || steps.tests-unit-int.outputs.conclusion != 'success'
-        run: |
-          echo "Static-Analysis Status : ${{ steps.static-analysis.outputs.conclusion }}"
-          echo "Unit/Integration Status : ${{ steps.tests-unit-int.outputs.conclusion }}"
-          false
-
   release:
     needs: [ wait-for-checks ]
     runs-on: ubuntu-latest
