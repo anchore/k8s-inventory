@@ -58,20 +58,23 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			anErrorOccurred := false
-			for account, report := range reports {
-				err = pkg.HandleReport(report, appConfig, account)
-				if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
-					// Retry with default account
-					retryAccount := appConfig.AnchoreDetails.Account
-					if appConfig.AccountRouteByNamespaceLabel.DefaultAccount != "" {
-						retryAccount = appConfig.AccountRouteByNamespaceLabel.DefaultAccount
+			for account, reportsForAccount := range reports {
+				for count, report := range reportsForAccount {
+					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
+					err = pkg.HandleReport(report, appConfig, account)
+					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+						// Retry with default account
+						retryAccount := appConfig.AnchoreDetails.Account
+						if appConfig.AccountRouteByNamespaceLabel.DefaultAccount != "" {
+							retryAccount = appConfig.AccountRouteByNamespaceLabel.DefaultAccount
+						}
+						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
+						err = pkg.HandleReport(report, appConfig, retryAccount)
 					}
-					log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-					err = pkg.HandleReport(report, appConfig, retryAccount)
-				}
-				if err != nil {
-					log.Errorf("Failed to handle Image Results: %+v", err)
-					anErrorOccurred = true
+					if err != nil {
+						log.Errorf("Failed to handle Image Results: %+v", err)
+						anErrorOccurred = true
+					}
 				}
 			}
 			if anErrorOccurred {

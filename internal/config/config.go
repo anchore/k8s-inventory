@@ -51,11 +51,12 @@ type Application struct {
 	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override"`
 	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy"`
 	RunMode                         mode.Mode
-	Mode                            string      `mapstructure:"mode"`
-	IgnoreNotRunning                bool        `mapstructure:"ignore-not-running"`
-	PollingIntervalSeconds          int         `mapstructure:"polling-interval-seconds"`
-	AnchoreDetails                  AnchoreInfo `mapstructure:"anchore"`
-	VerboseInventoryReports         bool        `mapstructure:"verbose-inventory-reports"`
+	Mode                            string                `mapstructure:"mode"`
+	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running"`
+	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds"`
+	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits"`
+	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore"`
+	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
@@ -90,6 +91,11 @@ type KubernetesAPI struct {
 	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds"`
 	RequestBatchSize      int64 `mapstructure:"request-batch-size"`
 	WorkerPoolSize        int   `mapstructure:"worker-pool-size"`
+}
+
+// Details upper limits for the inventory report contents before splitting into batches
+type InventoryReportLimits struct {
+	Namespaces int `mapstructure:"namespaces"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -219,6 +218,76 @@ func TestGetAccountRoutedNamespaces(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GetAccountRoutedNamespaces(tt.args.defaultAccount, tt.args.namespaces, tt.args.accountRoutes, tt.args.namespaceLabelRouting)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetNamespacesBatches(t *testing.T) {
+	type args struct {
+		namespaces []inventory.Namespace
+		batchSize  int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]inventory.Namespace
+	}{
+		{
+			name: "empty namespaces",
+			args: args{
+				namespaces: []inventory.Namespace{},
+				batchSize:  10,
+			},
+			want: [][]inventory.Namespace{},
+		},
+		{
+			name: "single batch",
+			args: args{
+				namespaces: TestNamespaces,
+				batchSize:  10,
+			},
+			want: [][]inventory.Namespace{
+				TestNamespaces,
+			},
+		},
+		{
+			name: "multiple batches",
+			args: args{
+				namespaces: TestNamespaces,
+				batchSize:  2,
+			},
+			want: [][]inventory.Namespace{
+				{TestNamespace1, TestNamespace2},
+				{TestNamespace3, TestNamespace4},
+			},
+		},
+		{
+			name: "multiple batches with remainder",
+			args: args{
+				namespaces: append(TestNamespaces, TestNamespace5),
+				batchSize:  2,
+			},
+			want: [][]inventory.Namespace{
+				{TestNamespace1, TestNamespace2},
+				{TestNamespace3, TestNamespace4},
+				{TestNamespace5},
+			},
+		},
+		{
+			name: "no batches configured (batch size 0)",
+			args: args{
+				namespaces: TestNamespaces,
+				batchSize:  0,
+			},
+			want: [][]inventory.Namespace{
+				TestNamespaces,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetNamespacesBatches(tt.args.namespaces, tt.args.batchSize)
 			assert.Equal(t, tt.want, got)
 		})
 	}

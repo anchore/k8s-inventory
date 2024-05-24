@@ -44,6 +44,8 @@ runmode: 0
 mode: adhoc
 ignorenotrunning: true
 pollingintervalseconds: 300
+inventoryreportlimits:
+  namespaces: 0
 anchoredetails:
   url: ""
   user: ""
