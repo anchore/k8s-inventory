@@ -14,6 +14,8 @@ const (
 )
 
 // Assumes that the hello-world helm chart in ./fixtures was installed (basic nginx container)
+//
+//nolint:gocognit
 func TestGetImageResults(t *testing.T) {
 	cmd.InitAppConfig()
 	reports, err := pkg.GetInventoryReports(cmd.GetAppConfig())
@@ -21,37 +23,39 @@ func TestGetImageResults(t *testing.T) {
 		t.Fatalf("failed to get image results: %v", err)
 	}
 
-	for _, report := range reports {
-		if report.ServerVersionMetadata == nil {
-			t.Errorf("Failed to include Server Version Metadata in report")
-		}
-
-		if report.Timestamp == "" {
-			t.Errorf("Failed to include Timestamp in report")
-		}
-
-		foundIntegrationTestNamespace := false
-		for _, item := range report.Namespaces {
-			if item.Name != IntegrationTestNamespace {
-				continue
+	for _, reportsForAccount := range reports {
+		for _, report := range reportsForAccount {
+			if report.ServerVersionMetadata == nil {
+				t.Errorf("Failed to include Server Version Metadata in report")
 			}
-			foundIntegrationTestNamespace = true
-			foundIntegrationTestImage := false
-			for _, image := range report.Containers {
-				if !strings.Contains(image.ImageTag, IntegrationTestImageTag) {
+
+			if report.Timestamp == "" {
+				t.Errorf("Failed to include Timestamp in report")
+			}
+
+			foundIntegrationTestNamespace := false
+			for _, item := range report.Namespaces {
+				if item.Name != IntegrationTestNamespace {
 					continue
 				}
-				foundIntegrationTestImage = true
-				if image.ImageDigest == "" {
-					t.Logf("Image Found, but no digest located: %v", image)
+				foundIntegrationTestNamespace = true
+				foundIntegrationTestImage := false
+				for _, image := range report.Containers {
+					if !strings.Contains(image.ImageTag, IntegrationTestImageTag) {
+						continue
+					}
+					foundIntegrationTestImage = true
+					if image.ImageDigest == "" {
+						t.Logf("Image Found, but no digest located: %v", image)
+					}
+				}
+				if !foundIntegrationTestImage {
+					t.Errorf("failed to locate integration test image")
 				}
 			}
-			if !foundIntegrationTestImage {
-				t.Errorf("failed to locate integration test image")
+			if !foundIntegrationTestNamespace {
+				t.Errorf("failed to locate integration test namespace")
 			}
-		}
-		if !foundIntegrationTestNamespace {
-			t.Errorf("failed to locate integration test namespace")
 		}
 	}
 }

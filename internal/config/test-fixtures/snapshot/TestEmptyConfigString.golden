@@ -44,6 +44,8 @@ runmode: 0
 mode: ""
 ignorenotrunning: false
 pollingintervalseconds: 0
+inventoryreportlimits:
+  namespaces: 0
 anchoredetails:
   url: ""
   user: ""

@@ -401,6 +401,17 @@ missing-tag-policy:
 ignore-not-running: true
 ```
 
+### Batching Inventory Report Posting
+
+Set upper limits for the content that can be contained in a single inventory report POST
+to Anchore Enterprise. If the inventory data is greater than the limit then the inventory
+report will be broken into smaller requests up to the limit size specified.
+
+```yaml
+inventory-report-limits:
+    namespaces: 0 # default of 0 means no limit
+```
+
 ### Anchore API configuration
 
 Use this section to configure the Anchore Enterprise API endpoint

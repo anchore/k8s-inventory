@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"time"
@@ -35,7 +36,7 @@ type channels struct {
 	stopper    chan struct{}
 }
 
-type AccountRoutedReports map[string]inventory.Report
+type AccountRoutedReports map[string][]inventory.Report
 
 func reportToStdout(report inventory.Report) error {
 	enc := json.NewEncoder(os.Stdout)
@@ -99,19 +100,22 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 		if err != nil {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
-			for account, report := range reports {
-				err := HandleReport(report, cfg, account)
-				if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
-					// Retry with default account
-					retryAccount := cfg.AnchoreDetails.Account
-					if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
-						retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
+			for account, reportsForAccount := range reports {
+				for count, report := range reportsForAccount {
+					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
+					err := HandleReport(report, cfg, account)
+					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+						// Retry with default account
+						retryAccount := cfg.AnchoreDetails.Account
+						if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
+							retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
+						}
+						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
+						err = HandleReport(report, cfg, retryAccount)
 					}
-					log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-					err = HandleReport(report, cfg, retryAccount)
-				}
-				if err != nil {
-					log.Errorf("Failed to handle Inventory Report: %w", err)
+					if err != nil {
+						log.Errorf("Failed to handle Inventory Report: %w", err)
+					}
 				}
 			}
 		}
@@ -322,19 +326,43 @@ func GetAccountRoutedNamespaces(defaultAccount string, namespaces []inventory.Na
 	return accountRoutesForAllNamespaces
 }
 
+func GetNamespacesBatches(namespaces []inventory.Namespace, batchSize int) [][]inventory.Namespace {
+	batches := make([][]inventory.Namespace, 0)
+	if batchSize <= 0 {
+		return append(batches, namespaces)
+	}
+	for i := 0; i < len(namespaces); i += batchSize {
+		end := i + batchSize
+		if end > len(namespaces) {
+			end = len(namespaces)
+		}
+		batches = append(batches, namespaces[i:end])
+	}
+	return batches
+}
+
 func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) {
 	log.Info("Starting image inventory collection")
 
 	reports := AccountRoutedReports{}
+	batchSize := cfg.InventoryReportLimits.Namespaces
+	if batchSize > 0 {
+		log.Infof("Batching namespaces into groups of %d", batchSize)
+	}
 
 	namespaces, _ := GetAllNamespaces(cfg)
 
 	if len(cfg.AccountRoutes) == 0 && cfg.AccountRouteByNamespaceLabel.LabelKey == "" {
-		allNamespacesReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
-		if err != nil {
-			return AccountRoutedReports{}, err
+		for batchCount, batch := range GetNamespacesBatches(namespaces, batchSize) {
+			if batchSize > 0 {
+				log.Infof("Collecting batch %d of %d for account %s", batchCount+1, int(math.Ceil(float64(len(namespaces))/float64(batchSize))), cfg.AnchoreDetails.Account)
+			}
+			batchNamespacesReport, err := GetInventoryReportForNamespaces(cfg, batch)
+			if err != nil {
+				return AccountRoutedReports{}, err
+			}
+			reports[cfg.AnchoreDetails.Account] = append(reports[cfg.AnchoreDetails.Account], batchNamespacesReport)
 		}
-		reports[cfg.AnchoreDetails.Account] = allNamespacesReport
 	} else {
 		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(cfg.AnchoreDetails.Account, namespaces, cfg.AccountRoutes, cfg.AccountRouteByNamespaceLabel)
 
@@ -348,11 +376,16 @@ func GetInventoryReports(cfg *config.Application) (AccountRoutedReports, error) 
 
 		// Get inventory reports for each account
 		for account, namespaces := range accountRoutesForAllNamespaces {
-			accountReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
-			if err != nil {
-				return AccountRoutedReports{}, err
+			for batchCount, batch := range GetNamespacesBatches(namespaces, batchSize) {
+				if batchSize > 0 {
+					log.Infof("Collecting inventory batch %d of %d for account %s", batchCount+1, int(math.Ceil(float64(len(namespaces))/float64(batchSize))), account)
+				}
+				accountReport, err := GetInventoryReportForNamespaces(cfg, batch)
+				if err != nil {
+					return AccountRoutedReports{}, err
+				}
+				reports[account] = append(reports[account], accountReport)
 			}
-			reports[account] = accountReport
 		}
 	}
 
