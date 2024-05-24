@@ -160,8 +160,11 @@ func GetInventoryReportForNamespaces(
 	cfg *config.Application,
 	namespaces []inventory.Namespace,
 ) (inventory.Report, error) {
-	log.Info("Starting image inventory collection for specific namespaces")
-	log.Debugf("Namespaces: %v", namespaces)
+	nsNames := make([]string, 0)
+	for _, ns := range namespaces {
+		nsNames = append(nsNames, ns.Name)
+	}
+	log.Info("Starting inventory collection for namespaces: ", nsNames)
 
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
