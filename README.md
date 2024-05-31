@@ -173,7 +173,7 @@ anchore-k8s-inventory's helm chart is part of the [charts.anchore.io](https://ch
 
 ```sh
 helm repo add anchore https://charts.anchore.io
-helm install <release-name> -f <values.yaml> anchore/anchore-k8s-inventory
+helm install <release-name> -f <values.yaml> anchore/k8s-inventory
 ```
 
 A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/main/stable/k8s-inventory/values.yaml)
