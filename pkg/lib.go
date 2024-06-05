@@ -486,7 +486,7 @@ func processNamespace(
 		return
 	}
 
-	pods := inventory.ProcessPods(v1pods, ns.UID, nodes, cfg.MetadataCollection.Pods.Disable)
+	pods := inventory.ProcessPods(v1pods, ns.UID, nodes, cfg.MetadataCollection.Pods.Annotations, cfg.MetadataCollection.Pods.Labels, cfg.MetadataCollection.Pods.Disable)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,
