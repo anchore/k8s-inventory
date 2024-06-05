@@ -17,6 +17,7 @@
 .tmp/
 *.tmp
 coverage.txt
+cover.cov
 
 # Binaries for programs and plugins
 *.exe
