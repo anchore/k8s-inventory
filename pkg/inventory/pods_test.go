@@ -73,10 +73,12 @@ func TestFetchPodsInNamespace(t *testing.T) {
 
 func TestProcessPods(t *testing.T) {
 	type args struct {
-		pods            []v1.Pod
-		namespaceUID    string
-		nodes           map[string]Node
-		disableMetadata bool
+		pods               []v1.Pod
+		namespaceUID       string
+		nodes              map[string]Node
+		includeAnnotations []string
+		includeLabels      []string
+		disableMetadata    bool
 	}
 	tests := []struct {
 		name string
@@ -111,7 +113,9 @@ func TestProcessPods(t *testing.T) {
 						UID:  "test-node-uid",
 					},
 				},
-				disableMetadata: false,
+				includeAnnotations: []string{},
+				includeLabels:      []string{},
+				disableMetadata:    false,
 			},
 			want: []Pod{
 				{
@@ -156,7 +160,9 @@ func TestProcessPods(t *testing.T) {
 						UID:  "test-node-uid",
 					},
 				},
-				disableMetadata: true,
+				includeAnnotations: []string{},
+				includeLabels:      []string{},
+				disableMetadata:    true,
 			},
 			want: []Pod{
 				{
@@ -167,10 +173,59 @@ func TestProcessPods(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "successfully return pods with filtered annotations/labels",
+			args: args{
+				pods: []v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-pod",
+							UID:  "test-uid",
+							Annotations: map[string]string{
+								"test-annotation": "test-value",
+								"do-not-include":  "do-not-include",
+							},
+							Labels: map[string]string{
+								"test-label":     "test-value",
+								"do-not-include": "do-not-include",
+							},
+							Namespace: "test-namespace",
+						},
+						Spec: v1.PodSpec{
+							NodeName: "test-node",
+						},
+					},
+				},
+				namespaceUID: "namespace-uid-0000",
+				nodes: map[string]Node{
+					"test-node": {
+						Name: "test-node",
+						UID:  "test-node-uid",
+					},
+				},
+				includeAnnotations: []string{"test-.*"},
+				includeLabels:      []string{"test-.*"},
+				disableMetadata:    false,
+			},
+			want: []Pod{
+				{
+					Name:         "test-pod",
+					UID:          "test-uid",
+					NamespaceUID: "namespace-uid-0000",
+					NodeUID:      "test-node-uid",
+					Annotations: map[string]string{
+						"test-annotation": "test-value",
+					},
+					Labels: map[string]string{
+						"test-label": "test-value",
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.nodes, tt.args.disableMetadata)
+			got := ProcessPods(tt.args.pods, tt.args.namespaceUID, tt.args.nodes, tt.args.includeAnnotations, tt.args.includeLabels, tt.args.disableMetadata)
 			assert.Equal(t, tt.want, got)
 		})
 	}

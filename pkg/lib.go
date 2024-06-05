@@ -200,6 +200,8 @@ func GetInventoryReportForNamespaces(
 		client,
 		cfg.Kubernetes.RequestBatchSize,
 		cfg.Kubernetes.RequestTimeoutSeconds,
+		cfg.MetadataCollection.Nodes.Annotations,
+		cfg.MetadataCollection.Nodes.Labels,
 		cfg.MetadataCollection.Nodes.Disable,
 	)
 	if err != nil {
@@ -272,7 +274,9 @@ func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {
 
 	namespaces, err := inventory.FetchNamespaces(client,
 		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
-		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include, cfg.MetadataCollection.Namespace.Disable)
+		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include,
+		cfg.MetadataCollection.Namespace.Annotations, cfg.MetadataCollection.Namespace.Labels,
+		cfg.MetadataCollection.Namespace.Disable)
 	if err != nil {
 		return []inventory.Namespace{}, err
 	}
@@ -484,7 +488,7 @@ func processNamespace(
 		return
 	}
 
-	pods := inventory.ProcessPods(v1pods, ns.UID, nodes, cfg.MetadataCollection.Pods.Disable)
+	pods := inventory.ProcessPods(v1pods, ns.UID, nodes, cfg.MetadataCollection.Pods.Annotations, cfg.MetadataCollection.Pods.Labels, cfg.MetadataCollection.Pods.Disable)
 	containers := inventory.GetContainersFromPods(
 		v1pods,
 		cfg.IgnoreNotRunning,

@@ -419,16 +419,16 @@ Include only a subset of annotations/labels for each resource type or disable me
 ```yaml
 metadata-collection:
   nodes:
-    include-annotations: [] # List of annotations to include (explicit or regex)
-    include-labels: [] # List of labels to include (explicit or regex)
+    annotations: [] # List of annotations to include (explicit or regex)
+    labels: [] # List of labels to include (explicit or regex)
     disable: false # Remove all optional node metadata from the inventory report
   namespaces:
-    include-annotations: [] # List of annotations to include (explicit or regex)
-    include-labels: [] # List of labels to include (explicit or regex)
+    annotations: [] # List of annotations to include (explicit or regex)
+    labels: [] # List of labels to include (explicit or regex)
     disable: false # Remove all optional namespace metadata from the inventory report
   pods:
-    include-annotations: [] # List of annotations to include (explicit or regex)
-    include-labels: [] # List of labels to include (explicit or regex)
+    annotations: [] # List of annotations to include (explicit or regex)
+    labels: [] # List of labels to include (explicit or regex)
     disable: false # Remove all optional pod metadata from the inventory report
 ```
 

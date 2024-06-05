@@ -75,7 +75,7 @@ func FetchNamespaces(
 	c client.Client,
 	batchSize, timeout int64,
 	excludes, includes []string,
-	// annotations, labels []string,
+	includeAnnotations, includeLabels []string,
 	disableMetadata bool,
 ) ([]Namespace, error) {
 	defer tracker.TrackFunctionTime(time.Now(), "Fetching namespaces")
@@ -98,11 +98,14 @@ func FetchNamespaces(
 		for _, n := range list.Items {
 			if !excludeNamespace(exclusionChecklist, n.ObjectMeta.Name) {
 				if !disableMetadata {
+					annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
+					labels := processAnnotationsOrLabels(n.Labels, includeLabels)
+
 					nsMap[n.ObjectMeta.Name] = Namespace{
 						Name:        n.ObjectMeta.Name,
 						UID:         string(n.UID),
-						Annotations: n.Annotations,
-						Labels:      n.Labels,
+						Annotations: annotations,
+						Labels:      labels,
 					}
 				} else {
 					nsMap[n.ObjectMeta.Name] = Namespace{
