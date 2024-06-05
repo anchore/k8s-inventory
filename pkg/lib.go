@@ -200,6 +200,8 @@ func GetInventoryReportForNamespaces(
 		client,
 		cfg.Kubernetes.RequestBatchSize,
 		cfg.Kubernetes.RequestTimeoutSeconds,
+		cfg.MetadataCollection.Nodes.Annotations,
+		cfg.MetadataCollection.Nodes.Labels,
 		cfg.MetadataCollection.Nodes.Disable,
 	)
 	if err != nil {

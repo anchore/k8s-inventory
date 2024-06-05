@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func FetchNodes(c client.Client, batchSize, timeout int64, disableMetadata bool) (map[string]Node, error) {
+func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, includeLabels []string, disableMetadata bool) (map[string]Node, error) {
 	nodes := make(map[string]Node)
 
 	cont := ""
@@ -32,16 +32,18 @@ func FetchNodes(c client.Client, batchSize, timeout int64, disableMetadata bool)
 
 		for _, n := range list.Items {
 			if !disableMetadata {
+				annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
+				labels := processAnnotationsOrLabels(n.Labels, includeLabels)
 				nodes[n.ObjectMeta.Name] = Node{
 					Name:                    n.ObjectMeta.Name,
 					UID:                     string(n.UID),
-					Annotations:             n.Annotations,
+					Annotations:             annotations,
 					Arch:                    n.Status.NodeInfo.Architecture,
 					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
 					KernelVersion:           n.Status.NodeInfo.KernelVersion,
 					KubeProxyVersion:        n.Status.NodeInfo.KubeProxyVersion,
 					KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
-					Labels:                  n.Labels,
+					Labels:                  labels,
 					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
 				}
 			} else {
