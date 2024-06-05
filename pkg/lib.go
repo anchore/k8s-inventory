@@ -272,7 +272,9 @@ func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {
 
 	namespaces, err := inventory.FetchNamespaces(client,
 		cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds,
-		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include, cfg.MetadataCollection.Namespace.Disable)
+		cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include,
+		cfg.MetadataCollection.Namespace.Annotations, cfg.MetadataCollection.Namespace.Labels,
+		cfg.MetadataCollection.Namespace.Disable)
 	if err != nil {
 		return []inventory.Namespace{}, err
 	}
