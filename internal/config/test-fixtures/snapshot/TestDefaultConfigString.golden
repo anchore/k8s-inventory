@@ -5,6 +5,10 @@ log:
   levelopt: debug
   level: debug
   file: ./anchore-k8s-inventory.log
+anchore-registration:
+  registration-id: ""
+  integration-name: ""
+  integration-description: ""
 clioptions:
   configpath: ../../anchore-k8s-inventory.yaml
   verbosity: 0
@@ -44,6 +48,7 @@ runmode: 0
 mode: adhoc
 ignore-not-running: true
 polling-interval-seconds: 300
+health-report-interval-seconds: 60
 inventory-report-limits:
   namespaces: 0
 metadata-collection:

@@ -23,6 +23,7 @@ deploy:
         k8sInventory.quiet: false
         k8sInventory.verboseInventoryReports: true
         k8sInventory.pollingIntervalSeconds: 60
+        k8sInventory.healthReportIntervalSeconds: 60
         k8sInventory.anchore.url: "http://host.docker.internal:8228"
         k8sInventory.anchore.user: "admin"
         k8sInventory.anchore.password: "foobar"

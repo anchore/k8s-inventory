@@ -15,7 +15,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/anchore/k8s-inventory/pkg/mode"
 	"gopkg.in/yaml.v2"
 
 	"github.com/adrg/xdg"
@@ -24,6 +23,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/anchore/k8s-inventory/internal"
+	"github.com/anchore/k8s-inventory/pkg/mode"
 )
 
 const redacted = "******"
@@ -37,8 +37,9 @@ type CliOnlyOptions struct {
 // All Application configurations
 type Application struct {
 	ConfigPath                      string
-	Quiet                           bool    `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
-	Log                             Logging `mapstructure:"log" json:"log,omitempty" yaml:"log"`
+	Quiet                           bool                `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
+	Log                             Logging             `mapstructure:"log" json:"log,omitempty" yaml:"log"`
+	Registration                    RegistrationOptions `mapstructure:"anchore-registration" json:"anchore-registration,omitempty" yaml:"anchore-registration"`
 	CliOptions                      CliOnlyOptions
 	Dev                             Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
 	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
@@ -54,10 +55,17 @@ type Application struct {
 	Mode                            string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
 	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
 	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
+	HealthReportIntervalSeconds     int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
 	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
 	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
 	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
 	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
+}
+
+type RegistrationOptions struct {
+	RegistrationID         string `mapstructure:"registration-id" json:"registration-id,omitempty" yaml:"registration-id"`
+	IntegrationName        string `mapstructure:"integration-name" json:"integration-name,omitempty" yaml:"integration-name"`
+	IntegrationDescription string `mapstructure:"integration-description" json:"integration-description,omitempty" yaml:"integration-description"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
@@ -160,6 +168,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("kubernetes.request-batch-size", 100)
 	v.SetDefault("kubernetes.worker-pool-size", 100)
 	v.SetDefault("ignore-not-running", true)
+	v.SetDefault("health-report-interval-seconds", 60)
 	v.SetDefault("missing-registry-override", "")
 	v.SetDefault("missing-tag-policy.policy", "digest")
 	v.SetDefault("missing-tag-policy.tag", "UNKNOWN")

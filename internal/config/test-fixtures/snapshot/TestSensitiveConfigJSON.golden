@@ -5,6 +5,8 @@
         "level": "debug",
         "file": "./anchore-k8s-inventory.log"
     },
+    "anchore-registration": {
+    },
     "CliOptions": {
         "ConfigPath": "../../anchore-k8s-inventory.yaml",
         "Verbosity": 0
@@ -50,6 +52,7 @@
     "mode": "adhoc",
     "ignore-not-running": true,
     "polling-interval-seconds": 300,
+    "health-report-interval-seconds": 60,
     "inventory-report-limits": {},
     "metadata-collection": {
         "nodes": {},
