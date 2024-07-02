@@ -117,6 +117,9 @@ ignore-not-running: true
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
+# Only respected if mode is periodic
+health-report-interval-seconds: 60
+
 # Batch Request configuration
 inventory-report-limits:
   namespaces: 0 # default of 0 means no limit per report

@@ -54,6 +54,7 @@ type Application struct {
 	Mode                            string                `mapstructure:"mode"`
 	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running"`
 	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds"`
+	HealthPingIntervalSeconds       int                   `mapstructure:"health-report-interval-seconds"`
 	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits"`
 	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection"`
 	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore"`

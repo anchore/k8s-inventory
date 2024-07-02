@@ -4,9 +4,13 @@ k8s go SDK
 */package pkg
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/anchore/k8s-inventory/pkg/healthreporter"
+	intg "github.com/anchore/k8s-inventory/pkg/integration"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"regexp"
 	"time"
@@ -18,6 +22,7 @@ import (
 
 	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/anchore/k8s-inventory/internal/log"
+	internaltime "github.com/anchore/k8s-inventory/internal/time"
 	"github.com/anchore/k8s-inventory/pkg/client"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 	"github.com/anchore/k8s-inventory/pkg/logger"
@@ -49,7 +54,7 @@ func reportToStdout(report inventory.Report) error {
 	return nil
 }
 
-func HandleReport(report inventory.Report, cfg *config.Application, account string) error {
+func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryReportInfo, cfg *config.Application, account string) error {
 	if cfg.VerboseInventoryReports {
 		err := reportToStdout(report)
 		if err != nil {
@@ -76,6 +81,7 @@ func HandleReport(report inventory.Report, cfg *config.Application, account stri
 	}
 
 	if anchoreDetails.IsValid() {
+		reportInfo.SentAsUser = anchoreDetails.User
 		if err := reporter.Post(report, anchoreDetails); err != nil {
 			if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
 				return err
@@ -91,7 +97,7 @@ func HandleReport(report inventory.Report, cfg *config.Application, account stri
 
 // PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
-func PeriodicallyGetInventoryReport(cfg *config.Application) {
+func PeriodicallyGetInventoryReport(cfg *config.Application, gatedReportInfo *healthreporter.GatedReportInfo) {
 	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
@@ -101,21 +107,46 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
 			for account, reportsForAccount := range reports {
+				reportInfo := healthreporter.InventoryReportInfo{
+					Account:             account,
+					BatchSize:           len(reportsForAccount),
+					LastSuccessfulIndex: -1,
+					Batches:             make([]healthreporter.BatchInfo, 0),
+					HasErrors:           false,
+				}
 				for count, report := range reportsForAccount {
 					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
-					err := HandleReport(report, cfg, account)
+
+					reportInfo.ReportTimestamp = report.Timestamp
+					batchInfo := healthreporter.BatchInfo{
+						SendTimestamp: internaltime.Now().UTC(),
+						BatchIndex:    count + 1,
+					}
+
+					err := HandleReport(report, &reportInfo, cfg, account)
 					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+						// record this error for the health report even if the retry works
+						batchInfo.Error = fmt.Sprintf("%s (%s) | ", err.Error(), account)
+						reportInfo.HasErrors = true
+
 						// Retry with default account
 						retryAccount := cfg.AnchoreDetails.Account
 						if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
 							retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
 						}
 						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-						err = HandleReport(report, cfg, retryAccount)
+						err = HandleReport(report, &reportInfo, cfg, retryAccount)
 					}
 					if err != nil {
 						log.Errorf("Failed to handle Inventory Report: %w", err)
+						// append the error to any error that happened during a retry, so we record both failures
+						batchInfo.Error += err.Error()
+						reportInfo.HasErrors = true
+					} else {
+						reportInfo.LastSuccessfulIndex = count + 1
 					}
+					reportInfo.Batches = append(reportInfo.Batches, batchInfo)
+					healthreporter.SetReportInfoNoBlocking(account, count, reportInfo, gatedReportInfo)
 				}
 			}
 		}
@@ -509,4 +540,100 @@ func processNamespace(
 
 func SetLogger(logger logger.Logger) {
 	log.Log = logger
+}
+
+func GetIntegrationInfo(cfg *config.Application, namespace string, podName string) (intg.Integration, error) {
+	kubeconfig, err := client.GetKubeConfig(cfg)
+	if err != nil {
+		log.Errorf("Failed to get Kubernetes config: %w", err)
+		return intg.Integration{}, err
+	}
+
+	clientset, err := client.GetClientSet(kubeconfig)
+	if err != nil {
+		log.Errorf("failed to get k8s client set: %w", err)
+		return intg.Integration{}, err
+	}
+
+	k8sClient := client.Client{
+		Clientset: clientset,
+	}
+
+	opts := metav1.GetOptions{}
+	pod, err := k8sClient.Clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, opts)
+	if err != nil {
+		log.Errorf("failed to get pod: %w", err)
+		return intg.Integration{}, err
+	}
+	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
+	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
+	if err != nil {
+		log.Errorf("failed to get replica set: %w", err)
+		return intg.Integration{}, err
+	}
+	deploymentName := replicaSet.ObjectMeta.OwnerReferences[0].Name
+	deployment, err := k8sClient.Clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, opts)
+	if err != nil {
+		log.Errorf("failed to get deployment: %w", err)
+		return intg.Integration{}, err
+	}
+
+	version := deployment.Labels[intg.AppVersionLabel]
+	instanceId := fmt.Sprint("", deployment.ObjectMeta.UID)
+	accounts, dynamic_namespaces := GetAccountsAndNamespacesForAgent(cfg)
+	namespaces := intg.Namespaces{
+		Static:  make([]string, 0),
+		Dynamic: dynamic_namespaces,
+	}
+	instance := intg.Integration{
+		Id:   instanceId,
+		Type: intg.IntegrationType,
+		Name: deployment.Name,
+		// Description: 	 "",
+		Version: version,
+		// State: "", READ_ONLY
+		StartedAt:       internaltime.Now().UTC(),
+		Uptime:          internaltime.Duration{},
+		DefaultUsername: cfg.AnchoreDetails.User,
+		DefaultAccount:  cfg.AnchoreDetails.Account,
+		Accounts:        accounts,
+		Namespaces:      namespaces,
+		// TODO(Bob): Obfuscate passwords, private keys etc!!!!
+		Configuration: *cfg,
+		ClusterName:   cfg.KubeConfig.Cluster,
+		Namespace:     namespace,
+	}
+	return instance, nil
+}
+
+// GetAccountsAndNamespacesForAgent Determines accounts this agent managers using:
+//  1. config.yaml (under account-routes:)
+//  2. namespaces with label cfg.AccountRouteByNamespaceLabel.Label set to name of account
+func GetAccountsAndNamespacesForAgent(cfg *config.Application) ([]string, []string) {
+	accountSet := make(map[string]bool)
+
+	// pick up accounts that are explicitly listed in the config
+	for account, _ := range cfg.AccountRoutes {
+		accountSet[account] = true
+	}
+	namespaceObjects := make([]inventory.Namespace, 0)
+	if cfg.AccountRouteByNamespaceLabel.LabelKey != "" {
+		// pick up accounts that are specified by value of namespace label
+		namespaceObjects, _ = GetAllNamespaces(cfg)
+		for _, namespace := range namespaceObjects {
+			account, exists := namespace.Labels[cfg.AccountRouteByNamespaceLabel.LabelKey]
+			if exists && account != "" {
+				accountSet[account] = true
+			}
+		}
+	}
+	accounts := make([]string, 0, len(accountSet))
+	for account, _ := range accountSet {
+		accounts = append(accounts, account)
+	}
+	namespaces := make([]string, 0, len(namespaceObjects))
+	for _, namespaceObj := range namespaceObjects {
+		namespaces = append(namespaces, namespaceObj.Name)
+	}
+	return accounts, namespaces
 }
