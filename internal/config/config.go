@@ -10,13 +10,13 @@ are listed below in order of precedence:
 */package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/anchore/k8s-inventory/pkg/mode"
+	"gopkg.in/yaml.v2"
 
 	"github.com/adrg/xdg"
 	"github.com/mitchellh/go-homedir"
@@ -37,106 +37,106 @@ type CliOnlyOptions struct {
 // All Application configurations
 type Application struct {
 	ConfigPath                      string
-	Quiet                           bool    `mapstructure:"quiet"`
-	Log                             Logging `mapstructure:"log"`
+	Quiet                           bool    `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
+	Log                             Logging `mapstructure:"log" json:"log,omitempty" yaml:"log"`
 	CliOptions                      CliOnlyOptions
-	Dev                             Development                  `mapstructure:"dev"`
-	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig"`
-	Kubernetes                      KubernetesAPI                `mapstructure:"kubernetes"`
-	Namespaces                      []string                     `mapstructure:"namespaces"`
-	KubernetesRequestTimeoutSeconds int64                        `mapstructure:"kubernetes-request-timeout-seconds"`
-	NamespaceSelectors              NamespaceSelector            `mapstructure:"namespace-selectors"`
-	AccountRoutes                   AccountRoutes                `mapstructure:"account-routes"`
-	AccountRouteByNamespaceLabel    AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label"`
-	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override"`
-	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy"`
+	Dev                             Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
+	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
+	Kubernetes                      KubernetesAPI                `mapstructure:"kubernetes" json:"kubernetes,omitempty" yaml:"kubernetes"`
+	Namespaces                      []string                     `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
+	KubernetesRequestTimeoutSeconds int64                        `mapstructure:"kubernetes-request-timeout-seconds" json:"kubernetes-request-timeout-seconds,omitempty" yaml:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors              NamespaceSelector            `mapstructure:"namespace-selectors" json:"namespace-selectors,omitempty" yaml:"namespace-selectors"`
+	AccountRoutes                   AccountRoutes                `mapstructure:"account-routes" json:"account-routes,omitempty" yaml:"account-routes"`
+	AccountRouteByNamespaceLabel    AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label" json:"account-route-by-namespace-label,omitempty" yaml:"account-route-by-namespace-label"`
+	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override" json:"missing-registry-override,omitempty" yaml:"missing-registry-override"`
+	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy" json:"missing-tag-policy,omitempty" yaml:"missing-tag-policy"`
 	RunMode                         mode.Mode
-	Mode                            string                `mapstructure:"mode"`
-	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running"`
-	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds"`
-	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits"`
-	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection"`
-	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore"`
-	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports"`
+	Mode                            string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
+	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
+	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
+	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
+	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
+	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
+	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
 }
 
 // MissingTagConf details the policy for handling missing tags when reporting images
 type MissingTagConf struct {
-	Policy string `mapstructure:"policy"`
-	Tag    string `mapstructure:"tag,omitempty"`
+	Policy string `mapstructure:"policy" json:"policy,omitempty" yaml:"policy"`
+	Tag    string `mapstructure:"tag,omitempty" json:"tag,omitempty" yaml:"tag"`
 }
 
 // NamespaceSelector details the inclusion/exclusion rules for namespaces
 type NamespaceSelector struct {
-	Include     []string `mapstructure:"include"`
-	Exclude     []string `mapstructure:"exclude"`
-	IgnoreEmpty bool     `mapstructure:"ignore-empty"`
+	Include     []string `mapstructure:"include" json:"include,omitempty" yaml:"include"`
+	Exclude     []string `mapstructure:"exclude" json:"exclude,omitempty" yaml:"exclude"`
+	IgnoreEmpty bool     `mapstructure:"ignore-empty" json:"ignore-empty,omitempty" yaml:"ignore-empty"`
 }
 
 type AccountRoutes map[string]AccountRouteDetails
 
 type AccountRouteDetails struct {
-	User       string   `mapstructure:"user"`
-	Password   string   `mapstructure:"password"`
-	Namespaces []string `mapstructure:"namespaces"`
+	User       string   `mapstructure:"user" json:"user,omitempty" yaml:"user"`
+	Password   string   `mapstructure:"password" json:"password,omitempty" yaml:"password"`
+	Namespaces []string `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
 }
 
 type AccountRouteByNamespaceLabel struct {
-	LabelKey           string `mapstructure:"key"`
-	DefaultAccount     string `mapstructure:"default-account"`
-	IgnoreMissingLabel bool   `mapstructure:"ignore-missing-label"`
+	LabelKey           string `mapstructure:"key" json:"key,omitempty" yaml:"key"`
+	DefaultAccount     string `mapstructure:"default-account" json:"default-account,omitempty" yaml:"default-account"`
+	IgnoreMissingLabel bool   `mapstructure:"ignore-missing-label" json:"ignore-missing-label,omitempty" yaml:"ignore-missing-label"`
 }
 
 // KubernetesAPI details the configuration for interacting with the k8s api server
 type KubernetesAPI struct {
-	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds"`
-	RequestBatchSize      int64 `mapstructure:"request-batch-size"`
-	WorkerPoolSize        int   `mapstructure:"worker-pool-size"`
+	RequestTimeoutSeconds int64 `mapstructure:"request-timeout-seconds" json:"request-timeout-second,omitempty" yaml:"request-timeout-seconds"`
+	RequestBatchSize      int64 `mapstructure:"request-batch-size" json:"request-batch-size,omitempty" yaml:"request-batch-size"`
+	WorkerPoolSize        int   `mapstructure:"worker-pool-size" json:"worker-pool-size,omitempty" yaml:"worker-pool-size"`
 }
 
 // Details upper limits for the inventory report contents before splitting into batches
 type InventoryReportLimits struct {
-	Namespaces int `mapstructure:"namespaces"`
+	Namespaces int `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
 }
 
 type ResourceMetadata struct {
-	Annotations []string `json:"include-annotations"`
-	Labels      []string `json:"include-labels"`
-	Disable     bool     `json:"disable-all-metadata"`
+	Annotations []string `mapstructure:"include-annotations" json:"include-annotations,omitempty" yaml:"include-annotations"`
+	Labels      []string `mapstructure:"include-labels" json:"include-labels,omitempty" yaml:"include-labels"`
+	Disable     bool     `mapstructure:"disable" json:"disable,omitempty" yaml:"disable"`
 }
 
 type MetadataCollection struct {
-	Nodes     ResourceMetadata `mapstructure:"nodes"`
-	Namespace ResourceMetadata `mapstructure:"namespaces"`
-	Pods      ResourceMetadata `mapstructure:"pods"`
+	Nodes     ResourceMetadata `mapstructure:"nodes" json:"nodes,omitempty" yaml:"nodes"`
+	Namespace ResourceMetadata `mapstructure:"namespaces" json:"namespace,omitempty" yaml:"namespaces"`
+	Pods      ResourceMetadata `mapstructure:"pods" json:"pods,omitempty" yaml:"pods"`
 }
 
 // Information for posting in-use image details to Anchore (or any URL for that matter)
 type AnchoreInfo struct {
-	URL      string     `mapstructure:"url"`
-	User     string     `mapstructure:"user"`
-	Password string     `mapstructure:"password"`
-	Account  string     `mapstructure:"account"`
-	HTTP     HTTPConfig `mapstructure:"http"`
+	URL      string     `mapstructure:"url" json:"url,omitempty" yaml:"url"`
+	User     string     `mapstructure:"user" json:"user,omitempty" yaml:"user"`
+	Password string     `mapstructure:"password" json:"password,omitempty" yaml:"password"`
+	Account  string     `mapstructure:"account" json:"account,omitempty" yaml:"account"`
+	HTTP     HTTPConfig `mapstructure:"http" json:"http,omitempty" yaml:"http"`
 }
 
 // Configurations for the HTTP Client itself (net/http)
 type HTTPConfig struct {
-	Insecure       bool `mapstructure:"insecure"`
-	TimeoutSeconds int  `mapstructure:"timeout-seconds"`
+	Insecure       bool `mapstructure:"insecure" json:"insecure,omitempty" yaml:"insecure"`
+	TimeoutSeconds int  `mapstructure:"timeout-seconds" json:"timeout-seconds,omitempty" yaml:"timeout-seconds"`
 }
 
 // Logging Configuration
 type Logging struct {
-	Structured   bool `mapstructure:"structured"`
+	Structured   bool `mapstructure:"structured" json:"structured,omitempty" yaml:"structured"`
 	LevelOpt     logrus.Level
-	Level        string `mapstructure:"level"`
-	FileLocation string `mapstructure:"file"`
+	Level        string `mapstructure:"level" json:"level,omitempty" yaml:"level"`
+	FileLocation string `mapstructure:"file" json:"file,omitempty" yaml:"file"`
 }
 
 // Development Configuration (only profile-cpu at the moment)
 type Development struct {
-	ProfileCPU bool `mapstructure:"profile-cpu"`
+	ProfileCPU bool `mapstructure:"profile-cpu" json:"profile-cpu,omitempty" yaml:"profile-cpu"`
 }
 
 // Return whether or not AnchoreDetails are specified
@@ -334,21 +334,6 @@ func readConfig(v *viper.Viper, configPath string) error {
 }
 
 func (cfg Application) String() string {
-	// redact sensitive information
-	// Note: If the configuration grows to have more redacted fields it would be good to refactor this into something that
-	// is more dynamic based on a property or list of "sensitive" fields
-	if cfg.AnchoreDetails.Password != "" {
-		cfg.AnchoreDetails.Password = redacted
-	}
-
-	if cfg.KubeConfig.User.PrivateKey != "" {
-		cfg.KubeConfig.User.PrivateKey = redacted
-	}
-
-	if cfg.KubeConfig.User.Token != "" {
-		cfg.KubeConfig.User.Token = redacted
-	}
-
 	// yaml is pretty human friendly (at least when compared to json)
 	appCfgStr, err := yaml.Marshal(&cfg)
 	if err != nil {
@@ -356,4 +341,38 @@ func (cfg Application) String() string {
 	}
 
 	return string(appCfgStr)
+}
+
+func (anchore AnchoreInfo) MarshalJSON() ([]byte, error) {
+	type anchoreInfoAlias AnchoreInfo // prevent recursion
+
+	aIA := anchoreInfoAlias(anchore)
+	if aIA.Password != "" {
+		aIA.Password = redacted
+	}
+	return json.Marshal(aIA)
+}
+
+func (anchore AnchoreInfo) MarshalYAML() (interface{}, error) {
+	if anchore.Password != "" {
+		anchore.Password = redacted
+	}
+	return anchore, nil
+}
+
+func (aRD AccountRouteDetails) MarshalJSON() ([]byte, error) {
+	type AccountRouteDetailsAlias AccountRouteDetails // prevent recursion
+
+	aRDA := AccountRouteDetailsAlias(aRD)
+	if aRDA.Password != "" {
+		aRDA.Password = redacted
+	}
+	return json.Marshal(aRDA)
+}
+
+func (aRD AccountRouteDetails) MarshalYAML() (interface{}, error) {
+	if aRD.Password != "" {
+		aRD.Password = redacted
+	}
+	return aRD, nil
 }

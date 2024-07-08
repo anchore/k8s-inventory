@@ -4,67 +4,67 @@ log:
   structured: false
   levelopt: panic
   level: ""
-  filelocation: ""
+  file: ""
 clioptions:
   configpath: ""
   verbosity: 0
 dev:
-  profilecpu: false
+  profile-cpu: false
 kubeconfig:
   path: ""
   cluster: ""
-  clustercert: ""
+  cluster-cert: ""
   server: ""
   user:
     userconftype: 0
-    userconf: ""
-    clientcert: ""
-    privatekey: ""
+    type: ""
+    client-cert: ""
+    private-key: ""
     token: ""
 kubernetes:
-  requesttimeoutseconds: 0
-  requestbatchsize: 0
-  workerpoolsize: 0
+  request-timeout-seconds: 0
+  request-batch-size: 0
+  worker-pool-size: 0
 namespaces: []
-kubernetesrequesttimeoutseconds: 0
-namespaceselectors:
+kubernetes-request-timeout-seconds: 0
+namespace-selectors:
   include: []
   exclude: []
-  ignoreempty: false
-accountroutes: {}
-accountroutebynamespacelabel:
-  labelkey: ""
-  defaultaccount: ""
-  ignoremissinglabel: false
-missingregistryoverride: ""
-missingtagpolicy:
+  ignore-empty: false
+account-routes: {}
+account-route-by-namespace-label:
+  key: ""
+  default-account: ""
+  ignore-missing-label: false
+missing-registry-override: ""
+missing-tag-policy:
   policy: ""
   tag: ""
 runmode: 0
 mode: ""
-ignorenotrunning: false
-pollingintervalseconds: 0
-inventoryreportlimits:
+ignore-not-running: false
+polling-interval-seconds: 0
+inventory-report-limits:
   namespaces: 0
-metadatacollection:
+metadata-collection:
   nodes:
-    annotations: []
-    labels: []
+    include-annotations: []
+    include-labels: []
     disable: false
-  namespace:
-    annotations: []
-    labels: []
+  namespaces:
+    include-annotations: []
+    include-labels: []
     disable: false
   pods:
-    annotations: []
-    labels: []
+    include-annotations: []
+    include-labels: []
     disable: false
-anchoredetails:
+anchore:
   url: ""
   user: ""
   password: ""
   account: ""
   http:
     insecure: false
-    timeoutseconds: 0
-verboseinventoryreports: false
+    timeout-seconds: 0
+verbose-inventory-reports: false

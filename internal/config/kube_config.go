@@ -2,8 +2,8 @@ package config
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
-
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -11,20 +11,43 @@ import (
 
 // Defines how the Kubernetes Client should be configured. Note: Doesn't seem to work well with Env vars
 type KubeConf struct {
-	Path        string       `mapstructure:"path"`
-	Cluster     string       `mapstructure:"cluster"`
-	ClusterCert string       `mapstructure:"cluster-cert"`
-	Server      string       `mapstructure:"server"`
-	User        KubeConfUser `mapstructure:"user"`
+	Path        string       `mapstructure:"path" json:"path,omitempty" yaml:"path"`
+	Cluster     string       `mapstructure:"cluster" json:"cluster,omitempty" yaml:"cluster"`
+	ClusterCert string       `mapstructure:"cluster-cert" json:"cluster-cert,omitempty" yaml:"cluster-cert"`
+	Server      string       `mapstructure:"server" json:"server,omitempty" yaml:"server"`
+	User        KubeConfUser `mapstructure:"user" json:"user,omitempty" yaml:"user"`
 }
 
 // If we are explicitly providing authentication information (not from a kubeconfig file), we need this info
 type KubeConfUser struct {
 	UserConfType UserConf
-	UserConf     string `mapstructure:"type"`
-	ClientCert   string `mapstructure:"client-cert"`
-	PrivateKey   string `mapstructure:"private-key"`
-	Token        string `mapstructure:"token"`
+	UserConf     string `mapstructure:"type" json:"type,omitempty" yaml:"type"`
+	ClientCert   string `mapstructure:"client-cert" json:"client-cert,omitempty" yaml:"client-cert"`
+	PrivateKey   string `mapstructure:"private-key" json:"private-key,omitempty" yaml:"private-key"`
+	Token        string `mapstructure:"token" json:"token,omitempty" yaml:"token"`
+}
+
+func (user KubeConfUser) MarshalJSON() ([]byte, error) {
+	type kubeConfAlias KubeConfUser // prevent recursion
+
+	kCUA := kubeConfAlias(user)
+	if kCUA.PrivateKey != "" {
+		kCUA.PrivateKey = redacted
+	}
+	if kCUA.Token != "" {
+		kCUA.Token = redacted
+	}
+	return json.Marshal(kCUA)
+}
+
+func (user KubeConfUser) MarshalYAML() (interface{}, error) {
+	if user.PrivateKey != "" {
+		user.PrivateKey = redacted
+	}
+	if user.Token != "" {
+		user.Token = redacted
+	}
+	return user, nil
 }
 
 func (kubeConf *KubeConf) IsKubeConfigFromFile() bool {

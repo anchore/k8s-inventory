@@ -1,0 +1,66 @@
+{
+    "ConfigPath": "../../anchore-k8s-inventory.yaml",
+    "log": {
+        "LevelOpt": "debug",
+        "level": "debug",
+        "file": "./anchore-k8s-inventory.log"
+    },
+    "CliOptions": {
+        "ConfigPath": "../../anchore-k8s-inventory.yaml",
+        "Verbosity": 0
+    },
+    "dev": {},
+    "kubeconfig": {
+        "cluster": "docker-desktop",
+        "user": {
+            "UserConfType": 0,
+            "private-key": "******",
+            "token": "******"
+        }
+    },
+    "kubernetes": {
+        "request-timeout-second": 60,
+        "request-batch-size": 100,
+        "worker-pool-size": 100
+    },
+    "kubernetes-request-timeout-seconds": -1,
+    "namespace-selectors": {},
+    "account-routes": {
+        "account0": {
+            "user": "account0User",
+            "password": "******",
+            "namespaces": [
+                "ns-account0"
+            ]
+        },
+        "account2": {
+            "user": "account2User",
+            "password": "******",
+            "namespaces": [
+                "ns-account2"
+            ]
+        }
+    },
+    "account-route-by-namespace-label": {},
+    "missing-tag-policy": {
+        "policy": "digest",
+        "tag": "UNKNOWN"
+    },
+    "RunMode": 0,
+    "mode": "adhoc",
+    "ignore-not-running": true,
+    "polling-interval-seconds": 300,
+    "inventory-report-limits": {},
+    "metadata-collection": {
+        "nodes": {},
+        "namespace": {},
+        "pods": {}
+    },
+    "anchore": {
+        "password": "******",
+        "account": "admin",
+        "http": {
+            "timeout-seconds": 10
+        }
+    }
+}
