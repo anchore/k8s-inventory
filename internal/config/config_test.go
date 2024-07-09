@@ -1,10 +1,12 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"testing"
 
 	"github.com/anchore/go-testutils"
+	"github.com/nsf/jsondiff"
 	"github.com/spf13/viper"
 )
 
@@ -55,6 +57,16 @@ func TestSensitiveConfigString(t *testing.T) {
 	config.AnchoreDetails.Password = "foo"
 	config.KubeConfig.User.PrivateKey = "baz"
 	config.KubeConfig.User.Token = "bar"
+	config.AccountRoutes["account0"] = AccountRouteDetails{
+		User:       "account0User",
+		Password:   "tooSimple",
+		Namespaces: []string{"ns-account0"},
+	}
+	config.AccountRoutes["account2"] = AccountRouteDetails{
+		User:       "account2User",
+		Password:   "notmuchbetter",
+		Namespaces: []string{"ns-account2"},
+	}
 	actual := config.String()
 
 	if *update {
@@ -117,5 +129,44 @@ func TestAnchoreInfo_IsValid(t *testing.T) {
 				t.Errorf("AnchoreInfo.IsValid() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSensitiveConfigJSON(t *testing.T) {
+	config, err := LoadConfigFromFile(viper.GetViper(), &CliOnlyOptions{
+		ConfigPath: "../../anchore-k8s-inventory.yaml",
+	})
+	if err != nil {
+		t.Errorf("failed to load application config: \n\t%+v\n", err)
+	}
+	config.AnchoreDetails.Password = "foo"
+	config.KubeConfig.User.PrivateKey = "baz"
+	config.KubeConfig.User.Token = "bar"
+	config.AccountRoutes["account0"] = AccountRouteDetails{
+		User:       "account0User",
+		Password:   "tooSimple",
+		Namespaces: []string{"ns-account0"},
+	}
+	config.AccountRoutes["account2"] = AccountRouteDetails{
+		User:       "account2User",
+		Password:   "notmuchbetter",
+		Namespaces: []string{"ns-account2"},
+	}
+	actual, err := json.MarshalIndent(config, "", "    ")
+	if err != nil {
+		t.Errorf("failed to marshal AnchoreInfo object: \n\t%+v\n", err)
+	}
+
+	if *update {
+		t.Logf("Updating Golden file")
+		testutils.UpdateGoldenFileContents(t, actual)
+	}
+
+	expected := string(testutils.GetGoldenFileContents(t))
+	diffOpts := jsondiff.DefaultConsoleOptions()
+	res, _ := jsondiff.Compare([]byte(expected), actual, &diffOpts)
+
+	if res != jsondiff.FullMatch {
+		t.Errorf("Config string does not match expected\nactual: %s\nexpected: %s", actual, expected)
 	}
 }

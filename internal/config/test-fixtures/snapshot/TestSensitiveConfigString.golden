@@ -4,67 +4,77 @@ log:
   structured: false
   levelopt: debug
   level: debug
-  filelocation: ./anchore-k8s-inventory.log
+  file: ./anchore-k8s-inventory.log
 clioptions:
   configpath: ../../anchore-k8s-inventory.yaml
   verbosity: 0
 dev:
-  profilecpu: false
+  profile-cpu: false
 kubeconfig:
   path: ""
   cluster: docker-desktop
-  clustercert: ""
+  cluster-cert: ""
   server: ""
   user:
     userconftype: 0
-    userconf: ""
-    clientcert: ""
-    privatekey: '******'
+    type: ""
+    client-cert: ""
+    private-key: '******'
     token: '******'
 kubernetes:
-  requesttimeoutseconds: 60
-  requestbatchsize: 100
-  workerpoolsize: 100
+  request-timeout-seconds: 60
+  request-batch-size: 100
+  worker-pool-size: 100
 namespaces: []
-kubernetesrequesttimeoutseconds: -1
-namespaceselectors:
+kubernetes-request-timeout-seconds: -1
+namespace-selectors:
   include: []
   exclude: []
-  ignoreempty: false
-accountroutes: {}
-accountroutebynamespacelabel:
-  labelkey: ""
-  defaultaccount: ""
-  ignoremissinglabel: false
-missingregistryoverride: ""
-missingtagpolicy:
+  ignore-empty: false
+account-routes:
+  account0:
+    user: account0User
+    password: '******'
+    namespaces:
+    - ns-account0
+  account2:
+    user: account2User
+    password: '******'
+    namespaces:
+    - ns-account2
+account-route-by-namespace-label:
+  key: ""
+  default-account: ""
+  ignore-missing-label: false
+missing-registry-override: ""
+missing-tag-policy:
   policy: digest
   tag: UNKNOWN
 runmode: 0
 mode: adhoc
-ignorenotrunning: true
-pollingintervalseconds: 300
-inventoryreportlimits:
+ignore-not-running: true
+polling-interval-seconds: 300
+inventory-report-limits:
   namespaces: 0
-metadatacollection:
+metadata-collection:
   nodes:
-    annotations: []
-    labels: []
+    include-annotations: []
+    include-labels: []
     disable: false
-  namespace:
-    annotations: []
-    labels: []
+  namespaces:
+    include-annotations: []
+    include-labels: []
     disable: false
   pods:
-    annotations: []
-    labels: []
+    include-annotations: []
+    include-labels: []
     disable: false
-anchoredetails:
+anchore:
   url: ""
   user: ""
   password: '******'
   account: admin
   http:
     insecure: false
-    timeoutseconds: 10
-verboseinventoryreports: false
+    timeout-seconds: 10
+verbose-inventory-reports: false
