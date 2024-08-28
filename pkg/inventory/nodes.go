@@ -41,7 +41,6 @@ func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, i
 					Arch:                    n.Status.NodeInfo.Architecture,
 					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
 					KernelVersion:           n.Status.NodeInfo.KernelVersion,
-					KubeProxyVersion:        n.Status.NodeInfo.KubeProxyVersion,
 					KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
 					Labels:                  labels,
 					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
@@ -53,7 +52,6 @@ func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, i
 					Arch:                    n.Status.NodeInfo.Architecture,
 					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
 					KernelVersion:           n.Status.NodeInfo.KernelVersion,
-					KubeProxyVersion:        n.Status.NodeInfo.KubeProxyVersion,
 					KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
 					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
 				}
