@@ -175,16 +175,19 @@ func setNonCliDefaultValues(v *viper.Viper) {
 func LoadConfigFromFile(v *viper.Viper, cliOpts *CliOnlyOptions) (*Application, error) {
 	// the user may not have a config, and this is OK, we can use the default config + default cobra cli values instead
 	setNonCliDefaultValues(v)
+	cfgPath := ""
 	if cliOpts != nil {
-		_ = readConfig(v, cliOpts.ConfigPath)
-	} else {
-		_ = readConfig(v, "")
+		cfgPath = cliOpts.ConfigPath
+	}
+	err := readConfig(v, cfgPath)
+	if err != nil && cfgPath != "" {
+		return nil, err
 	}
 
 	config := &Application{
 		CliOptions: *cliOpts,
 	}
-	err := v.Unmarshal(config)
+	err = v.Unmarshal(config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
 	}
