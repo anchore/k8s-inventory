@@ -14,6 +14,17 @@ log:
 # enable/disable checking for application updates on startup
 check-for-app-update: true
 
+anchore-registration:
+  # The id to register the agent as with Enterprise, so Enterprise can map the agent to its integration uuid.
+  # If left unspecified, the agent will attempt to set registration-id to the uid of the K8s Deployment for the agent.
+  # If that fails (e.g., if the agent is not deployed on K8s), the agent will generate a UUID to use as registration-id.
+  registration-id:
+  # The name that the agent should have. If left unspecified, the agent will attempt to set it to the name of the K8s
+  # Deployment for the agent. If that fails it will be empty.
+  integration-name:
+  # A short description for the agent
+  integration-description:
+
 kubeconfig:
   path:
   cluster: docker-desktop
@@ -116,6 +127,9 @@ ignore-not-running: true
 
 # Only respected if mode is periodic
 polling-interval-seconds: 300
+
+# Only respected if mode is periodic
+health-report-interval-seconds: 60
 
 # Batch Request configuration
 inventory-report-limits:

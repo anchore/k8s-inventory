@@ -5,7 +5,9 @@ go 1.22.5
 require (
 	github.com/adrg/xdg v0.5.0
 	github.com/anchore/go-testutils v0.0.0-20200925183923-d5f45b0d3c04
+	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
+	github.com/hashicorp/go-version v1.7.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1
 	github.com/sirupsen/logrus v1.9.3
@@ -33,7 +35,6 @@ require (
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect

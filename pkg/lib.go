@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	jstime "github.com/anchore/k8s-inventory/internal/time"
+	"github.com/anchore/k8s-inventory/pkg/integration"
 	"os"
 	"regexp"
 	"time"
-
-	"github.com/anchore/k8s-inventory/pkg/reporter"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -19,8 +19,10 @@ import (
 	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/anchore/k8s-inventory/internal/log"
 	"github.com/anchore/k8s-inventory/pkg/client"
+	"github.com/anchore/k8s-inventory/pkg/healthreporter"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 	"github.com/anchore/k8s-inventory/pkg/logger"
+	"github.com/anchore/k8s-inventory/pkg/reporter"
 )
 
 type ReportItem struct {
@@ -49,7 +51,7 @@ func reportToStdout(report inventory.Report) error {
 	return nil
 }
 
-func HandleReport(report inventory.Report, cfg *config.Application, account string) error {
+func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryReportInfo, cfg *config.Application, account string) error {
 	if cfg.VerboseInventoryReports {
 		err := reportToStdout(report)
 		if err != nil {
@@ -76,6 +78,7 @@ func HandleReport(report inventory.Report, cfg *config.Application, account stri
 	}
 
 	if anchoreDetails.IsValid() {
+		reportInfo.SentAsUser = anchoreDetails.User
 		if err := reporter.Post(report, anchoreDetails); err != nil {
 			if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
 				return err
@@ -91,7 +94,14 @@ func HandleReport(report inventory.Report, cfg *config.Application, account stri
 
 // PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
-func PeriodicallyGetInventoryReport(cfg *config.Application) {
+//
+//nolint:funlen, gocognit
+func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Channels, gatedReportInfo *healthreporter.GatedReportInfo) {
+	// Wait for registration with Enterprise to be disabled or completed
+	<-ch.InventoryReportingEnabled
+	log.Info("Inventory reporting started")
+	healthReportingEnabled := false
+
 	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
@@ -101,20 +111,56 @@ func PeriodicallyGetInventoryReport(cfg *config.Application) {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
 			for account, reportsForAccount := range reports {
+				reportInfo := healthreporter.InventoryReportInfo{
+					Account:             account,
+					BatchSize:           len(reportsForAccount),
+					LastSuccessfulIndex: -1,
+					Batches:             make([]healthreporter.BatchInfo, 0),
+					HasErrors:           false,
+				}
 				for count, report := range reportsForAccount {
 					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
-					err := HandleReport(report, cfg, account)
+
+					reportInfo.ReportTimestamp = report.Timestamp
+					batchInfo := healthreporter.BatchInfo{
+						SendTimestamp: jstime.Datetime{Time: time.Now().UTC()},
+						BatchIndex:    count + 1,
+					}
+
+					err := HandleReport(report, &reportInfo, cfg, account)
 					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+						// record this error for the health report even if the retry works
+						batchInfo.Error = fmt.Sprintf("%s (%s) | ", err.Error(), account)
+						reportInfo.HasErrors = true
+
 						// Retry with default account
 						retryAccount := cfg.AnchoreDetails.Account
 						if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
 							retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
 						}
 						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-						err = HandleReport(report, cfg, retryAccount)
+						err = HandleReport(report, &reportInfo, cfg, retryAccount)
 					}
 					if err != nil {
 						log.Errorf("Failed to handle Inventory Report: %w", err)
+						// append the error to any error that happened during a retry, so we record both failures
+						batchInfo.Error += err.Error()
+						reportInfo.HasErrors = true
+					} else {
+						reportInfo.LastSuccessfulIndex = count + 1
+					}
+
+					select {
+					case isEnabled, isNotClosed := <-ch.HealthReportingEnabled:
+						if isNotClosed {
+							healthReportingEnabled = isEnabled
+						}
+						log.Infof("Health reporting enabled: %t", healthReportingEnabled)
+					default:
+					}
+					if healthReportingEnabled {
+						reportInfo.Batches = append(reportInfo.Batches, batchInfo)
+						healthreporter.SetReportInfoNoBlocking(account, count, reportInfo, gatedReportInfo)
 					}
 				}
 			}

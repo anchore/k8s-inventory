@@ -3,11 +3,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"runtime/pprof"
-
+	"github.com/anchore/k8s-inventory/pkg/healthreporter"
+	"github.com/anchore/k8s-inventory/pkg/integration"
 	"github.com/anchore/k8s-inventory/pkg/mode"
 	"github.com/anchore/k8s-inventory/pkg/reporter"
+	"os"
+	"runtime/pprof"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -47,7 +48,20 @@ var rootCmd = &cobra.Command{
 
 		switch appConfig.RunMode {
 		case mode.PeriodicPolling:
-			pkg.PeriodicallyGetInventoryReport(appConfig)
+			neverDone := make(chan bool, 1)
+
+			ch := integration.GetChannels()
+			gatedReportInfo := healthreporter.GetGatedReportInfo()
+
+			go healthreporter.PeriodicallySendHealthReport(appConfig, ch, gatedReportInfo)
+			go pkg.PeriodicallyGetInventoryReport(appConfig, ch, gatedReportInfo)
+
+			_, err := integration.PerformRegistration(appConfig, ch)
+			if err != nil {
+				os.Exit(1)
+			}
+
+			<-neverDone
 		default:
 			reports, err := pkg.GetInventoryReports(appConfig)
 			if appConfig.Dev.ProfileCPU {
@@ -58,10 +72,11 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			anErrorOccurred := false
+			reportInfo := healthreporter.InventoryReportInfo{}
 			for account, reportsForAccount := range reports {
 				for count, report := range reportsForAccount {
 					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
-					err = pkg.HandleReport(report, appConfig, account)
+					err = pkg.HandleReport(report, &reportInfo, appConfig, account)
 					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
 						// Retry with default account
 						retryAccount := appConfig.AnchoreDetails.Account
@@ -69,7 +84,7 @@ var rootCmd = &cobra.Command{
 							retryAccount = appConfig.AccountRouteByNamespaceLabel.DefaultAccount
 						}
 						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-						err = pkg.HandleReport(report, appConfig, retryAccount)
+						err = pkg.HandleReport(report, &reportInfo, appConfig, retryAccount)
 					}
 					if err != nil {
 						log.Errorf("Failed to handle Image Results: %+v", err)
