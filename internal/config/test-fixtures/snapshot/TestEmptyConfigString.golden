@@ -5,6 +5,10 @@ log:
   levelopt: panic
   level: ""
   file: ""
+anchore-registration:
+  registration-id: ""
+  integration-name: ""
+  integration-description: ""
 clioptions:
   configpath: ""
   verbosity: 0
@@ -44,6 +48,7 @@ runmode: 0
 mode: ""
 ignore-not-running: false
 polling-interval-seconds: 0
+health-report-interval-seconds: 0
 inventory-report-limits:
   namespaces: 0
 metadata-collection:
