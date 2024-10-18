@@ -3,7 +3,7 @@ module github.com/anchore/k8s-inventory
 go 1.22.5
 
 require (
-	github.com/adrg/xdg v0.5.0
+	github.com/adrg/xdg v0.5.1
 	github.com/anchore/go-testutils v0.0.0-20200925183923-d5f45b0d3c04
 	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
@@ -69,7 +69,7 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
