@@ -178,6 +178,45 @@ helm install <release-name> -f <values.yaml> anchore/k8s-inventory
 
 A basic values file can always be found [here](https://github.com/anchore/anchore-charts/tree/main/stable/k8s-inventory/values.yaml)
 
+## The anchore-k8s-inventory agent as an Enterprise Integration
+In the Enterprise `v5.11.0` release, Enterprise provides the ability for k8s-inventory to register and provide health 
+reporting. This allows Enterprise to track the status of the agents and expose that information to administrators.
+In the API that Enterprise provides for this feature, the entities are referred to as Integrations. Hence, the
+anchore-k8s-inventory agent is a type of Integration.
+
+Before an agent can start sending health reports, it needs to register with Enterprise. This is a handshake whereby
+the agent presents itself to Enterprise. The registration contains information such as type of integration, its name, 
+when it was started, uptime, how often it will send health reports etc. Some of the properties are optional such as the 
+'description' property.
+
+When the agent registers it is assigned an integration uuid by Enterprise. This uuid is then used for all API operations 
+that target that particular integration instance. Hence, when the agent sends its health reports to Enterprise, it 
+makes a REST API call to a URL that includes the integration uuid.
+
+### Registering as integration
+When the agent registers with Enterprise, the registration will include a `registration_id` and a 
+`registration_instance_id`. These are used by Enterprise to look up the integration uuid for the agent.
+If it is the first time the agent registers, no integration `uuid` will exist so Enterprise will create one and store the
+association between the integration uuid and `<registration_id, registration_instance_id>` in its database. For 
+subsequent re-registrations (e.g., if the agent pod is restarted), the association will allow Enterprise to return the
+integration `uuid` created in the earlier registration. Hence, as long as the 
+`<registration_id, registration_instance_id>` pair remains the same, Enterprise will consider it to be the same 
+integration instance. The reason a value pair is needed is that integrations like the `anchore_k8s_inventory` agent can
+be deployed as multiple replicas (in the case of K8s Deployment). Enterprise must be able to differentiate between the
+agent replica instances. A value pair with sensibly chosen values makes that possible.
+
+The `registration_id` can be set via configuration (see the Configuration section below).
+
+Only the agent itself can set the `registration_instance_id` value. It will set it to the hostname where the agent runs 
+(or if its empty, generate a uuid and use that value).
+
+### Backwards compatibility 
+If the agent interacts with an Enterprise deployment that does not support Integration registration and health
+reporting (i.e., Enterprise releases < `v5.11.0`), it will skip registration, disable health reporting and then let
+inventory reporting continue like in pre-`v1.7.0` releases. The agent will periodically check if Enterprise has been
+upgraded to `v5.11.0` or later and perform registration and enable health reporting in such cases. No restart of the
+agent is required for this to happen.
+
 ## Configuration
 ```yaml
 # same as -q ; suppress all output (except for the inventory results)
@@ -209,6 +248,23 @@ kubeconfig:
 
 # enable/disable printing inventory reports to stdout
 verbose-inventory-reports: false
+```
+
+### Integration registration
+Configure values for the registration of the agent as an Integration.
+The `registration_id` can preferably be left empty if the Anchore helm charts`k8s-inventory v0.5.0` or later are used.
+If explicitly set in the configuration it is advisable to use some tool that can generate uuids to ensure uniqueness.
+```yaml
+anchore-registration:
+  # The id to register the agent as with Enterprise, so Enterprise can map the agent to its integration uuid.
+  # If left unspecified, the agent will attempt to set registration-id to the uid of the K8s Deployment for the agent.
+  # If that fails (e.g., if the agent is not deployed on K8s), the agent will generate a UUID to use as registration-id.
+  registration-id:
+  # The name that the agent should have. If left unspecified, the agent will attempt to set it to the name of the K8s
+  # Deployment for the agent. If that fails it will be empty.
+  integration-name:
+  # A short description for the agent
+  integration-description:
 ```
 
 ### Namespace selection
@@ -446,6 +502,11 @@ anchore:
     insecure: true
     timeout-seconds: 10
 ```
+
+## Support for Integration registration and health reporting (v1.7.0)
+From `v1.7.0`, anchore-k8s-inventory will attempt to register as an integration with Enterprise and send health reports
+to allow Enterprise to track its status. This requires Enterprise release `v5.11.0` or later but the agent will work with
+older versions of Enterprise. However, it will only perform the inventory reporting with those Enterprise deployments.
 
 ## Behavior change (v0.5.0) (formerly KAI) 
 
