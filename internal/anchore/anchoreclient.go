@@ -11,6 +11,7 @@ import (
 	"github.com/anchore/k8s-inventory/internal/tracker"
 	"github.com/h2non/gock"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -225,11 +226,26 @@ func ServerIsOffline(err error) bool {
 		return true
 	}
 
-	if errors.Is(err, syscall.ECONNREFUSED) {
-		return true
+	offlineErrors := []error{
+		syscall.ENETDOWN,
+		syscall.ENETUNREACH,
+		syscall.ENETRESET,
+		syscall.ECONNABORTED,
+		syscall.ECONNRESET,
+		syscall.ETIMEDOUT,
+		syscall.ECONNREFUSED,
+		syscall.EHOSTDOWN,
+		syscall.EHOSTUNREACH,
 	}
 
-	if errors.Is(err, syscall.ECONNRESET) {
+	for _, e := range offlineErrors {
+		if errors.Is(err, e) {
+			return true
+		}
+	}
+
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
 		return true
 	}
 

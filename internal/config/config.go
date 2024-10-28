@@ -265,6 +265,10 @@ func (cfg *Application) Build() error {
 
 	cfg.handleBackwardsCompatibility()
 
+	if cfg.HealthReportIntervalSeconds < 30 || cfg.HealthReportIntervalSeconds > 600 {
+		return fmt.Errorf("health-report-interval-seconds must be between 30 and 600")
+	}
+
 	return nil
 }
 

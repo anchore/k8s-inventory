@@ -83,6 +83,44 @@ var (
 		Err: &httpError{err: "net/http: timeout awaiting response headers", timeout: true},
 	}
 
+	networkDownError = url.Error{
+		Op:  "Post",
+		URL: "http://127.0.0.1:8228/v2/system/integrations/registration",
+		Err: &net.OpError{
+			Op:     "dial",
+			Net:    "tcp",
+			Source: nil,
+			Addr: &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 8228,
+				Zone: "",
+			},
+			Err: &os.SyscallError{
+				Syscall: "connect",
+				Err:     syscall.ENETDOWN,
+			},
+		},
+	}
+
+	networkUnreachableError = url.Error{
+		Op:  "Post",
+		URL: "http://127.0.0.1:8228/v2/system/integrations/registration",
+		Err: &net.OpError{
+			Op:     "dial",
+			Net:    "tcp",
+			Source: nil,
+			Addr: &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 8228,
+				Zone: "",
+			},
+			Err: &os.SyscallError{
+				Syscall: "connect",
+				Err:     syscall.ENETUNREACH,
+			},
+		},
+	}
+
 	connectionRefusedError = url.Error{
 		Op:  "Post",
 		URL: "http://127.0.0.1:8228/v2/system/integrations/registration",
@@ -121,6 +159,20 @@ var (
 			Err: &os.SyscallError{
 				Syscall: "read",
 				Err:     syscall.ECONNRESET,
+			},
+		},
+	}
+
+	dnsError = url.Error{
+		Op:  "Post",
+		URL: "http://doesnotexist:8228/v2/system/integrations/registration",
+		Err: &net.OpError{
+			Op:  "read",
+			Net: "tcp",
+			Err: &net.DNSError{
+				Err:        "no such host",
+				Name:       "http://doesnotexist:8228/v2/system/integrations/registration",
+				IsNotFound: true,
 			},
 		},
 	}
@@ -503,6 +555,16 @@ func TestAnchoreIsOffline(t *testing.T) {
 		want bool
 	}{
 		{
+			name: "Network unreachable returns true",
+			err:  &networkUnreachableError,
+			want: true,
+		},
+		{
+			name: "Network down returns true",
+			err:  &networkDownError,
+			want: true,
+		},
+		{
 			name: "Connection timeout returns true",
 			err:  &connectionTimeoutError,
 			want: true,
@@ -515,6 +577,11 @@ func TestAnchoreIsOffline(t *testing.T) {
 		{
 			name: "Connection reset errorMsg returns true",
 			err:  &connectionResetError,
+			want: true,
+		},
+		{
+			name: "DNSError returns true",
+			err:  &dnsError,
 			want: true,
 		},
 		{
