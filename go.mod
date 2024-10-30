@@ -3,7 +3,7 @@ module github.com/anchore/k8s-inventory
 go 1.22.5
 
 require (
-	github.com/adrg/xdg v0.5.1
+	github.com/adrg/xdg v0.5.2
 	github.com/anchore/go-testutils v0.0.0-20200925183923-d5f45b0d3c04
 	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
