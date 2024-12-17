@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/anchore/k8s-inventory/pkg/client"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"time"
 
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
@@ -96,7 +97,7 @@ type _Now func() time.Time
 func PerformRegistration(appConfig *config.Application, ch Channels) (*Integration, error) {
 	defer closeChannels(ch)
 
-	_, err := awaitVersion(appConfig.AnchoreDetails, ch, -1, 2*time.Second, 24*time.Hour)
+	_, err := awaitVersion(appConfig.AnchoreDetails, ch, -1, 2*time.Second, 1*time.Hour)
 	if err != nil {
 		return nil, err
 	}
