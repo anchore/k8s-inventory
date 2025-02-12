@@ -7,11 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	jstime "github.com/anchore/k8s-inventory/internal/time"
-	"github.com/anchore/k8s-inventory/pkg/integration"
 	"os"
 	"regexp"
 	"time"
+
+	jstime "github.com/anchore/k8s-inventory/internal/time"
+	"github.com/anchore/k8s-inventory/pkg/integration"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -95,7 +96,7 @@ func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryR
 // PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
 //
-//nolint:funlen, gocognit
+//nolint:gocognit
 func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Channels, gatedReportInfo *healthreporter.GatedReportInfo) {
 	// Wait for registration with Enterprise to be disabled or completed
 	<-ch.InventoryReportingEnabled
