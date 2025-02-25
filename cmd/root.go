@@ -3,12 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"runtime/pprof"
+
 	"github.com/anchore/k8s-inventory/pkg/healthreporter"
 	"github.com/anchore/k8s-inventory/pkg/integration"
 	"github.com/anchore/k8s-inventory/pkg/mode"
 	"github.com/anchore/k8s-inventory/pkg/reporter"
-	"os"
-	"runtime/pprof"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -40,7 +41,7 @@ var rootCmd = &cobra.Command{
 		if len(args) > 0 {
 			err := cmd.Help()
 			if err != nil {
-				log.Errorf(err.Error())
+				log.Error(err.Error())
 				os.Exit(1)
 			}
 			os.Exit(1)
