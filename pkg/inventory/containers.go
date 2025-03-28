@@ -29,7 +29,6 @@ func getRegistryOverrideNormalisedImageTag(imageTag, missingRegistryOverride str
 	return imageTag
 }
 
-//nolint:funlen
 func getContainersInPod(pod v1.Pod, missingRegistryOverride, missingTagPolicy, dummyTag string) []Container {
 	// Look at both status/spec for init and regular containers
 	// Must use status when looking at containers in order to obtain the container ID
