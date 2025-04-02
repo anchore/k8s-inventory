@@ -2,6 +2,11 @@ package healthreporter
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
 	jstime "github.com/anchore/k8s-inventory/internal/time"
@@ -9,10 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"reflect"
-	"testing"
-	"time"
 )
 
 const mutexLocked = int64(1 << iota) // mutex is locked
@@ -197,8 +198,22 @@ func TestGetAccountReportInfoBlockingWhenNotObtainingLockExpiredUnaffected(t *te
 	assert.Contains(t, gatedReportInfo.AccountInventoryReports, reportInfo.Account)
 	assert.Contains(t, gatedReportInfo.AccountInventoryReports, reportInfoExpired.Account)
 	// check mutex is still locked after operation
-	mutexState := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w").FieldByName("state")
-	assert.Equal(t, mutexState.Int()&mutexLocked, mutexLocked)
+	wField := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w")
+	if wField.IsValid() {
+		stateField := wField.FieldByName("state")
+		if stateField.IsValid() {
+			if stateField.Kind() == reflect.Int {
+				assert.Equal(t, stateField.Int()&mutexLocked, mutexLocked)
+			} else {
+				t.Errorf("Expected field 'state' to be of type int, but got %s", stateField.Kind())
+			}
+		} else {
+			// We don't want to error here as we're expecting one empty struct to be returned from go 1.24 onwards
+			t.Logf("Field 'state' does not exist in the 'w' field")
+		}
+	} else {
+		t.Errorf("Field 'w' does not exist in the AccessGate struct")
+	}
 }
 
 func TestSetReportInfoNoBlockingSetsWhenObtainingLock(t *testing.T) {
@@ -213,7 +228,22 @@ func TestSetReportInfoNoBlockingSetsWhenObtainingLock(t *testing.T) {
 	assert.Equal(t, reportInfo, gatedReportInfo.AccountInventoryReports[accountName])
 	// check mutex is unlocked after operation
 	mutexState := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w").FieldByName("state")
-	assert.Equal(t, mutexState.Int()&mutexLocked, int64(0))
+	wField := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w")
+	if wField.IsValid() {
+		stateField := wField.FieldByName("state")
+		if stateField.IsValid() {
+			if stateField.Kind() == reflect.Int {
+				assert.Equal(t, mutexState.Int()&mutexLocked, int64(0))
+			} else {
+				t.Errorf("Expected field 'state' to be of type int, but got %s", stateField.Kind())
+			}
+		} else {
+			// We don't want to error here as we're expecting one empty struct to be returned from go 1.24 onwards
+			t.Logf("Field 'state' does not exist in the 'w' field")
+		}
+	} else {
+		t.Errorf("Field 'w' does not exist in the AccessGate struct")
+	}
 }
 
 func TestSetReportInfoNoBlockingSkipsWhenLockAlreadyTaken(t *testing.T) {
@@ -230,5 +260,20 @@ func TestSetReportInfoNoBlockingSkipsWhenLockAlreadyTaken(t *testing.T) {
 	assert.NotContains(t, gatedReportInfo.AccountInventoryReports, accountName)
 	// check mutex is still locked after operation
 	mutexState := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w").FieldByName("state")
-	assert.Equal(t, mutexState.Int()&mutexLocked, mutexLocked)
+	wField := reflect.ValueOf(&gatedReportInfo.AccessGate).Elem().FieldByName("w")
+	if wField.IsValid() {
+		stateField := wField.FieldByName("state")
+		if stateField.IsValid() {
+			if stateField.Kind() == reflect.Int {
+				assert.Equal(t, mutexState.Int()&mutexLocked, mutexLocked)
+			} else {
+				t.Errorf("Expected field 'state' to be of type int, but got %s", stateField.Kind())
+			}
+		} else {
+			// We don't want to error here as we're expecting one empty struct to be returned from go 1.24 onwards
+			t.Logf("Field 'state' does not exist in the 'w' field")
+		}
+	} else {
+		t.Errorf("Field 'w' does not exist in the AccessGate struct")
+	}
 }
