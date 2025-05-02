@@ -309,9 +309,19 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 		registrationID = newUUID().String()
 	}
 
-	if name != "" {
-		log.Debugf("Using registration_instance_id: %s", name)
+	replicaCount, err := getReplicaCountFromK8s(k8sClient, namespace, name)
+	if err != nil {
+		log.Errorf("Failed to get replica count from K8s: %v", err)
+	}
+
+	log.Debugf("Determined replica count from K8s: %d", replicaCount)
+
+	if replicaCount > 1 {
+		log.Debugf("Multiple replicas found using registration_instance_id: %s", instanceName)
 		registrationInstanceID = name
+	} else if instanceName != "" {
+		log.Debugf("Using registration_instance_id: %s", instanceName)
+		registrationInstanceID = instanceName
 	} else {
 		log.Debugf("Generating UUIDv4 to use as registration_instance_id")
 		registrationInstanceID = newUUID().String()
@@ -383,6 +393,26 @@ func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName 
 	log.Debugf("Determined integration values for agent from K8s, registration_id: %s, instance_name: %s, appVersion: %s",
 		registrationID, instanceName, appVersion)
 	return registrationID, instanceName, appVersion
+}
+
+func getReplicaCountFromK8s(k8sClient *client.Client, namespace string, podName string) (int32, error) {
+	if k8sClient == nil {
+		log.Errorf("Kubernetes client not initialized. Unable to interact with K8s cluster.")
+		return 0, fmt.Errorf("kubernetes client not initialized")
+	}
+	opts := metav1.GetOptions{}
+	pod, err := k8sClient.Clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, opts)
+	if err != nil {
+		log.Errorf("failed to get pod: %v", err)
+		return 0, err
+	}
+	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
+	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
+	if err != nil {
+		log.Errorf("failed to get replica set: %v", err)
+		return 0, err
+	}
+	return *replicaSet.Spec.Replicas, nil
 }
 
 func getAccountsAndNamespacesForAgent(appConfig *config.Application) ([]string, []string) {

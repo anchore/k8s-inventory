@@ -2,6 +2,15 @@ package integration
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"slices"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
 	jstime "github.com/anchore/k8s-inventory/internal/time"
@@ -13,14 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"slices"
-	"syscall"
-	"testing"
-	"time"
 )
 
 var (
