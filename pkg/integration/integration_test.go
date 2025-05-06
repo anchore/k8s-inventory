@@ -2,6 +2,15 @@ package integration
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"slices"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
 	jstime "github.com/anchore/k8s-inventory/internal/time"
@@ -13,14 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"slices"
-	"syscall"
-	"testing"
-	"time"
 )
 
 var (
@@ -605,10 +606,11 @@ func TestGetRegistrationInfo(t *testing.T) {
 	timestamps := []time.Time{time.Now()}
 
 	type args struct {
-		config    *config.Application
-		c         *client.Client
-		namespace string
-		name      string
+		config       *config.Application
+		c            *client.Client
+		namespace    string
+		name         string
+		replicaCount int32
 	}
 	tests := []struct {
 		name string
@@ -632,9 +634,10 @@ func TestGetRegistrationInfo(t *testing.T) {
 					},
 					HealthReportIntervalSeconds: 60,
 				},
-				c:         nil,
-				namespace: "test-namespace",
-				name:      "",
+				c:            nil,
+				namespace:    "test-namespace",
+				name:         "",
+				replicaCount: 1,
 			},
 			want: &Registration{
 				RegistrationID:         uuids[0].String(),
@@ -676,9 +679,10 @@ func TestGetRegistrationInfo(t *testing.T) {
 					},
 					HealthReportIntervalSeconds: 60,
 				},
-				c:         nil,
-				namespace: "test-namespace",
-				name:      "1111223344",
+				c:            nil,
+				namespace:    "test-namespace",
+				name:         "1111223344",
+				replicaCount: 0,
 			},
 			want: &Registration{
 				RegistrationID:         "test-registration-id",
@@ -719,12 +723,56 @@ func TestGetRegistrationInfo(t *testing.T) {
 				c: &client.Client{
 					Clientset: fake.NewSimpleClientset(&pod, &replicaSet, &deployment),
 				},
-				namespace: "test-namespace",
-				name:      "test-pod",
+				namespace:    "test-namespace",
+				name:         "test-pod",
+				replicaCount: 2,
 			},
 			want: &Registration{
 				RegistrationID:         "test-deployment-uid",
 				RegistrationInstanceID: "test-pod",
+				Type:                   Type,
+				Name:                   "test-deployment-k8s-inventory",
+				Description:            "",
+				Version:                "1.7.0",
+				StartedAt:              jstime.Datetime{Time: timestamps[0].UTC()},
+				Uptime:                 new(jstime.Duration),
+				Username:               "admin",
+				ExplicitlyAccountBound: []string{"account3"},
+				Namespaces:             []string{"ns3"},
+				Configuration:          nil,
+				ClusterName:            "k8s-cluster1",
+				Namespace:              "test-namespace",
+				HealthReportInterval:   60,
+			},
+		},
+		{
+			name: "Values from k8s single replica",
+			args: args{
+				config: &config.Application{
+					AnchoreDetails: config.AnchoreInfo{
+						User: "admin",
+					},
+					AccountRoutes: config.AccountRoutes{
+						"account3": config.AccountRouteDetails{
+							Namespaces: []string{"ns3"},
+						},
+					},
+					KubeConfig: config.KubeConf{
+						Cluster: "k8s-cluster1",
+					},
+					Registration:                config.RegistrationOptions{},
+					HealthReportIntervalSeconds: 60,
+				},
+				c: &client.Client{
+					Clientset: fake.NewSimpleClientset(&pod, &replicaSet, &deployment),
+				},
+				namespace:    "test-namespace",
+				name:         "test-pod",
+				replicaCount: 1,
+			},
+			want: &Registration{
+				RegistrationID:         "test-deployment-uid",
+				RegistrationInstanceID: deployment.ObjectMeta.Name,
 				Type:                   Type,
 				Name:                   "test-deployment-k8s-inventory",
 				Description:            "",
@@ -756,7 +804,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 				return timestamp
 			}
 			result := getRegistrationInfo(tt.args.config, tt.args.c, tt.args.namespace,
-				tt.args.name, NewUUIDMock, nowMock)
+				tt.args.name, tt.args.replicaCount, NewUUIDMock, nowMock)
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.want, result)
 		})

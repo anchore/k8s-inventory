@@ -106,7 +106,12 @@ func PerformRegistration(appConfig *config.Application, ch Channels) (*Integrati
 	name := os.Getenv("HOSTNAME")
 
 	k8sClient := getK8sClient(appConfig)
-	registrationInfo := getRegistrationInfo(appConfig, k8sClient, namespace, name, uuid.New, time.Now)
+	replicaCount, err := getReplicaCountFromK8s(k8sClient, namespace, name)
+	if err != nil {
+		log.Errorf("Failed to get replica count from K8s: %v", err)
+	}
+	log.Debugf("Determined replica count from K8s: %d", replicaCount)
+	registrationInfo := getRegistrationInfo(appConfig, k8sClient, namespace, name, replicaCount, uuid.New, time.Now)
 
 	// Register this agent with enterprise
 	registeredIntegration, err := register(registrationInfo, appConfig.AnchoreDetails, -1,
@@ -292,7 +297,7 @@ func doRegister(registrationInfo *Registration, anchoreDetails config.AnchoreInf
 }
 
 func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client,
-	namespace string, name string, newUUID _NewUUID, now _Now) *Registration {
+	namespace string, name string, replicaCount int32, newUUID _NewUUID, now _Now) *Registration {
 	var registrationID, registrationInstanceID, instanceName, appVersion, description string
 
 	log.Debugf("Attempting to determine values from K8s Deployment for Pod: %s in Namespace: %s",
@@ -309,10 +314,14 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 		registrationID = newUUID().String()
 	}
 
-	if name != "" {
-		log.Debugf("Using registration_instance_id: %s", name)
+	switch {
+	case replicaCount != 1:
+		log.Debugf("Could not find single replica, using registration_instance_id: %s", instanceName)
 		registrationInstanceID = name
-	} else {
+	case instanceName != "":
+		log.Debugf("Using registration_instance_id: %s", instanceName)
+		registrationInstanceID = instanceName
+	default:
 		log.Debugf("Generating UUIDv4 to use as registration_instance_id")
 		registrationInstanceID = newUUID().String()
 	}
@@ -383,6 +392,26 @@ func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName 
 	log.Debugf("Determined integration values for agent from K8s, registration_id: %s, instance_name: %s, appVersion: %s",
 		registrationID, instanceName, appVersion)
 	return registrationID, instanceName, appVersion
+}
+
+func getReplicaCountFromK8s(k8sClient *client.Client, namespace string, podName string) (int32, error) {
+	if k8sClient == nil {
+		log.Errorf("Kubernetes client not initialized. Unable to interact with K8s cluster.")
+		return 0, fmt.Errorf("kubernetes client not initialized")
+	}
+	opts := metav1.GetOptions{}
+	pod, err := k8sClient.Clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, opts)
+	if err != nil {
+		log.Errorf("failed to get pod: %v", err)
+		return 0, err
+	}
+	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
+	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
+	if err != nil {
+		log.Errorf("failed to get replica set: %v", err)
+		return 0, err
+	}
+	return *replicaSet.Spec.Replicas, nil
 }
 
 func getAccountsAndNamespacesForAgent(appConfig *config.Application) ([]string, []string) {
