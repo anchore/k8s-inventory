@@ -106,7 +106,12 @@ func PerformRegistration(appConfig *config.Application, ch Channels) (*Integrati
 	name := os.Getenv("HOSTNAME")
 
 	k8sClient := getK8sClient(appConfig)
-	registrationInfo := getRegistrationInfo(appConfig, k8sClient, namespace, name, uuid.New, time.Now)
+	replicaCount, err := getReplicaCountFromK8s(k8sClient, namespace, name)
+	if err != nil {
+		log.Errorf("Failed to get replica count from K8s: %v", err)
+	}
+	log.Debugf("Determined replica count from K8s: %d", replicaCount)
+	registrationInfo := getRegistrationInfo(appConfig, k8sClient, namespace, name, replicaCount, uuid.New, time.Now)
 
 	// Register this agent with enterprise
 	registeredIntegration, err := register(registrationInfo, appConfig.AnchoreDetails, -1,
@@ -292,7 +297,7 @@ func doRegister(registrationInfo *Registration, anchoreDetails config.AnchoreInf
 }
 
 func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client,
-	namespace string, name string, newUUID _NewUUID, now _Now) *Registration {
+	namespace string, name string, replicaCount int32, newUUID _NewUUID, now _Now) *Registration {
 	var registrationID, registrationInstanceID, instanceName, appVersion, description string
 
 	log.Debugf("Attempting to determine values from K8s Deployment for Pod: %s in Namespace: %s",
@@ -309,20 +314,14 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 		registrationID = newUUID().String()
 	}
 
-	replicaCount, err := getReplicaCountFromK8s(k8sClient, namespace, name)
-	if err != nil {
-		log.Errorf("Failed to get replica count from K8s: %v", err)
-	}
-
-	log.Debugf("Determined replica count from K8s: %d", replicaCount)
-
-	if replicaCount > 1 {
-		log.Debugf("Multiple replicas found using registration_instance_id: %s", instanceName)
+	switch {
+	case replicaCount != 1:
+		log.Debugf("Could not find single replica, using registration_instance_id: %s", instanceName)
 		registrationInstanceID = name
-	} else if instanceName != "" {
+	case instanceName != "":
 		log.Debugf("Using registration_instance_id: %s", instanceName)
 		registrationInstanceID = instanceName
-	} else {
+	default:
 		log.Debugf("Generating UUIDv4 to use as registration_instance_id")
 		registrationInstanceID = newUUID().String()
 	}
