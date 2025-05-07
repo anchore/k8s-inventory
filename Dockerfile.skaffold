@@ -5,7 +5,7 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifica
 
 WORKDIR /tmp
 
-COPY snapshot/anchore-k8s-inventory /
+COPY snapshot/generic_linux_amd64_v1/anchore-k8s-inventory /
 
 ARG BUILD_DATE
 ARG BUILD_VERSION
