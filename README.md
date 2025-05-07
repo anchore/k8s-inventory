@@ -7,6 +7,8 @@
 
 It can be run inside a cluster (under a Service Account) or outside (via any provided kubeconfig).
 
+> **Note: this integration requires a valid license or subscription entitlement from Anchore**
+
 ## Getting Started
 [Install the binary](#installation) or Download the [Docker image](https://hub.docker.com/r/anchore/k8s-inventory/tags)
 
