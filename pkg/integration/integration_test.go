@@ -645,7 +645,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 				Type:                   Type,
 				Name:                   "",
 				Description:            "",
-				Version:                "",
+				Version:                "dev",
 				StartedAt:              jstime.Datetime{Time: timestamps[0].UTC()},
 				Uptime:                 new(jstime.Duration),
 				Username:               "admin",
@@ -690,7 +690,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 				Type:                   Type,
 				Name:                   "test k8s inventory",
 				Description:            "Description from config",
-				Version:                "",
+				Version:                "dev",
 				StartedAt:              jstime.Datetime{Time: timestamps[0].UTC()},
 				Uptime:                 new(jstime.Duration),
 				Username:               "admin",
@@ -733,7 +733,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 				Type:                   Type,
 				Name:                   "test-deployment-k8s-inventory",
 				Description:            "",
-				Version:                "1.7.0",
+				Version:                "dev",
 				StartedAt:              jstime.Datetime{Time: timestamps[0].UTC()},
 				Uptime:                 new(jstime.Duration),
 				Username:               "admin",
@@ -776,7 +776,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 				Type:                   Type,
 				Name:                   "test-deployment-k8s-inventory",
 				Description:            "",
-				Version:                "1.7.0",
+				Version:                "dev",
 				StartedAt:              jstime.Datetime{Time: timestamps[0].UTC()},
 				Uptime:                 new(jstime.Duration),
 				Username:               "admin",
@@ -820,7 +820,6 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 	type want struct {
 		registrationID string
 		instanceName   string
-		appVersion     string
 	}
 	tests := []struct {
 		name string
@@ -839,7 +838,6 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			want: want{
 				registrationID: "test-deployment-uid",
 				instanceName:   "k8s-inventory",
-				appVersion:     "1.7.0",
 			},
 		},
 		{
@@ -852,7 +850,6 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			want: want{
 				registrationID: "",
 				instanceName:   "",
-				appVersion:     "",
 			},
 		},
 		{
@@ -867,7 +864,6 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			want: want{
 				registrationID: "",
 				instanceName:   "",
-				appVersion:     "",
 			},
 		},
 		{
@@ -882,7 +878,6 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			want: want{
 				registrationID: "",
 				instanceName:   "",
-				appVersion:     "",
 			},
 		},
 		{
@@ -897,16 +892,14 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			want: want{
 				registrationID: "",
 				instanceName:   "",
-				appVersion:     "",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resultRegID, resultInstName, resultAppVersion := getInstanceDataFromK8s(tt.args.c, tt.args.namespace, tt.args.podName)
+			resultRegID, resultInstName := getInstanceDataFromK8s(tt.args.c, tt.args.namespace, tt.args.podName)
 			assert.Equal(t, tt.want.registrationID, resultRegID)
 			assert.NotNil(t, tt.want.instanceName, resultInstName)
-			assert.NotNil(t, tt.want.appVersion, resultAppVersion)
 		})
 	}
 }
