@@ -16,6 +16,7 @@ import (
 	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/anchore/k8s-inventory/internal/log"
 	jstime "github.com/anchore/k8s-inventory/internal/time"
+	akiVersion "github.com/anchore/k8s-inventory/internal/version"
 )
 
 var requiredAnchoreVersion, _ = version.NewVersion("5.11")
@@ -298,11 +299,11 @@ func doRegister(registrationInfo *Registration, anchoreDetails config.AnchoreInf
 
 func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client,
 	namespace string, name string, replicaCount int32, newUUID _NewUUID, now _Now) *Registration {
-	var registrationID, registrationInstanceID, instanceName, appVersion, description string
+	var registrationID, registrationInstanceID, instanceName, description string
 
 	log.Debugf("Attempting to determine values from K8s Deployment for Pod: %s in Namespace: %s",
 		name, namespace)
-	registrationID, instanceName, appVersion = getInstanceDataFromK8s(k8sClient, namespace, name)
+	registrationID, instanceName = getInstanceDataFromK8s(k8sClient, namespace, name)
 
 	if appConfig.Registration.RegistrationID != "" {
 		log.Debugf("Using registration_id specified in config: %s", appConfig.Registration.RegistrationID)
@@ -342,6 +343,11 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 
 	explicitlyAccountBound, namespaces := getAccountsAndNamespacesForAgent(appConfig)
 
+	appVersion := akiVersion.FromBuild().Version
+	if appVersion == akiVersion.ValueNotProvided {
+		appVersion = "dev"
+	}
+
 	instance := Registration{
 		RegistrationID:         registrationID,
 		RegistrationInstanceID: registrationInstanceID,
@@ -362,36 +368,35 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 	return &instance
 }
 
-func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName string) (string, string, string) {
+func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName string) (string, string) {
 	if k8sClient == nil {
 		log.Errorf("Kubernetes client not initialized. Unable to interact with K8s cluster.")
-		return "", "", ""
+		return "", ""
 	}
 	opts := metav1.GetOptions{}
 	pod, err := k8sClient.Clientset.CoreV1().Pods(namespace).Get(context.Background(), podName, opts)
 	if err != nil {
 		log.Errorf("failed to get pod: %v", err)
-		return "", "", ""
+		return "", ""
 	}
 	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
 	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
 	if err != nil {
 		log.Errorf("failed to get replica set: %v", err)
-		return "", "", ""
+		return "", ""
 	}
 	deploymentName := replicaSet.ObjectMeta.OwnerReferences[0].Name
 	deployment, err := k8sClient.Clientset.AppsV1().Deployments(namespace).Get(context.Background(), deploymentName, opts)
 	if err != nil {
 		log.Errorf("failed to get deployment: %v", err)
-		return "", "", ""
+		return "", ""
 	}
 
-	appVersion := deployment.Labels[AppVersionLabel]
 	registrationID := fmt.Sprint("", deployment.ObjectMeta.UID)
 	instanceName := deploymentName
-	log.Debugf("Determined integration values for agent from K8s, registration_id: %s, instance_name: %s, appVersion: %s",
-		registrationID, instanceName, appVersion)
-	return registrationID, instanceName, appVersion
+	log.Debugf("Determined integration values for agent from K8s, registration_id: %s, instance_name: %s",
+		registrationID, instanceName)
+	return registrationID, instanceName
 }
 
 func getReplicaCountFromK8s(k8sClient *client.Client, namespace string, podName string) (int32, error) {

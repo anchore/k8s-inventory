@@ -6,12 +6,12 @@ import (
 	"runtime"
 )
 
-const valueNotProvided = "[not provided]"
+const ValueNotProvided = "[not provided]"
 
-var version = valueNotProvided
-var gitCommit = valueNotProvided
-var gitTreeState = valueNotProvided
-var buildDate = valueNotProvided
+var version = ValueNotProvided
+var gitCommit = ValueNotProvided
+var gitTreeState = ValueNotProvided
+var buildDate = ValueNotProvided
 var platform = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 
 type Version struct {
