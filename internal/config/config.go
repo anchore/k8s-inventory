@@ -104,7 +104,8 @@ type KubernetesAPI struct {
 
 // Details upper limits for the inventory report contents before splitting into batches
 type InventoryReportLimits struct {
-	Namespaces int `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
+	Namespaces   int `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
+	PayloadBytes int `mapstructure:"payload-bytes" json:"payload-bytes,omitempty" yaml:"payload-bytes"`
 }
 
 type ResourceMetadata struct {
