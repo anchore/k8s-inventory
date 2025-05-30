@@ -41,6 +41,14 @@ type channels struct {
 type AccountRoutedReports map[string]inventory.Report
 type BatchedReports map[string][]inventory.Report
 
+type batchState struct {
+	currNS   []inventory.Namespace
+	currPods []inventory.Pod
+	currCont []inventory.Container
+	currNode map[string]inventory.Node
+	currSize int
+}
+
 func reportToStdout(report inventory.Report) error {
 	enc := json.NewEncoder(os.Stdout)
 	// prevent > and < from being escaped in the payload
@@ -426,87 +434,158 @@ func GetInventoryReports(cfg *config.Application) (BatchedReports, error) {
 		}
 	}
 
-	return getBatchedInventoryReports(reports, cfg.InventoryReportLimits.Namespaces), nil
+	return getBatchedInventoryReports(reports, cfg.InventoryReportLimits), nil
 }
 
-//nolint:gocognit,funlen
-func getBatchedInventoryReports(reports AccountRoutedReports, batchSize int) BatchedReports {
-	batchedReports := BatchedReports{}
-	if batchSize <= 0 {
-		for account, report := range reports {
-			batchedReports[account] = append(batchedReports[account], report)
-		}
-		return batchedReports
+func (state *batchState) createReportBatch(accountReport inventory.Report) *inventory.Report {
+	if len(state.currNS) == 0 {
+		return nil
 	}
 
-	log.Infof("Batching namespaces into groups of %d", batchSize)
+	// Flatten map[string]inventory.Node → []inventory.Node
+	nodes := make([]inventory.Node, 0, len(state.currNode))
+	for _, n := range state.currNode {
+		nodes = append(nodes, n)
+	}
+
+	// Build the new inventory report
+	rpt := inventory.Report{
+		Timestamp:             accountReport.Timestamp,
+		Namespaces:            state.currNS,
+		Pods:                  state.currPods,
+		Containers:            state.currCont,
+		Nodes:                 nodes,
+		ServerVersionMetadata: accountReport.ServerVersionMetadata,
+		ClusterName:           accountReport.ClusterName,
+	}
+
+	// Reset batch state
+	*state = batchState{
+		currNode: make(map[string]inventory.Node),
+	}
+
+	return &rpt
+}
+
+// Lookup tables are used to retrieve all the pods, containers, and nodes
+// associated with each namespace when created batched reports
+type inventoryLookups struct {
+	nodeMap               map[string]inventory.Node
+	podMap                map[string]inventory.Pod
+	podsByNamespace       map[string][]inventory.Pod
+	containersByNamespace map[string][]inventory.Container
+}
+
+func buildLookups(accountReport inventory.Report) inventoryLookups {
+	// nodeMap: UID -> Node
+	nodeMap := make(map[string]inventory.Node, len(accountReport.Nodes))
+	for _, node := range accountReport.Nodes {
+		nodeMap[node.UID] = node
+	}
+	// podMap: UID -> Pod
+	podMap := make(map[string]inventory.Pod, len(accountReport.Pods))
+	for _, pod := range accountReport.Pods {
+		podMap[pod.UID] = pod
+	}
+	// podsByNamespace: namespaceUID -> []pods
+	podsByNamespace := make(map[string][]inventory.Pod)
+	for _, pod := range accountReport.Pods {
+		podsByNamespace[pod.NamespaceUID] = append(podsByNamespace[pod.NamespaceUID], pod)
+	}
+	// containersByNamespace: namespaceUID -> []containers
+	containersByNamespace := make(map[string][]inventory.Container)
+	for _, ctr := range accountReport.Containers {
+		nsUID := podMap[ctr.PodUID].NamespaceUID
+		containersByNamespace[nsUID] = append(containersByNamespace[nsUID], ctr)
+	}
+
+	return inventoryLookups{
+		nodeMap:               nodeMap,
+		podMap:                podMap,
+		podsByNamespace:       podsByNamespace,
+		containersByNamespace: containersByNamespace,
+	}
+}
+
+//nolint:gocognit
+func getBatchedInventoryReports(reports AccountRoutedReports, limits config.InventoryReportLimits) BatchedReports {
+	batchCount := 0
+	batched := BatchedReports{}
 	for account, accountReport := range reports {
-		if len(accountReport.Namespaces) <= batchSize {
-			batchedReports[account] = append(batchedReports[account], accountReport)
+		// Check if batching is enabled
+		if limits.PayloadThresholdBytes <= 0 && limits.Namespaces <= 0 {
+			batched[account] = append(batched[account], accountReport)
 			continue
 		}
-		namespaceBatches := make([][]inventory.Namespace, 0)
-		// Construct batches of namespaces
-		for i := 0; i < len(accountReport.Namespaces); i += batchSize {
-			end := i + batchSize
-			if end > len(accountReport.Namespaces) {
-				end = len(accountReport.Namespaces)
-			}
-			namespaceBatches = append(namespaceBatches, accountReport.Namespaces[i:end])
+
+		// We are batching - build lookup tables and init state tracking
+		lookups := buildLookups(accountReport)
+		state := batchState{
+			currNode: make(map[string]inventory.Node),
+			currSize: 0,
 		}
 
-		nodeMap := make(map[string]inventory.Node)
-		for _, node := range accountReport.Nodes {
-			nodeMap[node.UID] = node
-		}
-		podMap := make(map[string]inventory.Pod)
-		for _, pod := range accountReport.Pods {
-			podMap[pod.UID] = pod
-		}
-		containersByPod := make(map[string][]inventory.Container)
-		for _, container := range accountReport.Containers {
-			containersByPod[container.PodUID] = append(containersByPod[container.PodUID], container)
-		}
-		podsByNamespace := make(map[string][]inventory.Pod)
-		for _, pod := range accountReport.Pods {
-			podsByNamespace[pod.NamespaceUID] = append(podsByNamespace[pod.NamespaceUID], pod)
-		}
-		containersByNamespace := make(map[string][]inventory.Container)
-		for _, container := range accountReport.Containers {
-			namespaceUID := podMap[container.PodUID].NamespaceUID
-			containersByNamespace[namespaceUID] = append(containersByNamespace[namespaceUID], container)
-		}
-
-		// Construct reports for each batch
-		for _, batch := range namespaceBatches {
-			batchedPodsSlice := []inventory.Pod{}
-			batchedContainersSlice := []inventory.Container{}
-			batchedNodesMap := map[string]inventory.Node{}
-			for _, ns := range batch {
-				batchedPodsSlice = append(batchedPodsSlice, podsByNamespace[ns.UID]...)
-				batchedContainersSlice = append(batchedContainersSlice, containersByNamespace[ns.UID]...)
-				for _, pod := range batchedPodsSlice {
-					batchedNodesMap[pod.NodeUID] = nodeMap[pod.NodeUID]
+		// Iterate over all namespaces, watching for when we exceed our max payload threshold
+		for _, ns := range accountReport.Namespaces {
+			// Calculate the set of Nodes referenced by all Pods in the Namespace
+			newNodes := make(map[string]inventory.Node)
+			for _, p := range lookups.podsByNamespace[ns.UID] {
+				if _, exists := state.currNode[p.NodeUID]; !exists {
+					newNodes[p.NodeUID] = lookups.nodeMap[p.NodeUID]
 				}
 			}
-			batchedNodesSlice := []inventory.Node{}
-			for _, node := range batchedNodesMap {
-				batchedNodesSlice = append(batchedNodesSlice, node)
+
+			var payloadLength = 0
+			if limits.PayloadThresholdBytes > 0 {
+				// Flatten to a list - this is just used for sizing up the additional payload bytes
+				nodesArr := make([]inventory.Node, 0, len(newNodes))
+				for _, node := range newNodes {
+					nodesArr = append(nodesArr, node)
+				}
+
+				// Size up a report with just this new info, not the entire 'state' of the batch
+				// NOTE: This isn't going to find the precise incremental size of adding this namespace,
+				//       but it's a close enough approximation for batching purposes
+				nextRecord := inventory.Report{
+					Namespaces: []inventory.Namespace{ns},
+					Pods:       lookups.podsByNamespace[ns.UID],
+					Containers: lookups.containersByNamespace[ns.UID],
+					Nodes:      nodesArr,
+				}
+				sizeNext, _ := json.Marshal(nextRecord)
+				payloadLength = len(sizeNext)
 			}
-			batchedReport := inventory.Report{
-				Timestamp:             accountReport.Timestamp,
-				Containers:            batchedContainersSlice,
-				Pods:                  batchedPodsSlice,
-				Namespaces:            batch,
-				Nodes:                 batchedNodesSlice,
-				ServerVersionMetadata: accountReport.ServerVersionMetadata,
-				ClusterName:           accountReport.ClusterName,
+
+			// Now we can add this namespace into the batch
+			//  - Namespaces, Containers, and Pods are appended
+			//  - Nodes are merged into the currNode map
+			state.currSize += payloadLength
+			state.currNS = append(state.currNS, ns)
+			state.currPods = append(state.currPods, lookups.podsByNamespace[ns.UID]...)
+			state.currCont = append(state.currCont, lookups.containersByNamespace[ns.UID]...)
+			for k, v := range newNodes {
+				state.currNode[k] = v
 			}
-			batchedReports[account] = append(batchedReports[account], batchedReport)
+
+			// Check if the batch is full after having added this namespace
+			if (limits.PayloadThresholdBytes > 0 && state.currSize >= limits.PayloadThresholdBytes) ||
+				(limits.Namespaces > 0 && len(state.currNS) >= limits.Namespaces) {
+				if rpt := state.createReportBatch(accountReport); rpt != nil {
+					batched[account] = append(batched[account], *rpt)
+					batchCount++
+				}
+			}
+		}
+
+		// Emit tail batch (if any).
+		if rpt := state.createReportBatch(accountReport); rpt != nil {
+			batched[account] = append(batched[account], *rpt)
+			batchCount++
 		}
 	}
 
-	return batchedReports
+	log.Infof("Finished batching %d inventory reports (threshold = %d namespaces, %d bytes)", batchCount, limits.Namespaces, limits.PayloadThresholdBytes)
+	return batched
 }
 
 func processNamespace(

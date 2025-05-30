@@ -51,6 +51,7 @@ polling-interval-seconds: 0
 health-report-interval-seconds: 0
 inventory-report-limits:
   namespaces: 0
+  payload-threshold-bytes: 0
 metadata-collection:
   nodes:
     include-annotations: []

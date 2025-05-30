@@ -134,6 +134,7 @@ health-report-interval-seconds: 60
 # Batch Request configuration
 inventory-report-limits:
   namespaces: 0 # default of 0 means no limit per report
+  payload-threshold-bytes: 0 # default of 0 means no limit per report
 
 # Metadata configuration
 metadata-collection:
