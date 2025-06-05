@@ -513,7 +513,7 @@ func getBatchedInventoryReports(reports AccountRoutedReports, limits config.Inve
 	batched := BatchedReports{}
 	for account, accountReport := range reports {
 		// Check if batching is enabled
-		if limits.PayloadBytes <= 0 && limits.Namespaces < 0 {
+		if limits.PayloadBytes <= 0 && limits.Namespaces <= 0 {
 			batched[account] = append(batched[account], accountReport)
 			continue
 		}
