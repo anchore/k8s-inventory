@@ -510,7 +510,7 @@ var (
 	}
 )
 
-func Test_getBatchedInventoryReports(t *testing.T) {
+func Test_getBatchedInventoryReportsByNamespace(t *testing.T) {
 	type args struct {
 		reports   AccountRoutedReports
 		batchSize int
@@ -692,7 +692,222 @@ func Test_getBatchedInventoryReports(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getBatchedInventoryReports(tt.args.reports, tt.args.batchSize)
+			limits := config.InventoryReportLimits{
+				Namespaces:            tt.args.batchSize,
+				PayloadThresholdBytes: 0,
+			}
+			got := getBatchedInventoryReports(tt.args.reports, limits)
+			// Sort the reports for comparison
+			for _, reports := range got {
+				for _, inner := range reports {
+					sort.Slice(inner.Namespaces, func(i, j int) bool {
+						return inner.Namespaces[i].Name < inner.Namespaces[j].Name
+					})
+					sort.Slice(inner.Containers, func(i, j int) bool {
+						return inner.Containers[i].Name < inner.Containers[j].Name
+					})
+					sort.Slice(inner.Pods, func(i, j int) bool {
+						return inner.Pods[i].Name < inner.Pods[j].Name
+					})
+					sort.Slice(inner.Nodes, func(i, j int) bool {
+						return inner.Nodes[i].Name < inner.Nodes[j].Name
+					})
+				}
+			}
+			for _, reports := range tt.want {
+				for _, inner := range reports {
+					sort.Slice(inner.Namespaces, func(i, j int) bool {
+						return inner.Namespaces[i].Name < inner.Namespaces[j].Name
+					})
+					sort.Slice(inner.Containers, func(i, j int) bool {
+						return inner.Containers[i].Name < inner.Containers[j].Name
+					})
+					sort.Slice(inner.Pods, func(i, j int) bool {
+						return inner.Pods[i].Name < inner.Pods[j].Name
+					})
+					sort.Slice(inner.Nodes, func(i, j int) bool {
+						return inner.Nodes[i].Name < inner.Nodes[j].Name
+					})
+				}
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_getBatchedInventoryReportsByPayload(t *testing.T) {
+	type args struct {
+		reports   AccountRoutedReports
+		batchSize int
+	}
+	tests := []struct {
+		name string
+		args args
+		want BatchedReports
+	}{
+		{
+			name: "empty reports",
+			args: args{
+				reports:   AccountRoutedReports{},
+				batchSize: 1000,
+			},
+			want: BatchedReports{},
+		},
+		{
+			name: "no batches configured (batch size 0)",
+			args: args{
+				reports: AccountRoutedReports{
+					"account1": TestReport,
+				},
+				batchSize: 0,
+			},
+			want: BatchedReports{
+				"account1": {
+					TestReport,
+				},
+			},
+		},
+		{
+			name: "single batch (payload < batch size)",
+			args: args{
+				reports: AccountRoutedReports{
+					"account1": TestReport,
+				},
+				batchSize: 1000 * 1000,
+			},
+			want: BatchedReports{
+				"account1": {
+					TestReport,
+				},
+			},
+		},
+		{
+			name: "multiple batches",
+			args: args{
+				reports: AccountRoutedReports{
+					"account1": TestReport,
+				},
+				batchSize: 100,
+			},
+			want: BatchedReports{
+				"account1": {
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace1},
+						Containers:  []inventory.Container{Container1},
+						Pods:        []inventory.Pod{Pod1},
+						Nodes:       []inventory.Node{Node1},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace2},
+						Containers:  []inventory.Container{Container2},
+						Pods:        []inventory.Pod{Pod2},
+						Nodes:       []inventory.Node{Node2},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace3},
+						Containers:  []inventory.Container{Container3},
+						Pods:        []inventory.Pod{Pod3},
+						Nodes:       []inventory.Node{Node2},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace4},
+						Containers:  []inventory.Container{Container4},
+						Pods:        []inventory.Pod{Pod4},
+						Nodes:       []inventory.Node{Node3},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace5},
+						Containers:  []inventory.Container{Container5},
+						Pods:        []inventory.Pod{Pod5},
+						Nodes:       []inventory.Node{Node3},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple batches (2 expected)",
+			args: args{
+				reports: AccountRoutedReports{
+					"account1": TestReport,
+				},
+				batchSize: 2000,
+			},
+			want: BatchedReports{
+				"account1": {
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace1, TestNamespace2, TestNamespace3},
+						Containers:  []inventory.Container{Container1, Container2, Container3},
+						Pods:        []inventory.Pod{Pod1, Pod2, Pod3},
+						Nodes:       []inventory.Node{Node1, Node2},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace4, TestNamespace5},
+						Containers:  []inventory.Container{Container4, Container5},
+						Pods:        []inventory.Pod{Pod4, Pod5},
+						Nodes:       []inventory.Node{Node3},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple batches (2 expected) x 2 accounts",
+			args: args{
+				reports: AccountRoutedReports{
+					"account1": TestReport,
+					"account2": TestReport,
+				},
+				batchSize: 2000,
+			},
+			want: BatchedReports{
+				"account1": {
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace1, TestNamespace2, TestNamespace3},
+						Containers:  []inventory.Container{Container1, Container2, Container3},
+						Pods:        []inventory.Pod{Pod1, Pod2, Pod3},
+						Nodes:       []inventory.Node{Node1, Node2},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace4, TestNamespace5},
+						Containers:  []inventory.Container{Container4, Container5},
+						Pods:        []inventory.Pod{Pod4, Pod5},
+						Nodes:       []inventory.Node{Node3},
+					},
+				},
+				"account2": {
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace1, TestNamespace2, TestNamespace3},
+						Containers:  []inventory.Container{Container1, Container2, Container3},
+						Pods:        []inventory.Pod{Pod1, Pod2, Pod3},
+						Nodes:       []inventory.Node{Node1, Node2},
+					},
+					{
+						ClusterName: "cluster1",
+						Namespaces:  []inventory.Namespace{TestNamespace4, TestNamespace5},
+						Containers:  []inventory.Container{Container4, Container5},
+						Pods:        []inventory.Pod{Pod4, Pod5},
+						Nodes:       []inventory.Node{Node3},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			limits := config.InventoryReportLimits{
+				Namespaces:            0,
+				PayloadThresholdBytes: tt.args.batchSize,
+			}
+			got := getBatchedInventoryReports(tt.args.reports, limits)
 			// Sort the reports for comparison
 			for _, reports := range got {
 				for _, inner := range reports {
