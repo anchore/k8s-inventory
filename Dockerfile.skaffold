@@ -21,4 +21,7 @@ LABEL org.opencontainers.image.vendor="Anchore, Inc."
 LABEL org.opencontainers.image.version=$BUILD_VERSION
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
+USER 1000
+HEALTHCHECK CMD ["/anchore-k8s-inventory", "version"]
+
 ENTRYPOINT ["/anchore-k8s-inventory"]
