@@ -1,59 +1,67 @@
-issues:
-  max-same-issues: 25
-  uniq-by-line: false
-  exclude-dirs:
-     - .circleci
-     - .github
-     - scripts
-  exclude-rules:
-    - path: (.+)_test.go
-      linters:
-        - funlen
-        - dupl
-        - goconst
-
-run:
-  timeout: 5m
-
+version: "2"
 linters:
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - dupl
     - errcheck
     - errorlint
-    - copyloopvar
     - funlen
     - gocognit
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - tparallel
-    - importas
     - gosec
-    - gosimple
     - govet
+    - importas
     - ineffassign
     - misspell
     - nolintlint
     - revive
     - staticcheck
-    - stylecheck
-    - typecheck
+    - tparallel
     - unconvert
     - unparam
     - unused
     - whitespace
-linters-settings:
-  funlen:
-    # Checks the number of lines in a function.
-    # If lower than 0, disable the check.
-    # Default: 60
-    lines: 70
-    # Checks the number of statements in a function.
-    # If lower than 0, disable the check.
-    # Default: 40
-    statements: 50
+  settings:
+    funlen:
+      lines: 70
+      statements: 50
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - dupl
+          - funlen
+          - goconst
+        path: (.+)_test.go
+    paths:
+      - .circleci
+      - .github
+      - scripts
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-same-issues: 25
+  uniq-by-line: false
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - .circleci
+      - .github
+      - scripts
+      - third_party$
+      - builtin$
+      - examples$

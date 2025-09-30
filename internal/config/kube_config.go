@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -59,13 +60,14 @@ func (kubeConf *KubeConf) IsNonFileKubeConfigValid() bool {
 }
 
 func (user *KubeConfUser) isValid() bool {
-	result := true
-	if user.UserConfType == PrivateKey {
-		result = user.ClientCert != "" && user.PrivateKey != ""
-	} else if user.UserConfType == ServiceAccountToken {
-		result = user.Token != ""
+	switch user.UserConfType {
+	case PrivateKey:
+		return user.ClientCert != "" && user.PrivateKey != ""
+	case ServiceAccountToken:
+		return user.Token != ""
+	default:
+		return true
 	}
-	return result
 }
 
 func (kubeConf *KubeConf) GetKubeConfigFromConf() (*rest.Config, error) {
@@ -106,8 +108,8 @@ func (kubeConf *KubeConf) getAuthInfosFromConf() (map[string]*api.AuthInfo, erro
 	authInfos := make(map[string]*api.AuthInfo)
 	cluster := kubeConf.Cluster
 	userConf := kubeConf.User
-	userConfType := userConf.UserConfType
-	if userConfType == PrivateKey {
+	switch userConf.UserConfType {
+	case PrivateKey:
 		decodedClientCert, err := base64.StdEncoding.DecodeString(userConf.ClientCert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to base64 decode client cert: %w", err)
@@ -122,7 +124,7 @@ func (kubeConf *KubeConf) getAuthInfosFromConf() (map[string]*api.AuthInfo, erro
 			ClientCertificateData: decodedClientCert,
 			ClientKeyData:         decodedPrivateKey,
 		}
-	} else if userConfType == ServiceAccountToken {
+	case ServiceAccountToken:
 		authInfos[cluster] = &api.AuthInfo{
 			Token: kubeConf.User.Token,
 		}

@@ -392,7 +392,7 @@ func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName 
 		return "", ""
 	}
 
-	registrationID := fmt.Sprint("", deployment.ObjectMeta.UID)
+	registrationID := fmt.Sprint("", deployment.UID)
 	instanceName := deploymentName
 	log.Debugf("Determined integration values for agent from K8s, registration_id: %s, instance_name: %s",
 		registrationID, instanceName)

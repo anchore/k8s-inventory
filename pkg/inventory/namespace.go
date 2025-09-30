@@ -96,20 +96,20 @@ func FetchNamespaces(
 			return nil, fmt.Errorf("failed to list namespaces: %w", err)
 		}
 		for _, n := range list.Items {
-			if !excludeNamespace(exclusionChecklist, n.ObjectMeta.Name) {
+			if !excludeNamespace(exclusionChecklist, n.Name) {
 				if !disableMetadata {
 					annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
 					labels := processAnnotationsOrLabels(n.Labels, includeLabels)
 
-					nsMap[n.ObjectMeta.Name] = Namespace{
-						Name:        n.ObjectMeta.Name,
+					nsMap[n.Name] = Namespace{
+						Name:        n.Name,
 						UID:         string(n.UID),
 						Annotations: annotations,
 						Labels:      labels,
 					}
 				} else {
-					nsMap[n.ObjectMeta.Name] = Namespace{
-						Name: n.ObjectMeta.Name,
+					nsMap[n.Name] = Namespace{
+						Name: n.Name,
 						UID:  string(n.UID),
 					}
 				}
