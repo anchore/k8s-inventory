@@ -34,8 +34,8 @@ func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, i
 			if !disableMetadata {
 				annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
 				labels := processAnnotationsOrLabels(n.Labels, includeLabels)
-				nodes[n.ObjectMeta.Name] = Node{
-					Name:                    n.ObjectMeta.Name,
+				nodes[n.Name] = Node{
+					Name:                    n.Name,
 					UID:                     string(n.UID),
 					Annotations:             annotations,
 					Arch:                    n.Status.NodeInfo.Architecture,
@@ -46,8 +46,8 @@ func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, i
 					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
 				}
 			} else {
-				nodes[n.ObjectMeta.Name] = Node{
-					Name:                    n.ObjectMeta.Name,
+				nodes[n.Name] = Node{
+					Name:                    n.Name,
 					UID:                     string(n.UID),
 					Arch:                    n.Status.NodeInfo.Architecture,
 					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,

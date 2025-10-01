@@ -772,7 +772,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 			},
 			want: &Registration{
 				RegistrationID:         "test-deployment-uid",
-				RegistrationInstanceID: deployment.ObjectMeta.Name,
+				RegistrationInstanceID: deployment.Name,
 				Type:                   Type,
 				Name:                   "test-deployment-k8s-inventory",
 				Description:            "",
@@ -950,7 +950,7 @@ func TestGetAccountsAndNamespacesForAgent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resultAccountNames, resultNamespaces := getAccountsAndNamespacesForAgent(tt.args.config)
+			resultAccountNames, resultNamespaces := getAccountsAndNamespacesForAgent(tt.config)
 			slices.Sort(resultAccountNames)
 			assert.Equal(t, tt.want.accountNames, resultAccountNames)
 			slices.Sort(resultNamespaces)

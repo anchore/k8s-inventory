@@ -18,9 +18,9 @@ COVERAGE_THRESHOLD := 45
 
 CLUSTER_NAME=anchore-k8s-inventory-testing
 
-GOLANG_CI_VERSION=v1.64.2
+GOLANG_CI_VERSION=v2.5.0
 GOBOUNCER_VERSION=v0.4.0
-GORELEASER_VERSION=v1.18.2
+GORELEASER_VERSION=v2.12.3
 
 ## Build variables
 DISTDIR=./dist
@@ -80,7 +80,7 @@ bootstrap: ## Download and install all go dependencies (+ prep tooling in the ./
 	# install utilities
 	[ -f "$(TEMPDIR)/golangci" ] || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(TEMPDIR) $(GOLANG_CI_VERSION)
 	[ -f "$(TEMPDIR)/bouncer" ] || curl -sSfL https://raw.githubusercontent.com/wagoodman/go-bouncer/master/bouncer.sh | sh -s -- -b $(TEMPDIR) $(GOBOUNCER_VERSION)
-	[ -f "$(TEMPDIR)/goreleaser" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/goreleaser/goreleaser@$(GORELEASER_VERSION)
+	[ -f "$(TEMPDIR)/goreleaser" ] || GOBIN=$(abspath $(TEMPDIR)) go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 
 .PHONY: install-cluster-deps
 install-cluster-deps: ## Install Helm and Kubectl

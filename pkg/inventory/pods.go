@@ -45,7 +45,7 @@ func ProcessPods(pods []v1.Pod, namespaceUID string, nodes map[string]Node, incl
 
 	for _, p := range pods {
 		pod := Pod{
-			Name:         p.ObjectMeta.Name,
+			Name:         p.Name,
 			UID:          string(p.UID),
 			NamespaceUID: namespaceUID,
 		}
