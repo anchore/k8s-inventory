@@ -175,7 +175,7 @@ $(SNAPSHOTDIR): ## Build snapshot release binaries and packages
 
 	# build release snapshots
 	BUILD_GIT_TREE_STATE=$(GITTREESTATE) \
-	$(TEMPDIR)/goreleaser release --skip-publish --clean --snapshot --config $(TEMPDIR)/goreleaser.yaml
+	$(TEMPDIR)/goreleaser release --skip=publish --clean --snapshot --config $(TEMPDIR)/goreleaser.yaml
 
 .PHONY: release
 release: clean-dist ## Build and publish final binaries and packages

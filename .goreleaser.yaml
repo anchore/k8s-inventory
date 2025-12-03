@@ -1,3 +1,5 @@
+version: 2
+
 release:
   # If set to auto, will mark the release as not ready for production
   # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
@@ -47,13 +49,13 @@ builds:
 
 archives:
   - id: archive-generic
-    format: tar.gz
-    builds:
+    formats: [ 'tar.gz' ]
+    ids:
       - generic
     name_template: 'anchore-k8s-inventory_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
   - id: archive-fips
-    format: tar.gz
-    builds:
+    formats: [ 'tar.gz' ]
+    ids:
       - fips
     name_template: 'anchore-k8s-inventory-fips_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
 
