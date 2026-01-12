@@ -27,7 +27,7 @@ func TestFetchPodsInNamespace(t *testing.T) {
 			name: "successfully return pods from namespace",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(&v1.Pod{
+					Clientset: fake.NewClientset(&v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-pod",
 							UID:  "test-uid",
