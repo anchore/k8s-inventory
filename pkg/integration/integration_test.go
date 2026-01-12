@@ -721,7 +721,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 					HealthReportIntervalSeconds: 60,
 				},
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(&pod, &replicaSet, &deployment),
+					Clientset: fake.NewClientset(&pod, &replicaSet, &deployment),
 				},
 				namespace:    "test-namespace",
 				name:         "test-pod",
@@ -764,7 +764,7 @@ func TestGetRegistrationInfo(t *testing.T) {
 					HealthReportIntervalSeconds: 60,
 				},
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(&pod, &replicaSet, &deployment),
+					Clientset: fake.NewClientset(&pod, &replicaSet, &deployment),
 				},
 				namespace:    "test-namespace",
 				name:         "test-pod",
@@ -830,7 +830,7 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			name: "successful get instance data from k8s",
 			args: args{
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(&pod, &replicaSet, &deployment),
+					Clientset: fake.NewClientset(&pod, &replicaSet, &deployment),
 				},
 				namespace: "test-namespace",
 				podName:   "test-pod",
@@ -856,7 +856,7 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			name: "no pod",
 			args: args{
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(),
+					Clientset: fake.NewClientset(),
 				},
 				namespace: "test-namespace",
 				podName:   "test-pod",
@@ -870,7 +870,7 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			name: "no replicaSet",
 			args: args{
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(&pod),
+					Clientset: fake.NewClientset(&pod),
 				},
 				namespace: "test-namespace",
 				podName:   "test-pod",
@@ -884,7 +884,7 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 			name: "no deployment",
 			args: args{
 				c: &client.Client{
-					Clientset: fake.NewSimpleClientset(&pod, &replicaSet),
+					Clientset: fake.NewClientset(&pod, &replicaSet),
 				},
 				namespace: "test-namespace",
 				podName:   "test-pod",

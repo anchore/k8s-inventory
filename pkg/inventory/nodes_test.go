@@ -29,7 +29,7 @@ func TestFetchNodes(t *testing.T) {
 			name: "successfully returns nodes",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(&v1.Node{
+					Clientset: fake.NewClientset(&v1.Node{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-node",
 							UID:  "test-uid",
@@ -79,7 +79,7 @@ func TestFetchNodes(t *testing.T) {
 			name: "successfully returns nodes without metadata",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(&v1.Node{
+					Clientset: fake.NewClientset(&v1.Node{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-node",
 							UID:  "test-uid",
@@ -123,7 +123,7 @@ func TestFetchNodes(t *testing.T) {
 			name: "successfully returns nodes with filtered annotation/label metadata",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(&v1.Node{
+					Clientset: fake.NewClientset(&v1.Node{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-node",
 							UID:  "test-uid",

@@ -32,7 +32,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "successfully returns namespaces",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(&v1.Namespace{
+					Clientset: fake.NewClientset(&v1.Namespace{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "test-namespace",
 							UID:  "test-uid",
@@ -66,7 +66,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "returns nil when no namespaces are found",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(),
+					Clientset: fake.NewClientset(),
 				},
 				batchSize:          100,
 				timeout:            10,
@@ -82,7 +82,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "successfully excludes namespaces",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -129,7 +129,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "successfully excludes namespaces by regex",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -188,7 +188,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "successfully shows only explicitly included namespaces",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -247,7 +247,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "successfully shows only explicitly included namespaces when excludes are also set",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -306,7 +306,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "omits metadata when disabled",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -363,7 +363,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "only includes specified namespace annotations and labels",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
@@ -406,7 +406,7 @@ func Test_fetchNamespaces(t *testing.T) {
 			name: "only includes specified namespace annotations and labels (regex)",
 			args: args{
 				c: client.Client{
-					Clientset: fake.NewSimpleClientset(
+					Clientset: fake.NewClientset(
 						&v1.Namespace{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "test-namespace",
