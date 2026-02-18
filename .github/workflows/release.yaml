@@ -9,7 +9,7 @@ on:
       - 'v*'
 
 env:
-  GO_VERSION: "1.25.5"
+  GO_VERSION: "1.25.7"
 
 jobs:
   wait-for-checks:
@@ -31,7 +31,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # This check name is defined as the github actions job name (in .github/workflows/static-analysis-integration.yaml)
-          checkName: "Static-Analysis (1.25.5, ubuntu-latest)"
+          checkName: "Static-Analysis (1.25.7, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Check unit, and integration test results
@@ -40,7 +40,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # This check name is defined as the github actions job name (in .github/workflows/static-analysis-integration.yaml)
-          checkName: "Tests (1.25.5, ubuntu-latest)"
+          checkName: "Tests (1.25.7, ubuntu-latest)"
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Quality gate
