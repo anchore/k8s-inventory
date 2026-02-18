@@ -77,6 +77,7 @@ dockers:
       - generic
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--provenance=false"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
@@ -91,6 +92,7 @@ dockers:
       - generic
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--provenance=false"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
@@ -106,6 +108,7 @@ dockers:
       - generic
     build_flag_templates:
       - "--platform=linux/arm64/v8"
+      - "--provenance=false"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
@@ -121,6 +124,7 @@ dockers:
       - generic
     build_flag_templates:
       - "--platform=linux/arm64/v8"
+      - "--provenance=false"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
@@ -134,6 +138,7 @@ dockers:
       - fips
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--provenance=false"
       - "--build-arg=BUILD_DATE={{.Date}}"
       - "--build-arg=BUILD_VERSION={{.Version}}"
       - "--build-arg=VCS_REF={{.FullCommit}}"
