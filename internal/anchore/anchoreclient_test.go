@@ -251,6 +251,63 @@ var (
 	}
 )
 
+func TestAPIClientError_Error(t *testing.T) {
+	tests := []struct {
+		name string
+		err  APIClientError
+		want string
+	}{
+		{
+			name: "basic error message",
+			err: APIClientError{
+				HTTPStatusCode: 404,
+				Message:        "Not Found",
+				Path:           "/v2/test",
+				Method:         "GET",
+			},
+			want: `API errorMsg(404): Not Found Path: "/v2/test" <nil> <nil>`,
+		},
+		{
+			name: "error with API details",
+			err: APIClientError{
+				HTTPStatusCode: 403,
+				Message:        "Forbidden",
+				Path:           "/v2/test",
+				Method:         "POST",
+				APIErrorDetails: &APIErrorDetails{
+					Message:  "Not authorized",
+					HTTPCode: 403,
+				},
+			},
+			want: `API errorMsg(403): Forbidden Path: "/v2/test"`,
+		},
+		{
+			name: "error with controller details",
+			err: APIClientError{
+				HTTPStatusCode: 404,
+				Message:        "Not Found",
+				Path:           "/v2/test",
+				Method:         "POST",
+				ControllerErrorDetails: &ControllerErrorDetails{
+					Type:   "about:blank",
+					Title:  "Not Found",
+					Detail: "URL not found",
+					Status: 404,
+				},
+			},
+			want: `API errorMsg(404): Not Found Path: "/v2/test"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.err.Error()
+			assert.Contains(t, result, tt.want[:30]) // Check beginning of message matches
+			assert.Contains(t, result, fmt.Sprintf("API errorMsg(%d)", tt.err.HTTPStatusCode))
+			assert.Contains(t, result, tt.err.Path)
+		})
+	}
+}
+
 func TestGetVersion(t *testing.T) {
 	defer gock.Off()
 

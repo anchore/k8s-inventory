@@ -1,12 +1,20 @@
 package pkg
 
 import (
+	"bytes"
+	"encoding/json"
+	"os"
 	"sort"
 	"testing"
 
 	"github.com/anchore/k8s-inventory/internal/config"
+	"github.com/anchore/k8s-inventory/internal/log"
+	"github.com/anchore/k8s-inventory/pkg/healthreporter"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
+	"github.com/anchore/k8s-inventory/pkg/logger"
+	"github.com/h2non/gock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -734,6 +742,196 @@ func Test_getBatchedInventoryReportsByNamespace(t *testing.T) {
 		})
 	}
 }
+
+func TestReportToStdout(t *testing.T) {
+	report := inventory.Report{
+		ClusterName: "test-cluster",
+		Timestamp:   "2024-01-01T00:00:00Z",
+		Containers:  []inventory.Container{},
+		Pods:        []inventory.Pod{},
+		Namespaces:  []inventory.Namespace{},
+		Nodes:       []inventory.Node{},
+	}
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	os.Stdout = w
+	err = reportToStdout(report)
+	w.Close()
+	os.Stdout = oldStdout
+
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	// Verify JSON output
+	var decoded inventory.Report
+	err = json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, "test-cluster", decoded.ClusterName)
+	assert.Equal(t, "2024-01-01T00:00:00Z", decoded.Timestamp)
+}
+
+func TestHandleReport(t *testing.T) {
+	tests := []struct {
+		name      string
+		report    inventory.Report
+		cfg       *config.Application
+		account   string
+		wantErr   bool
+		errString string
+	}{
+		{
+			name:   "empty account returns error",
+			report: inventory.Report{},
+			cfg: &config.Application{
+				AnchoreDetails: config.AnchoreInfo{
+					URL:      "https://ancho.re",
+					User:     "admin",
+					Password: "foobar",
+					Account:  "admin",
+				},
+			},
+			account:   "",
+			wantErr:   true,
+			errString: "account name is required",
+		},
+		{
+			name:   "invalid anchore details skips posting",
+			report: inventory.Report{},
+			cfg: &config.Application{
+				AnchoreDetails: config.AnchoreInfo{
+					URL:  "https://ancho.re",
+					User: "", // invalid - empty user
+				},
+			},
+			account: "test-account",
+			wantErr: false,
+		},
+		{
+			name:   "valid anchore details posts successfully",
+			report: inventory.Report{ClusterName: "test"},
+			cfg: &config.Application{
+				AnchoreDetails: config.AnchoreInfo{
+					URL:      "https://ancho.re",
+					User:     "admin",
+					Password: "foobar",
+					Account:  "admin",
+					HTTP: config.HTTPConfig{
+						TimeoutSeconds: 10,
+						Insecure:       true,
+					},
+				},
+			},
+			account: "test-account",
+			wantErr: false,
+		},
+		{
+			name:   "account route overrides credentials",
+			report: inventory.Report{ClusterName: "test"},
+			cfg: &config.Application{
+				AnchoreDetails: config.AnchoreInfo{
+					URL:      "https://ancho.re",
+					User:     "default-user",
+					Password: "default-pass",
+					Account:  "admin",
+					HTTP: config.HTTPConfig{
+						TimeoutSeconds: 10,
+						Insecure:       true,
+					},
+				},
+				AccountRoutes: config.AccountRoutes{
+					"routed-account": config.AccountRouteDetails{
+						User:     "route-user",
+						Password: "route-pass",
+					},
+				},
+			},
+			account: "routed-account",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer gock.Off()
+			// Set up gock mock for tests that will actually post
+			if tt.cfg.AnchoreDetails.IsValid() && tt.account != "" {
+				gock.New("https://ancho.re").
+					Post("/v2/kubernetes-inventory").
+					Reply(201).
+					JSON(map[string]interface{}{})
+			}
+
+			reportInfo := &healthreporter.InventoryReportInfo{}
+			err := HandleReport(tt.report, reportInfo, tt.cfg, tt.account)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errString != "" {
+					assert.Contains(t, err.Error(), tt.errString)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleReport_VerboseOutput(t *testing.T) {
+	// Test that VerboseInventoryReports triggers stdout output
+	report := inventory.Report{ClusterName: "verbose-test"}
+	cfg := &config.Application{
+		VerboseInventoryReports: true,
+		AnchoreDetails: config.AnchoreInfo{
+			URL:  "",
+			User: "", // invalid - won't try to post
+		},
+	}
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	os.Stdout = w
+	reportInfo := &healthreporter.InventoryReportInfo{}
+	err = HandleReport(report, reportInfo, cfg, "test-account")
+	w.Close()
+	os.Stdout = oldStdout
+
+	assert.NoError(t, err)
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	assert.Contains(t, buf.String(), "verbose-test")
+}
+
+func TestSetLogger(t *testing.T) {
+	// Verify that SetLogger sets the global logger
+	originalLogger := log.Log
+
+	var testLogger logger.Logger = &testLoggerImpl{}
+	SetLogger(testLogger)
+	assert.Equal(t, testLogger, log.Log)
+
+	// Restore
+	log.Log = originalLogger
+}
+
+// testLoggerImpl is a minimal logger for testing
+type testLoggerImpl struct{}
+
+func (l *testLoggerImpl) Errorf(_ string, _ ...interface{}) {}
+func (l *testLoggerImpl) Warnf(_ string, _ ...interface{})  {}
+func (l *testLoggerImpl) Infof(_ string, _ ...interface{})  {}
+func (l *testLoggerImpl) Info(_ ...interface{})              {}
+func (l *testLoggerImpl) Debugf(_ string, _ ...interface{}) {}
+func (l *testLoggerImpl) Debug(_ ...interface{})             {}
 
 func Test_getBatchedInventoryReportsByPayload(t *testing.T) {
 	type args struct {
