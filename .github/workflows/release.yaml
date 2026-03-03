@@ -8,6 +8,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 env:
   GO_VERSION: "1.25.X"
 
@@ -17,6 +20,8 @@ jobs:
     steps:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+        with:
+          persist-credentials: false
 
       # we don't want to release commits that have been pushed and tagged, but not necessarily merged onto main
       - name: Ensure tagged commit is on main
@@ -46,23 +51,33 @@ jobs:
       - name: Quality gate
         if: steps.static-analysis.outputs.conclusion != 'success' || steps.tests-unit-int.outputs.conclusion != 'success'
         run: |
-          echo "Static-Analysis Status : ${{ steps.static-analysis.outputs.conclusion }}"
-          echo "Unit/Integration Status : ${{ steps.tests-unit-int.outputs.conclusion }}"
+          echo "Static-Analysis Status : ${STEPS_STATIC_ANALYSIS_OUTPUTS_CONCLUSION}"
+          echo "Unit/Integration Status : ${STEPS_TESTS_UNIT_INT_OUTPUTS_CONCLUSION}"
           false
+        env:
+          STEPS_STATIC_ANALYSIS_OUTPUTS_CONCLUSION: ${{ steps.static-analysis.outputs.conclusion }}
+          STEPS_TESTS_UNIT_INT_OUTPUTS_CONCLUSION: ${{ steps.tests-unit-int.outputs.conclusion }}
 
   release:
     needs: [ wait-for-checks ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      # required for goreleaser signs section with cosign
+      id-token: write
     steps:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 #v6.3.0
         with:
           go-version-file: go.mod
           check-latest: true
+          cache: false
 
       - name: Restore bootstrap cache
         id: cache
@@ -75,6 +90,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('Makefile') }}-
             ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+          lookup-only: true
 
       - name: Bootstrap dependencies
         if: steps.cache.outputs.cache-hit != 'true'
