@@ -510,6 +510,27 @@ From `v1.7.0`, anchore-k8s-inventory will attempt to register as an integration 
 to allow Enterprise to track its status. This requires Enterprise release `v5.11.0` or later but the agent will work with
 older versions of Enterprise. However, it will only perform the inventory reporting with those Enterprise deployments.
 
+## Behavior change (v1.7.0)
+
+Please note that as of k8s-inventory >= v1.7.0 the /version/ endpoint must be routed to the API service via the provided Anchore Enterprise URL. The /version/ endpoint must return the version fields found in the JSON payload below:
+
+```json
+{
+  "api": {
+    "version": "2"
+  },
+  "db": {
+    "schema_version": "5260"
+  },
+  "service": {
+    "commit_sha": "c81dec015833e7705338ab082c8aa21c94ebfa9a",
+    "image_build_dt": "2026-03-31T13:21:56.051468Z",
+    "version": "5.26.0"
+  }
+}
+
+```
+
 ## Behavior change (v0.5.0) (formerly KAI) 
 
 In versions of anchore-k8s-inventory < v0.5.0 the default behavior was to output the inventory report
