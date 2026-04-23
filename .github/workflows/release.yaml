@@ -114,3 +114,23 @@ jobs:
           name: artifacts
           path: dist/**/*
 
+  trigger-e2e-tests:
+    needs: [ release ]
+    if: contains(github.ref_name, '-rc')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger e2e-testing k8s-inventory suite
+        run: |
+          curl -X POST https://circleci.com/api/v2/project/gh/anchore/e2e-testing/pipeline \
+            -H "Circle-Token: ${CIRCLECI_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"branch\": \"main\",
+              \"parameters\": {
+                \"K8S_INVENTORY_RUN\": true,
+                \"K8S_INVENTORY_IMAGE_TAG\": \"${GITHUB_REF_NAME}\"
+              }
+            }"
+        env:
+          CIRCLECI_TOKEN: ${{ secrets.CIRCLECI_TOKEN }}
+
