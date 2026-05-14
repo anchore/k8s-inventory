@@ -20,6 +20,8 @@ import (
 	"time"
 )
 
+const methodNotAllowedDetail = "Method Not Allowed"
+
 type Version struct {
 	API struct {
 		Version string `json:"version"`
@@ -274,7 +276,7 @@ func ServerLacksAgentHealthAPISupport(err error) bool {
 		}
 
 		if apiClientError.HTTPStatusCode == http.StatusMethodNotAllowed &&
-			apiClientError.ControllerErrorDetails.Detail == "Method Not Allowed" {
+			apiClientError.ControllerErrorDetails.Detail == methodNotAllowedDetail {
 			return true
 		}
 	}
