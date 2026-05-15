@@ -14,6 +14,8 @@ var (
 	tagRegex    = regexp.MustCompile(`:[\w][\w.-]{0,127}$`)
 )
 
+const missingTagPolicyDigest = "digest"
+
 func getRegistryOverrideNormalisedImageTag(imageTag, missingRegistryOverride string) string {
 	if missingRegistryOverride != "" {
 		parts := strings.Split(imageTag, "/")
@@ -93,7 +95,7 @@ func getContainersInPod(pod v1.Pod, missingRegistryOverride, missingTagPolicy, d
 			switch missingTagPolicy {
 			case "dummy":
 				c.ImageTag = fmt.Sprintf("%s:%s", c.ImageTag, dummyTag)
-			case "digest":
+			case missingTagPolicyDigest:
 				digest := strings.Split(c.ImageDigest, ":")
 				c.ImageTag = fmt.Sprintf("%s:%s", c.ImageTag, digest[len(digest)-1])
 			}

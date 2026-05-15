@@ -218,8 +218,8 @@ var (
 		Method:         "POST",
 		ControllerErrorDetails: &ControllerErrorDetails{
 			Type:   "about:blank",
-			Title:  "Method Not Allowed",
-			Detail: "Method Not Allowed",
+			Title:  methodNotAllowedDetail,
+			Detail: methodNotAllowedDetail,
 			Status: http.StatusMethodNotAllowed,
 		},
 	}

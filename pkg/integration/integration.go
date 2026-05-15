@@ -26,6 +26,7 @@ var inventoryReportingActive = false
 const Type = "k8s_inventory_agent"
 const RegisterAPIPathV2 = "v2/system/integrations/registration"
 const AppVersionLabel = "app.kubernetes.io/version"
+const devVersion = "dev"
 
 type Channels struct {
 	IntegrationObj            chan *Integration
@@ -345,7 +346,7 @@ func getRegistrationInfo(appConfig *config.Application, k8sClient *client.Client
 
 	appVersion := akiVersion.FromBuild().Version
 	if appVersion == akiVersion.ValueNotProvided {
-		appVersion = "dev"
+		appVersion = devVersion
 	}
 
 	instance := Registration{

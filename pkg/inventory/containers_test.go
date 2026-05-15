@@ -43,7 +43,7 @@ func Test_getContainersInPod(t *testing.T) {
 					},
 				},
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "UNKNOWN",
 			},
 			want: []Container{
@@ -79,7 +79,7 @@ func Test_getContainersInPod(t *testing.T) {
 					},
 				},
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "UNKNOWN",
 			},
 			want: []Container{
@@ -107,7 +107,7 @@ func Test_getContainersInPod(t *testing.T) {
 					},
 				},
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "UNKNOWN",
 			},
 			want: []Container{
@@ -190,7 +190,7 @@ func TestGetContainersFromPods(t *testing.T) {
 				},
 				ignoreNotRunning:        false,
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "",
 			},
 			want: []Container{
@@ -257,7 +257,7 @@ func TestGetContainersFromPods(t *testing.T) {
 				},
 				ignoreNotRunning:        true,
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "",
 			},
 			want: []Container{
@@ -297,7 +297,7 @@ func TestGetContainersFromPods(t *testing.T) {
 				},
 				ignoreNotRunning:        false,
 				missingRegistryOverride: "",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "",
 			},
 			want: []Container{
@@ -459,7 +459,7 @@ func TestGetContainersFromPods(t *testing.T) {
 				},
 				ignoreNotRunning:        false,
 				missingRegistryOverride: "custom.registry.io",
-				missingTagPolicy:        "digest",
+				missingTagPolicy:        missingTagPolicyDigest,
 				dummyTag:                "",
 			},
 			want: []Container{

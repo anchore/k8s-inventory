@@ -17,16 +17,16 @@ func TestParseMode(t *testing.T) {
 		want Mode
 	}{
 		{
-			name: "adhoc",
+			name: adhocStr,
 			args: args{
-				userStr: "adhoc",
+				userStr: adhocStr,
 			},
 			want: AdHoc,
 		},
 		{
-			name: "periodic",
+			name: periodicStr,
 			args: args{
-				userStr: "periodic",
+				userStr: periodicStr,
 			},
 			want: PeriodicPolling,
 		},

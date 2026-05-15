@@ -12,9 +12,14 @@ const (
 	PeriodicPolling
 )
 
+const (
+	adhocStr    = "adhoc"
+	periodicStr = "periodic"
+)
+
 var modeStr = []string{
-	"adhoc",
-	"periodic",
+	adhocStr,
+	periodicStr,
 }
 
 var Modes = []Mode{
