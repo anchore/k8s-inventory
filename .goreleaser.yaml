@@ -67,23 +67,8 @@ changelog:
       - '^test:'
 
 dockers:
-  - image_templates:
-      - "anchore/k8s-inventory:latest"
-      - "anchore/k8s-inventory:v{{ .Major }}-amd64"
-      - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64"
-    dockerfile: Dockerfile
-    use: buildx
-    ids:
-      - generic
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--provenance=false"
-      - "--build-arg=BUILD_DATE={{.Date}}"
-      - "--build-arg=BUILD_VERSION={{.Version}}"
-      - "--build-arg=VCS_REF={{.FullCommit}}"
-      - "--build-arg=VCS_URL={{.GitURL}}"
-    skip_push: auto
-
+  # Generic amd64 image — always pushed (incl. prereleases); building block for the generic
+  # multi-arch manifests below.
   - image_templates:
       - "anchore/k8s-inventory:{{ .Tag }}-amd64"
     dockerfile: Dockerfile
@@ -98,23 +83,7 @@ dockers:
       - "--build-arg=VCS_REF={{.FullCommit}}"
       - "--build-arg=VCS_URL={{.GitURL}}"
 
-  - image_templates:
-      - "anchore/k8s-inventory:v{{ .Major }}-arm64v8"
-      - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8"
-    goarch: arm64
-    dockerfile: Dockerfile
-    use: buildx
-    ids:
-      - generic
-    build_flag_templates:
-      - "--platform=linux/arm64/v8"
-      - "--provenance=false"
-      - "--build-arg=BUILD_DATE={{.Date}}"
-      - "--build-arg=BUILD_VERSION={{.Version}}"
-      - "--build-arg=VCS_REF={{.FullCommit}}"
-      - "--build-arg=VCS_URL={{.GitURL}}"
-    skip_push: auto
-
+  # Generic arm64 image — always pushed (incl. prereleases).
   - image_templates:
       - "anchore/k8s-inventory:{{ .Tag }}-arm64v8"
     goarch: arm64
@@ -130,7 +99,14 @@ dockers:
       - "--build-arg=VCS_REF={{.FullCommit}}"
       - "--build-arg=VCS_URL={{.GitURL}}"
 
+  # FIPS image (amd64 only — boringcrypto has no arm64 target). skip_push: auto publishes the
+  # whole FIPS line on final releases and skips it on prereleases. All names point at the same
+  # image; :{Tag}-fips-amd64 is kept for back-compat.
   - image_templates:
+      - "anchore/k8s-inventory:latest-fips"
+      - "anchore/k8s-inventory:v{{ .Major }}-fips"
+      - "anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-fips"
+      - "anchore/k8s-inventory:{{ .Tag }}-fips"
       - "anchore/k8s-inventory:{{ .Tag }}-fips-amd64"
     dockerfile: Dockerfile
     use: buildx
@@ -146,24 +122,26 @@ dockers:
     skip_push: auto
 
 docker_manifests:
+  # Generic multi-arch manifests (amd64 + arm64), all built from the per-tag arch images above.
+  # :{Tag} omits skip_push so prereleases get a pullable multi-arch tag; latest / major / minor
+  # use skip_push: auto so a prerelease never moves them.
   - name_template: anchore/k8s-inventory:{{ .Tag }}
     image_templates:
       - anchore/k8s-inventory:{{ .Tag }}-amd64
-      - anchore/k8s-inventory:{{ .Tag }}-fips-amd64
-      - anchore/k8s-inventory:v{{ .Major }}-amd64
-      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
       - anchore/k8s-inventory:{{ .Tag }}-arm64v8
-      - anchore/k8s-inventory:v{{ .Major }}-arm64v8
-      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8
-    skip_push: auto
   - name_template: anchore/k8s-inventory:latest
     image_templates:
       - anchore/k8s-inventory:{{ .Tag }}-amd64
-      - anchore/k8s-inventory:{{ .Tag }}-fips-amd64
-      - anchore/k8s-inventory:v{{ .Major }}-amd64
-      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-amd64
       - anchore/k8s-inventory:{{ .Tag }}-arm64v8
-      - anchore/k8s-inventory:v{{ .Major }}-arm64v8
-      - anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}-arm64v8
+    skip_push: auto
+  - name_template: anchore/k8s-inventory:v{{ .Major }}
+    image_templates:
+      - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-arm64v8
+    skip_push: auto
+  - name_template: anchore/k8s-inventory:v{{ .Major }}.{{ .Minor }}
+    image_templates:
+      - anchore/k8s-inventory:{{ .Tag }}-amd64
+      - anchore/k8s-inventory:{{ .Tag }}-arm64v8
     skip_push: auto
       
