@@ -2,7 +2,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/anchore/k8s-inventory)](https://goreportcard.com/report/github.com/anchore/k8s-inventory)
 [![GitHub release](https://img.shields.io/github/release/anchore/k8s-inventory.svg)](https://github.com/anchore/k8s-inventory/releases/latest)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/anchore/k8s-inventory/blob/main/LICENSE)
-
+ 
 `anchore-k8s-inventory` polls the Kubernetes API on an interval to retrieve which images are currently in use.
 
 It can be run inside a cluster (under a Service Account) or outside (via any provided kubeconfig).
