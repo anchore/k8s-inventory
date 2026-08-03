@@ -1,0 +1,111 @@
+# Gated RC/GA tagger for k8s-inventory's automated release pipeline.
+#
+# One workflow, two stages, keyed on the version string:
+#   -rc version  → pins the `rc-release` environment
+#   bare version → pins the `ga-release` environment
+# Each environment is gated by the platform-int-releaser GitHub App (attached as
+# a custom deployment protection rule). GitHub parks the deployment; the Lambda
+# evaluates policy, mints a repo-scoped contents:write token, writes it as the
+# TAG_TOKEN env secret, and approves the gate. This workflow then pushes the tag.
+#
+# TAG-ONLY BY DESIGN. It does NOT build artifacts or create the GitHub Release.
+# Pushing the v* tag triggers the existing release.yaml (goreleaser), which
+# builds + pushes the images and creates the Release (`prerelease: auto` marks
+# RCs). That Release event is what drives the rest of the pipeline —
+# release.prereleased → e2e (trigger-circleci-e2e.yaml); release.published (GA)
+# → downstream fan-out. Creating a release here too would collide with
+# goreleaser, so we deliberately stop at the tag push.
+#
+# RC is cut from main HEAD; GA is cut from the SAME commit as the latest RC of
+# that version — the commit e2e actually validated — not a possibly-advanced
+# main.
+#
+# The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
+# this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
+# (release-integrations.yaml). It declares a single `version` input — the only
+# input the Lambda sends.
+
+name: Release Integrations
+
+permissions: {}
+
+concurrency:
+  group: release-integrations
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version to release, RC or GA (e.g. 1.2.3 or 1.2.3-rc1 — v prefix optional)
+        required: true
+
+run-name: release-integrations ${{ inputs.version }}
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    # each stage keeps its own gated env so the automation can apply different
+    # policy to an RC than to a GA (e.g. human reviewers on ga-release).
+    environment: ${{ contains(inputs.version, '-rc') && 'rc-release' || 'ga-release' }}
+    # No workflow-level GITHUB_TOKEN scopes: the git push uses the short-lived
+    # TAG_TOKEN minted by the release automation, not the workflow token.
+    permissions: {}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify TAG_TOKEN was minted
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+        run: |
+          if [ -z "${TAG_TOKEN:-}" ]; then
+            echo "TAG_TOKEN not set — the env gate should have written it as an env secret." >&2
+            exit 1
+          fi
+          echo "TAG_TOKEN present."
+
+      - name: Push tag
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          # tolerate both `1.2.3` and `v1.2.3` inputs
+          TAG="v${VERSION#v}"
+
+          case "$TAG" in
+            *-rc*)
+              # RC: cut from the currently checked-out ref (main HEAD).
+              echo "tagging RC $TAG at HEAD"
+              git tag "$TAG"
+              ;;
+            *)
+              # GA: tag the SAME commit as the latest RC of this version. main
+              # may have advanced since that RC was cut and e2e-tested, so the GA
+              # must point at exactly the commit that was validated — not HEAD.
+              # fetch-depth: 0 makes every RC tag + its commit available locally.
+              # sort -V orders rc2 < rc10 correctly; the glob won't match other
+              # versions (e.g. v1.2.30-rc1) since the next char after $TAG is '-'.
+              LATEST_RC=$(git tag -l "${TAG}-rc*" | sort -V | tail -n1)
+              if [ -z "$LATEST_RC" ]; then
+                echo "no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
+                exit 1
+              fi
+              RC_SHA=$(git rev-list -n1 "$LATEST_RC")
+              echo "tagging GA $TAG at $LATEST_RC ($RC_SHA)"
+              git tag "$TAG" "$RC_SHA"
+              ;;
+          esac
+
+          echo "pushing $TAG"
+          # github's git endpoint rejects `bearer` headers. a credential helper
+          # feeds the token to git over a pipe instead — note the single quotes:
+          # git stores the literal `$TAG_TOKEN`, and the helper's own shell
+          # expands it from the env at push time, so the value never lands in
+          # argv or in .git/config.
+          git -c credential.helper= \
+              -c credential.helper='!f() { echo username=x-access-token; echo "password=$TAG_TOKEN"; }; f' \
+              push origin "$TAG"

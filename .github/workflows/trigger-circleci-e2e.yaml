@@ -1,0 +1,99 @@
+# Triggers the downstream CircleCI e2e pipeline when a k8s-inventory
+# *pre-release* (RC) is published, so the RC image gets exercised end-to-end
+# before it is promoted to GA.
+#
+# The e2e pipeline lives in a *separate, private* CircleCI project (its repo is
+# not named here — see the CIRCLECI_PROJECT_SLUG secret below). Because it's a
+# different repo from k8s-inventory:
+#   - We trigger by BRANCH, never by tag: the RC tag exists on k8s-inventory,
+#     not on the CircleCI project's repo, so a tag trigger would 404 there.
+#   - The product repo + RC tag this run is for are carried as pipeline
+#     parameters (CALLBACK_PRODUCT_REPO / CALLBACK_RC_TAG). The
+#     platform-int-releaser Lambda reads them back via CircleCI's pipeline-values
+#     API to recover which product/RC a completed run tested — the native
+#     workflow-completed webhook does not carry pipeline parameters.
+#
+# ┌─ REQUIRED on the CircleCI project side ────────────────────────────────────┐
+# │ The project's setup config AND its continuation config must DECLARE the     │
+# │ CALLBACK_PRODUCT_REPO and CALLBACK_RC_TAG string parameters (default "").   │
+# │ CircleCI rejects a trigger that sets undeclared pipeline parameters, so     │
+# │ without this the POST below 400s. They need only be declared (so the Lambda │
+# │ can read them back); no job has to consume them.                            │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# `prereleased` fires only for releases with the pre-release box checked
+# (goreleaser's `prerelease: auto` sets it for RC tags), so GA releases never
+# trigger this. The explicit `if` below is belt-and-suspenders.
+#
+# Config (all live in the `e2e` environment):
+#   - secrets.CIRCLECI_API_TOKEN      CircleCI token able to trigger the e2e
+#                                     project's pipelines (Circle-Token)
+#   - secrets.CIRCLECI_PROJECT_SLUG   the e2e project slug, e.g. gh/<org>/<repo>.
+#                                     A secret (not a var) so the private repo
+#                                     name is masked in logs, not just kept out
+#                                     of source.
+#   - vars.CIRCLECI_E2E_BRANCH        branch of the e2e project to run
+#                                     (defaults to main; not sensitive)
+
+name: Trigger CircleCI e2e
+
+permissions: {}
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: RC tag to run the e2e pipeline for (e.g. v1.2.3-rc1)
+        required: true
+
+jobs:
+  trigger:
+    # Run for manual dispatches, or for release events only when the release is
+    # actually a pre-release.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease == true }}
+    runs-on: ubuntu-24.04
+    environment: e2e
+    permissions: {}
+    steps:
+      - name: Trigger e2e pipeline for the RC
+        env:
+          CIRCLECI_API_TOKEN: ${{ secrets.CIRCLECI_API_TOKEN }}
+          PROJECT_SLUG: ${{ secrets.CIRCLECI_PROJECT_SLUG }}
+          E2E_BRANCH: ${{ vars.CIRCLECI_E2E_BRANCH || 'main' }}
+          PRODUCT_REPO: ${{ github.repository }}
+          # release events carry tag_name; manual runs supply it via input.
+          RC_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -eu
+          : "${CIRCLECI_API_TOKEN:?secret not set}"
+          : "${PROJECT_SLUG:?secret not set}"
+
+          # Trigger by BRANCH, not tag: the RC tag lives on k8s-inventory, not on
+          # the e2e project's repo. The product repo + RC tag ride along as
+          # pipeline parameters instead (the CALLBACK_* pair the Lambda reads
+          # back).
+          #
+          # RUN_K8S_SUITE=true selects the k8s-inventory suite in the e2e
+          # project's setup config; TAG_K8S_INVENTORY pins it to this RC's
+          # published image (goreleaser pushes anchore/k8s-inventory:<tag> for
+          # prereleases).
+          BODY=$(jq -cn \
+            --arg br   "$E2E_BRANCH" \
+            --arg repo "$PRODUCT_REPO" \
+            --arg tag  "$RC_TAG" \
+            '{branch:$br, parameters:{
+                CALLBACK_PRODUCT_REPO: $repo,
+                CALLBACK_RC_TAG:       $tag,
+                RUN_K8S_SUITE:         true,
+                TAG_K8S_INVENTORY:     $tag
+             }}')
+
+          # -f makes the step fail on any 4xx/5xx from the API (e.g. an
+          # undeclared-parameter 400 → see the required declaration above).
+          curl -fsS -X POST \
+            "https://circleci.com/api/v2/project/${PROJECT_SLUG}/pipeline" \
+            -H "Circle-Token: ${CIRCLECI_API_TOKEN}" \
+            -H "content-type: application/json" \
+            --data "$BODY"
