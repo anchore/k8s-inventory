@@ -20,6 +20,14 @@
 # that version — the commit e2e actually validated — not a possibly-advanced
 # main.
 #
+# DEPENDABOT-ONLY GUARD. This workflow may only cut dependency-bump releases:
+# every commit between the last GA release and the commit being tagged must be
+# authored by dependabot[bot]. A single human (or other) author blocks the tag.
+# The check runs against the commit we're about to tag (HEAD for an RC, the RC's
+# commit for a GA), so a human commit that lands on main *after* an RC does not
+# block promoting that already-validated RC — only what's actually in the
+# release matters.
+#
 # The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
 # this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
 # (release-integrations.yaml). It declares a single `version` input — the only
@@ -67,9 +75,9 @@ jobs:
           fi
           echo "TAG_TOKEN present."
 
-      - name: Push tag
+      - name: Resolve target commit and enforce dependabot-only changes
+        id: plan
         env:
-          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: |
           set -eu
@@ -79,8 +87,8 @@ jobs:
           case "$TAG" in
             *-rc*)
               # RC: cut from the currently checked-out ref (main HEAD).
-              echo "tagging RC $TAG at HEAD"
-              git tag "$TAG"
+              TARGET_SHA=$(git rev-parse HEAD)
+              echo "RC $TAG → tag HEAD ($TARGET_SHA)"
               ;;
             *)
               # GA: tag the SAME commit as the latest RC of this version. main
@@ -94,13 +102,48 @@ jobs:
                 echo "no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
                 exit 1
               fi
-              RC_SHA=$(git rev-list -n1 "$LATEST_RC")
-              echo "tagging GA $TAG at $LATEST_RC ($RC_SHA)"
-              git tag "$TAG" "$RC_SHA"
+              TARGET_SHA=$(git rev-list -n1 "$LATEST_RC")
+              echo "GA $TAG → tag $LATEST_RC ($TARGET_SHA)"
               ;;
           esac
 
-          echo "pushing $TAG"
+          # Guard: only dependency-bump releases may be tagged by this workflow.
+          # Baseline is the last GA tag (v<semver> with no prerelease suffix);
+          # every commit from there to the commit we're about to tag must be
+          # authored by dependabot[bot]. --no-merges: a squash/merge commit's
+          # committer (web-flow or whoever clicked merge) is irrelevant — we only
+          # judge who authored the actual changes.
+          BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
+          if [ -z "$BASE" ]; then
+            echo "::error::no prior GA release tag to compare against; cut the first release manually." >&2
+            exit 1
+          fi
+          echo "checking authors of ${BASE}..${TARGET_SHA}"
+
+          NON_DEP=$(git log --no-merges --format='%an' "${BASE}..${TARGET_SHA}" | grep -cxvF 'dependabot[bot]' || true)
+          if [ "${NON_DEP:-0}" -ne 0 ]; then
+            echo "::error::${NON_DEP} non-dependabot commit(s) since ${BASE} — refusing to auto-release (this workflow only tags dependency-bump releases)." >&2
+            echo "non-dependabot commits:" >&2
+            git log --no-merges --format='  %h  %an  %s' "${BASE}..${TARGET_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
+            exit 1
+          fi
+          echo "all changes since ${BASE} are from dependabot[bot] — ok to tag ${TAG}."
+
+          {
+            echo "tag=${TAG}"
+            echo "target_sha=${TARGET_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          TARGET_SHA: ${{ steps.plan.outputs.target_sha }}
+        run: |
+          set -eu
+          echo "tagging $TAG at $TARGET_SHA and pushing"
+          git tag "$TAG" "$TARGET_SHA"
+
           # github's git endpoint rejects `bearer` headers. a credential helper
           # feeds the token to git over a pipe instead — note the single quotes:
           # git stores the literal `$TAG_TOKEN`, and the helper's own shell

@@ -13,6 +13,16 @@
 #     API to recover which product/RC a completed run tested — the native
 #     workflow-completed webhook does not carry pipeline parameters.
 #
+# GA-PROMOTION GATE. A successful e2e run drives a GA tag ONLY when this workflow
+# sends the CALLBACK_* params (that pair is what the Lambda dispatches GA from).
+#   - Automatic `release.prereleased` runs always send them — that's the pipeline.
+#   - MANUAL (workflow_dispatch) runs are TEST-ONLY by default: they omit
+#     CALLBACK_*, so e2e runs but the callback sees no product/RC and skips the
+#     GA dispatch. To deliberately promote via a manual run, set promote=true.
+# This keeps a casual "re-run e2e" from cutting a GA. (Even a promoting run still
+# has to clear the ga-release environment's required reviewers downstream — this
+# gate is the first line, not the only one.)
+#
 # ┌─ REQUIRED on the CircleCI project side ────────────────────────────────────┐
 # │ The project's setup config AND its continuation config must DECLARE the     │
 # │ CALLBACK_PRODUCT_REPO and CALLBACK_RC_TAG string parameters (default "").   │
@@ -20,10 +30,6 @@
 # │ without this the POST below 400s. They need only be declared (so the Lambda │
 # │ can read them back); no job has to consume them.                            │
 # └─────────────────────────────────────────────────────────────────────────────┘
-#
-# `prereleased` fires only for releases with the pre-release box checked
-# (goreleaser's `prerelease: auto` sets it for RC tags), so GA releases never
-# trigger this. The explicit `if` below is belt-and-suspenders.
 #
 # Config (all live in the `e2e` environment):
 #   - secrets.CIRCLECI_API_TOKEN      CircleCI token able to trigger the e2e
@@ -47,6 +53,10 @@ on:
       tag:
         description: RC tag to run the e2e pipeline for (e.g. v1.2.3-rc1)
         required: true
+      promote:
+        description: "if e2e passes, ALSO allow promotion to GA (default off — manual runs are test-only)"
+        type: boolean
+        default: false
 
 jobs:
   trigger:
@@ -63,32 +73,47 @@ jobs:
           PROJECT_SLUG: ${{ secrets.CIRCLECI_PROJECT_SLUG }}
           E2E_BRANCH: ${{ vars.CIRCLECI_E2E_BRANCH || 'main' }}
           PRODUCT_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
           # release events carry tag_name; manual runs supply it via input.
           RC_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          # only meaningful on manual runs; empty on release events.
+          PROMOTE_INPUT: ${{ inputs.promote }}
         run: |
           set -eu
           : "${CIRCLECI_API_TOKEN:?secret not set}"
           : "${PROJECT_SLUG:?secret not set}"
 
+          # RC-tag shape check: reject anything that isn't vX.Y.Z-rcN before we
+          # trigger. Belt-and-suspenders — the Lambda re-validates this and the
+          # GA tagger additionally requires the RC tag to actually exist.
+          case "$RC_TAG" in
+            v[0-9]*.[0-9]*.[0-9]*-rc[0-9]*) : ;;
+            *) echo "refusing: '$RC_TAG' is not an RC tag (expected vX.Y.Z-rcN)" >&2; exit 1 ;;
+          esac
+
+          # GA-promotion gate: automatic pre-release events always promote; a
+          # manual run only promotes when the operator opts in with promote=true.
+          if [ "$EVENT" = "release" ] || [ "${PROMOTE_INPUT:-false}" = "true" ]; then
+            PROMOTE=true
+          else
+            PROMOTE=false
+          fi
+          echo "event=$EVENT  promote=$PROMOTE  rc_tag=$RC_TAG"
+
+          # Base params always run the k8s suite against this RC's image. A
+          # promoting run additionally carries the CALLBACK_* pair the Lambda
+          # dispatches GA from; a test-only run omits it and therefore CANNOT
+          # cut a GA (the callback sees no product/RC → log-only skip).
+          PARAMS=$(jq -cn --arg tag "$RC_TAG" '{RUN_K8S_SUITE: true, TAG_K8S_INVENTORY: $tag}')
+          if [ "$PROMOTE" = "true" ]; then
+            PARAMS=$(printf '%s' "$PARAMS" | jq -c \
+              --arg repo "$PRODUCT_REPO" --arg tag "$RC_TAG" \
+              '. + {CALLBACK_PRODUCT_REPO: $repo, CALLBACK_RC_TAG: $tag}')
+          fi
+
           # Trigger by BRANCH, not tag: the RC tag lives on k8s-inventory, not on
-          # the e2e project's repo. The product repo + RC tag ride along as
-          # pipeline parameters instead (the CALLBACK_* pair the Lambda reads
-          # back).
-          #
-          # RUN_K8S_SUITE=true selects the k8s-inventory suite in the e2e
-          # project's setup config; TAG_K8S_INVENTORY pins it to this RC's
-          # published image (goreleaser pushes anchore/k8s-inventory:<tag> for
-          # prereleases).
-          BODY=$(jq -cn \
-            --arg br   "$E2E_BRANCH" \
-            --arg repo "$PRODUCT_REPO" \
-            --arg tag  "$RC_TAG" \
-            '{branch:$br, parameters:{
-                CALLBACK_PRODUCT_REPO: $repo,
-                CALLBACK_RC_TAG:       $tag,
-                RUN_K8S_SUITE:         true,
-                TAG_K8S_INVENTORY:     $tag
-             }}')
+          # the e2e project's repo.
+          BODY=$(jq -cn --arg br "$E2E_BRANCH" --argjson p "$PARAMS" '{branch: $br, parameters: $p}')
 
           # -f makes the step fail on any 4xx/5xx from the API (e.g. an
           # undeclared-parameter 400 → see the required declaration above).
