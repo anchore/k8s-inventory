@@ -1,0 +1,154 @@
+# Gated RC/GA tagger for k8s-inventory's automated release pipeline.
+#
+# One workflow, two stages, keyed on the version string:
+#   -rc version  → pins the `rc-release` environment
+#   bare version → pins the `ga-release` environment
+# Each environment is gated by the platform-int-releaser GitHub App (attached as
+# a custom deployment protection rule). GitHub parks the deployment; the Lambda
+# evaluates policy, mints a repo-scoped contents:write token, writes it as the
+# TAG_TOKEN env secret, and approves the gate. This workflow then pushes the tag.
+#
+# TAG-ONLY BY DESIGN. It does NOT build artifacts or create the GitHub Release.
+# Pushing the v* tag triggers the existing release.yaml (goreleaser), which
+# builds + pushes the images and creates the Release (`prerelease: auto` marks
+# RCs). That Release event is what drives the rest of the pipeline —
+# release.prereleased → e2e (trigger-circleci-e2e.yaml); release.published (GA)
+# → downstream fan-out. Creating a release here too would collide with
+# goreleaser, so we deliberately stop at the tag push.
+#
+# RC is cut from main HEAD; GA is cut from the SAME commit as the latest RC of
+# that version — the commit e2e actually validated — not a possibly-advanced
+# main.
+#
+# DEPENDABOT-ONLY GUARD. This workflow may only cut dependency-bump releases:
+# every commit between the last GA release and the commit being tagged must be
+# authored by dependabot[bot]. A single human (or other) author blocks the tag.
+# The check runs against the commit we're about to tag (HEAD for an RC, the RC's
+# commit for a GA), so a human commit that lands on main *after* an RC does not
+# block promoting that already-validated RC — only what's actually in the
+# release matters.
+#
+# The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
+# this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
+# (release-integrations.yaml). It declares a single `version` input — the only
+# input the Lambda sends.
+
+name: Release Integrations
+
+permissions: {}
+
+concurrency:
+  group: release-integrations
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version to release, RC or GA (e.g. 1.2.3 or 1.2.3-rc1 — v prefix optional)
+        required: true
+
+run-name: release-integrations ${{ inputs.version }}
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    # each stage keeps its own gated env so the automation can apply different
+    # policy to an RC than to a GA (e.g. human reviewers on ga-release).
+    environment: ${{ contains(inputs.version, '-rc') && 'rc-release' || 'ga-release' }}
+    # No workflow-level GITHUB_TOKEN scopes: the git push uses the short-lived
+    # TAG_TOKEN minted by the release automation, not the workflow token.
+    permissions: {}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify TAG_TOKEN was minted
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+        run: |
+          if [ -z "${TAG_TOKEN:-}" ]; then
+            echo "TAG_TOKEN not set — the env gate should have written it as an env secret." >&2
+            exit 1
+          fi
+          echo "TAG_TOKEN present."
+
+      - name: Resolve target commit and enforce dependabot-only changes
+        id: plan
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          # tolerate both `1.2.3` and `v1.2.3` inputs
+          TAG="v${VERSION#v}"
+
+          case "$TAG" in
+            *-rc*)
+              # RC: cut from the currently checked-out ref (main HEAD).
+              TARGET_SHA=$(git rev-parse HEAD)
+              echo "RC $TAG → tag HEAD ($TARGET_SHA)"
+              ;;
+            *)
+              # GA: tag the SAME commit as the latest RC of this version. main
+              # may have advanced since that RC was cut and e2e-tested, so the GA
+              # must point at exactly the commit that was validated — not HEAD.
+              # fetch-depth: 0 makes every RC tag + its commit available locally.
+              # sort -V orders rc2 < rc10 correctly; the glob won't match other
+              # versions (e.g. v1.2.30-rc1) since the next char after $TAG is '-'.
+              LATEST_RC=$(git tag -l "${TAG}-rc*" | sort -V | tail -n1)
+              if [ -z "$LATEST_RC" ]; then
+                echo "no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
+                exit 1
+              fi
+              TARGET_SHA=$(git rev-list -n1 "$LATEST_RC")
+              echo "GA $TAG → tag $LATEST_RC ($TARGET_SHA)"
+              ;;
+          esac
+
+          # Guard: only dependency-bump releases may be tagged by this workflow.
+          # Baseline is the last GA tag (v<semver> with no prerelease suffix);
+          # every commit from there to the commit we're about to tag must be
+          # authored by dependabot[bot]. --no-merges: a squash/merge commit's
+          # committer (web-flow or whoever clicked merge) is irrelevant — we only
+          # judge who authored the actual changes.
+          BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
+          if [ -z "$BASE" ]; then
+            echo "::error::no prior GA release tag to compare against; cut the first release manually." >&2
+            exit 1
+          fi
+          echo "checking authors of ${BASE}..${TARGET_SHA}"
+
+          NON_DEP=$(git log --no-merges --format='%an' "${BASE}..${TARGET_SHA}" | grep -cxvF 'dependabot[bot]' || true)
+          if [ "${NON_DEP:-0}" -ne 0 ]; then
+            echo "::error::${NON_DEP} non-dependabot commit(s) since ${BASE} — refusing to auto-release (this workflow only tags dependency-bump releases)." >&2
+            echo "non-dependabot commits:" >&2
+            git log --no-merges --format='  %h  %an  %s' "${BASE}..${TARGET_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
+            exit 1
+          fi
+          echo "all changes since ${BASE} are from dependabot[bot] — ok to tag ${TAG}."
+
+          {
+            echo "tag=${TAG}"
+            echo "target_sha=${TARGET_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push tag
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          TARGET_SHA: ${{ steps.plan.outputs.target_sha }}
+        run: |
+          set -eu
+          echo "tagging $TAG at $TARGET_SHA and pushing"
+          git tag "$TAG" "$TARGET_SHA"
+
+          # github's git endpoint rejects `bearer` headers. a credential helper
+          # feeds the token to git over a pipe instead — note the single quotes:
+          # git stores the literal `$TAG_TOKEN`, and the helper's own shell
+          # expands it from the env at push time, so the value never lands in
+          # argv or in .git/config.
+          git -c credential.helper= \
+              -c credential.helper='!f() { echo username=x-access-token; echo "password=$TAG_TOKEN"; }; f' \
+              push origin "$TAG"
