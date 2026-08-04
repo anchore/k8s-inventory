@@ -28,6 +28,11 @@
 # block promoting that already-validated RC — only what's actually in the
 # release matters.
 #
+# The `force` input (default false) bypasses the dependabot-only guard, so the
+# workflow can also cut normal/manual releases (or the very first release, when
+# there's no GA baseline yet). The automated GA dispatch from the Lambda sends
+# only `version` and never sets force, so automation stays dependabot-only.
+#
 # The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
 # this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
 # (release-integrations.yaml). It declares a single `version` input — the only
@@ -47,6 +52,10 @@ on:
       version:
         description: version to release, RC or GA (e.g. 1.2.3 or 1.2.3-rc1 — v prefix optional)
         required: true
+      force:
+        description: "bypass the dependabot-only guard (allow human commits in the release). Default off."
+        type: boolean
+        default: false
 
 run-name: release-integrations ${{ inputs.version }}
 
@@ -79,6 +88,7 @@ jobs:
         id: plan
         env:
           VERSION: ${{ inputs.version }}
+          FORCE: ${{ inputs.force }}
         run: |
           set -eu
           # tolerate both `1.2.3` and `v1.2.3` inputs
@@ -107,27 +117,31 @@ jobs:
               ;;
           esac
 
-          # Guard: only dependency-bump releases may be tagged by this workflow.
-          # Baseline is the last GA tag (v<semver> with no prerelease suffix);
-          # every commit from there to the commit we're about to tag must be
-          # authored by dependabot[bot]. --no-merges: a squash/merge commit's
-          # committer (web-flow or whoever clicked merge) is irrelevant — we only
-          # judge who authored the actual changes.
-          BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
-          if [ -z "$BASE" ]; then
-            echo "::error::no prior GA release tag to compare against; cut the first release manually." >&2
-            exit 1
-          fi
-          echo "checking authors of ${BASE}..${TARGET_SHA}"
+          # Guard: by default only dependency-bump releases may be tagged — every
+          # commit from the last GA tag to the commit we're about to tag must be
+          # authored by dependabot[bot]. force=true bypasses it (normal/manual
+          # release, or the first release when there's no baseline). --no-merges:
+          # a squash/merge commit's committer (web-flow or whoever clicked merge)
+          # is irrelevant — we only judge who authored the actual changes.
+          if [ "${FORCE:-false}" = "true" ]; then
+            echo "::warning::force=true — bypassing the dependabot-only guard for ${TAG}."
+          else
+            BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
+            if [ -z "$BASE" ]; then
+              echo "::error::no prior GA release tag to compare against; re-run with force=true (or cut the first release manually)." >&2
+              exit 1
+            fi
+            echo "checking authors of ${BASE}..${TARGET_SHA}"
 
-          NON_DEP=$(git log --no-merges --format='%an' "${BASE}..${TARGET_SHA}" | grep -cxvF 'dependabot[bot]' || true)
-          if [ "${NON_DEP:-0}" -ne 0 ]; then
-            echo "::error::${NON_DEP} non-dependabot commit(s) since ${BASE} — refusing to auto-release (this workflow only tags dependency-bump releases)." >&2
-            echo "non-dependabot commits:" >&2
-            git log --no-merges --format='  %h  %an  %s' "${BASE}..${TARGET_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
-            exit 1
+            NON_DEP=$(git log --no-merges --format='%an' "${BASE}..${TARGET_SHA}" | grep -cxvF 'dependabot[bot]' || true)
+            if [ "${NON_DEP:-0}" -ne 0 ]; then
+              echo "::error::${NON_DEP} non-dependabot commit(s) since ${BASE} — refusing to release. Re-run with force=true to override." >&2
+              echo "non-dependabot commits:" >&2
+              git log --no-merges --format='  %h  %an  %s' "${BASE}..${TARGET_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
+              exit 1
+            fi
+            echo "all changes since ${BASE} are from dependabot[bot] — ok to tag ${TAG}."
           fi
-          echo "all changes since ${BASE} are from dependabot[bot] — ok to tag ${TAG}."
 
           {
             echo "tag=${TAG}"
