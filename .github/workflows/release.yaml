@@ -125,3 +125,19 @@ jobs:
           name: artifacts
           path: dist/**/*
 
+  # RC only: once the RC image is built + published above, kick off the
+  # downstream CircleCI e2e pipeline. GA tags skip this (a GA is only cut after
+  # e2e passes). Called as a reusable workflow rather than reacting to
+  # release.prereleased: goreleaser publishes the release with GITHUB_TOKEN, and
+  # GitHub suppresses Actions triggers for GITHUB_TOKEN-created events, so a
+  # release-event reaction never fires. This job runs inside the (App-token)
+  # tag-push run, so it isn't suppressed. promote=true because this is the
+  # automatic pipeline path (a successful e2e should drive the GA).
+  trigger-e2e:
+    needs: [release]
+    if: ${{ contains(github.ref_name, '-rc') }}
+    uses: ./.github/workflows/trigger-circleci-e2e.yaml
+    with:
+      tag: ${{ github.ref_name }}
+      promote: true
+
