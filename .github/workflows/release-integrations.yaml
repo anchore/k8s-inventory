@@ -20,18 +20,19 @@
 # that version — the commit e2e actually validated — not a possibly-advanced
 # main.
 #
-# DEPENDABOT-ONLY GUARD. This workflow may only cut dependency-bump releases:
-# every commit between the last GA release and the commit being tagged must be
-# authored by dependabot[bot]. A single human (or other) author blocks the tag.
-# The check runs against the commit we're about to tag (HEAD for an RC, the RC's
-# commit for a GA), so a human commit that lands on main *after* an RC does not
-# block promoting that already-validated RC — only what's actually in the
-# release matters.
+# DEPENDABOT-ONLY GUARD (RC STAGE ONLY). Cutting an RC is the single decision
+# point for whether an automated release may start: every commit between the
+# last GA release and main HEAD must be authored by dependabot[bot], or a single
+# human author blocks the RC. The `force` input (default false) bypasses it, so
+# the workflow can also cut a normal/manual RC (or the very first release, when
+# there's no GA baseline yet).
 #
-# The `force` input (default false) bypasses the dependabot-only guard, so the
-# workflow can also cut normal/manual releases (or the very first release, when
-# there's no GA baseline yet). The automated GA dispatch from the Lambda sends
-# only `version` and never sets force, so automation stays dependabot-only.
+# The GA stage does NOT run this guard. A GA only ever promotes the exact commit
+# an RC already validated through e2e (see the RC-commit resolution below), so
+# the "should we release?" question was already answered when that RC was cut.
+# Re-checking at GA would just re-block a deliberately force-cut RC (and is
+# redundant for a clean one) — the RC's existence is the gate. This is why the
+# Lambda's automated GA dispatch can send only `version` and no force.
 #
 # The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
 # this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
@@ -97,6 +98,7 @@ jobs:
           case "$TAG" in
             *-rc*)
               # RC: cut from the currently checked-out ref (main HEAD).
+              STAGE=rc
               TARGET_SHA=$(git rev-parse HEAD)
               echo "RC $TAG → tag HEAD ($TARGET_SHA)"
               ;;
@@ -107,6 +109,7 @@ jobs:
               # fetch-depth: 0 makes every RC tag + its commit available locally.
               # sort -V orders rc2 < rc10 correctly; the glob won't match other
               # versions (e.g. v1.2.30-rc1) since the next char after $TAG is '-'.
+              STAGE=ga
               LATEST_RC=$(git tag -l "${TAG}-rc*" | sort -V | tail -n1)
               if [ -z "$LATEST_RC" ]; then
                 echo "no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
@@ -117,15 +120,20 @@ jobs:
               ;;
           esac
 
-          # Guard: by default only dependency-bump releases may be tagged — every
-          # commit from the last GA tag to the commit we're about to tag must be
-          # authored by dependabot[bot]. force=true bypasses it (normal/manual
-          # release, or the first release when there's no baseline). --no-merges:
-          # a squash/merge commit's committer (web-flow or whoever clicked merge)
-          # is irrelevant — we only judge who authored the actual changes.
-          if [ "${FORCE:-false}" = "true" ]; then
+          # Dependabot-only guard — RC STAGE ONLY (see the header comment). A GA
+          # just promotes the commit its RC already validated, so it skips the
+          # guard entirely: the release decision was made when the RC was cut.
+          if [ "$STAGE" != "rc" ]; then
+            echo "GA promotion of ${LATEST_RC}: dependabot-only guard applies at RC cut, not here."
+          elif [ "${FORCE:-false}" = "true" ]; then
+            # force=true bypasses it (normal/manual RC, or the first release when
+            # there's no baseline).
             echo "::warning::force=true — bypassing the dependabot-only guard for ${TAG}."
           else
+            # Every commit from the last GA tag to the commit we're about to tag
+            # must be authored by dependabot[bot]. --no-merges: a squash/merge
+            # commit's committer (web-flow or whoever clicked merge) is
+            # irrelevant — we only judge who authored the actual changes.
             BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
             if [ -z "$BASE" ]; then
               echo "::error::no prior GA release tag to compare against; re-run with force=true (or cut the first release manually)." >&2
@@ -155,6 +163,20 @@ jobs:
           TARGET_SHA: ${{ steps.plan.outputs.target_sha }}
         run: |
           set -eu
+          # Idempotent: if the remote already has this tag (e.g. a duplicate GA
+          # dispatch — CircleCI fires a workflow-completed webhook per workflow),
+          # succeed if it points at the same commit, fail only on a real
+          # conflict. Keeps a redundant dispatch from spuriously failing.
+          EXISTING=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')
+          if [ -n "$EXISTING" ]; then
+            if [ "$EXISTING" = "$TARGET_SHA" ]; then
+              echo "$TAG already exists at $TARGET_SHA — nothing to do."
+              exit 0
+            fi
+            echo "::error::$TAG already exists at $EXISTING but we resolved $TARGET_SHA — refusing to move it." >&2
+            exit 1
+          fi
+
           echo "tagging $TAG at $TARGET_SHA and pushing"
           git tag "$TAG" "$TARGET_SHA"
 
