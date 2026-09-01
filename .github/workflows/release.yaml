@@ -140,4 +140,10 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
       promote: true
+    # Run the called workflow with our secret access so its `trigger` job (which
+    # declares `environment: e2e`) can resolve the e2e ENVIRONMENT secrets
+    # (CIRCLECI_API_TOKEN / CIRCLECI_PROJECT_SLUG). `inherit` keeps them
+    # environment-scoped: explicit `secrets: {NAME: ...}` would be evaluated in
+    # this caller job (which has no environment) and force a repo-level copy.
+    secrets: inherit # zizmor: ignore[secrets-inherit] required to reach the e2e env secrets from the reusable workflow
 
