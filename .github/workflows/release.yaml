@@ -21,14 +21,36 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
         with:
+          # full history so the GA marker commit's parent (the RC commit) is
+          # available for the on-main ancestry check below.
+          fetch-depth: 0
           persist-credentials: false
 
-      # we don't want to release commits that have been pushed and tagged, but not necessarily merged onto main
+      # We don't want to release commits pushed + tagged but not merged onto
+      # main. A GA tag is the exception: it sits on a release-marker commit whose
+      # PARENT is the e2e-validated RC commit (on main); the marker commit itself
+      # only reaches main later, via the release PR. So accept the tagged commit
+      # being on main OR its first parent being on main.
       - name: Ensure tagged commit is on main
         run: |
-          echo "Tag: ${GITHUB_REF##*/}"
+          set -eu
+          TAG="${GITHUB_REF##*/}"
+          echo "Tag: ${TAG}"
           git fetch origin main
-          git merge-base --is-ancestor ${GITHUB_REF##*/} origin/main && echo "${GITHUB_REF##*/} is a commit on main!"
+          if git merge-base --is-ancestor "${TAG}" origin/main; then
+            echo "${TAG} is a commit on main!"
+          elif git merge-base --is-ancestor "${TAG}^" origin/main \
+               && [ "$(git diff --name-only "${TAG}^" "${TAG}")" = "README.md" ]; then
+            # GA release-marker commit: exactly one commit atop the on-main RC
+            # commit, changing ONLY the README marker line — so the built binary
+            # is identical to the reviewed, on-main parent. Any commit carrying
+            # other changes on top of main (e.g. unmerged code) is refused, even
+            # though its parent is on main.
+            echo "${TAG} is the release-marker commit (only README.md changed atop main) — ok."
+          else
+            echo "::error::${TAG} is not on main, and it is not a README-only marker commit atop main — refusing to release." >&2
+            exit 1
+          fi
 
       - name: Check static analysis
         uses: fountainhead/action-wait-for-check@5a908a24814494009c4bb27c242ea38c93c593be #v1.2.0
