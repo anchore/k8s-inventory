@@ -8,34 +8,38 @@
 # evaluates policy, mints a repo-scoped contents:write token, writes it as the
 # TAG_TOKEN env secret, and approves the gate. This workflow then pushes the tag.
 #
-# TAG-ONLY BY DESIGN. It does NOT build artifacts or create the GitHub Release.
+# TAG-DRIVEN BY DESIGN. It does NOT build artifacts or create the GitHub Release.
 # Pushing the v* tag triggers the existing release.yaml (goreleaser), which
 # builds + pushes the images and creates the Release (`prerelease: auto` marks
-# RCs). That Release event is what drives the rest of the pipeline —
-# release.prereleased → e2e (trigger-circleci-e2e.yaml); release.published (GA)
-# → downstream fan-out. Creating a release here too would collide with
-# goreleaser, so we deliberately stop at the tag push.
+# RCs). That Release event drives the rest of the pipeline — RC e2e is kicked off
+# by release.yaml's trigger-e2e job; release.published (GA) → downstream fan-out.
 #
-# RC is cut from main HEAD; GA is cut from the SAME commit as the latest RC of
-# that version — the commit e2e actually validated — not a possibly-advanced
-# main.
+# WHERE EACH STAGE TAGS:
+#   - RC  → tags main HEAD directly (the commit to validate).
+#   - GA  → does NOT reuse the RC's commit. GitHub "immutable releases" seals a
+#           release per commit, so a second release tag on the RC's commit can't
+#           upload assets (goreleaser 422s). Instead the GA is tagged on a NEW
+#           "release-marker" commit whose PARENT is the validated RC commit:
+#           identical tree (RC code) plus a one-line README marker, so it's a
+#           unique commit with no prior sealed release. That commit is pushed on
+#           a `v<ver>-release` branch and a PR is opened into main; a human
+#           approves + merges it (merge commit) to record the release on main.
+#           The GA release is cut immediately from the tag — it does NOT wait on
+#           the PR (release.yaml's on-main check accepts the marker commit
+#           because its parent, the RC commit, is on main).
 #
 # DEPENDABOT-ONLY GUARD (RC STAGE ONLY). Cutting an RC is the single decision
 # point for whether an automated release may start: every commit between the
 # last GA release and main HEAD must be authored by dependabot[bot], or a single
 # human author blocks the RC. The `force` input (default false) bypasses it, so
 # the workflow can also cut a normal/manual RC (or the very first release, when
-# there's no GA baseline yet).
-#
-# The GA stage does NOT run this guard. A GA only ever promotes the exact commit
-# an RC already validated through e2e (see the RC-commit resolution below), so
-# the "should we release?" question was already answered when that RC was cut.
-# Re-checking at GA would just re-block a deliberately force-cut RC (and is
-# redundant for a clean one) — the RC's existence is the gate. This is why the
-# Lambda's automated GA dispatch can send only `version` and no force.
+# there's no GA baseline yet). The GA stage does NOT run this guard — it only
+# promotes the exact commit an RC already validated, so the "should we release?"
+# question was answered at RC time. This is why the Lambda's automated GA
+# dispatch can send only `version` and no force.
 #
 # The GA stage is dispatched by the platform-int-releaser Lambda by filename, so
-# this file's name MUST match circleci_config.ga_workflow in webhooks.yaml
+# this file's name MUST match tag_workflow in webhooks.yaml
 # (release-integrations.yaml). It declares a single `version` input — the only
 # input the Lambda sends.
 
@@ -66,9 +70,12 @@ jobs:
     # each stage keeps its own gated env so the automation can apply different
     # policy to an RC than to a GA (e.g. human reviewers on ga-release).
     environment: ${{ contains(inputs.version, '-rc') && 'rc-release' || 'ga-release' }}
-    # No workflow-level GITHUB_TOKEN scopes: the git push uses the short-lived
-    # TAG_TOKEN minted by the release automation, not the workflow token.
-    permissions: {}
+    # contents via the short-lived TAG_TOKEN (git pushes), not GITHUB_TOKEN.
+    # GITHUB_TOKEN needs pull-requests:write only to open the GA release PR (a
+    # human approves + merges it), and contents:read for checkout/gh.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,7 +92,7 @@ jobs:
           fi
           echo "TAG_TOKEN present."
 
-      - name: Resolve target commit and enforce dependabot-only changes
+      - name: Resolve base commit and enforce release guards
         id: plan
         env:
           VERSION: ${{ inputs.version }}
@@ -99,30 +106,39 @@ jobs:
             *-rc*)
               # RC: cut from the currently checked-out ref (main HEAD).
               STAGE=rc
-              TARGET_SHA=$(git rev-parse HEAD)
-              echo "RC $TAG → tag HEAD ($TARGET_SHA)"
+              BASE_SHA=$(git rev-parse HEAD)
+              echo "RC $TAG → tag HEAD ($BASE_SHA)"
               ;;
             *)
-              # GA: tag the SAME commit as the latest RC of this version. main
-              # may have advanced since that RC was cut and e2e-tested, so the GA
-              # must point at exactly the commit that was validated — not HEAD.
-              # fetch-depth: 0 makes every RC tag + its commit available locally.
-              # sort -V orders rc2 < rc10 correctly; the glob won't match other
-              # versions (e.g. v1.2.30-rc1) since the next char after $TAG is '-'.
+              # GA: base on the SAME commit as the latest RC of this version —
+              # the commit e2e actually validated. sort -V orders rc2 < rc10; the
+              # glob won't match other versions (e.g. v1.2.30-rc1) since the next
+              # char after $TAG is '-'.
               STAGE=ga
               LATEST_RC=$(git tag -l "${TAG}-rc*" | sort -V | tail -n1)
               if [ -z "$LATEST_RC" ]; then
-                echo "no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
+                echo "::error::no ${TAG}-rcN tag found; refusing to cut GA from an untested commit" >&2
                 exit 1
               fi
-              TARGET_SHA=$(git rev-list -n1 "$LATEST_RC")
-              echo "GA $TAG → tag $LATEST_RC ($TARGET_SHA)"
+              BASE_SHA=$(git rev-list -n1 "$LATEST_RC")
+              echo "GA $TAG → base on $LATEST_RC ($BASE_SHA)"
+
+              # rc-in-line-with-main guard: the marker commit is built on the RC
+              # commit and lands on main via PR, so main must currently BE the RC
+              # commit. If main advanced since the RC, stop for a human (re-cut
+              # the RC, or reconcile) rather than silently releasing stale code.
+              # Dispatched on main, so HEAD is main HEAD.
+              HEAD_SHA=$(git rev-parse HEAD)
+              if [ "$HEAD_SHA" != "$BASE_SHA" ]; then
+                echo "::error::main ($HEAD_SHA) is not at the RC commit ($BASE_SHA) — main advanced since ${LATEST_RC}. Refusing to cut GA; reconcile main with the RC (or re-cut the RC) first." >&2
+                exit 1
+              fi
               ;;
           esac
 
           # Dependabot-only guard — RC STAGE ONLY (see the header comment). A GA
           # just promotes the commit its RC already validated, so it skips the
-          # guard entirely: the release decision was made when the RC was cut.
+          # guard: the release decision was made when the RC was cut.
           if [ "$STAGE" != "rc" ]; then
             echo "GA promotion of ${LATEST_RC}: dependabot-only guard applies at RC cut, not here."
           elif [ "${FORCE:-false}" = "true" ]; then
@@ -134,39 +150,72 @@ jobs:
             # must be authored by dependabot[bot]. --no-merges: a squash/merge
             # commit's committer (web-flow or whoever clicked merge) is
             # irrelevant — we only judge who authored the actual changes.
-            BASE=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
-            if [ -z "$BASE" ]; then
+            LAST_GA=$(git tag -l 'v[0-9]*' | awk '!/-/' | sort -V | tail -n1)
+            if [ -z "$LAST_GA" ]; then
               echo "::error::no prior GA release tag to compare against; re-run with force=true (or cut the first release manually)." >&2
               exit 1
             fi
-            echo "checking authors of ${BASE}..${TARGET_SHA}"
+            echo "checking authors of ${LAST_GA}..${BASE_SHA}"
 
-            NON_DEP=$(git log --no-merges --format='%an' "${BASE}..${TARGET_SHA}" | grep -cxvF 'dependabot[bot]' || true)
+            NON_DEP=$(git log --no-merges --format='%an' "${LAST_GA}..${BASE_SHA}" | grep -cxvF 'dependabot[bot]' || true)
             if [ "${NON_DEP:-0}" -ne 0 ]; then
-              echo "::error::${NON_DEP} non-dependabot commit(s) since ${BASE} — refusing to release. Re-run with force=true to override." >&2
+              echo "::error::${NON_DEP} non-dependabot commit(s) since ${LAST_GA} — refusing to release. Re-run with force=true to override." >&2
               echo "non-dependabot commits:" >&2
-              git log --no-merges --format='  %h  %an  %s' "${BASE}..${TARGET_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
+              git log --no-merges --format='  %h  %an  %s' "${LAST_GA}..${BASE_SHA}" | grep -vF 'dependabot[bot]' >&2 || true
               exit 1
             fi
-            echo "all changes since ${BASE} are from dependabot[bot] — ok to tag ${TAG}."
+            echo "all changes since ${LAST_GA} are from dependabot[bot] — ok to tag ${TAG}."
           fi
 
           {
+            echo "stage=${STAGE}"
             echo "tag=${TAG}"
-            echo "target_sha=${TARGET_SHA}"
+            echo "base_sha=${BASE_SHA}"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Create release-marker commit (GA)
+        id: marker
+        if: ${{ steps.plan.outputs.stage == 'ga' }}
+        env:
+          TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          BASE_SHA: ${{ steps.plan.outputs.base_sha }}
+        run: |
+          set -eu
+          BR="${TAG}-release"
+
+          # Build the marker commit on top of the validated RC commit: identical
+          # tree + one README line → a unique commit the GA tag can own without
+          # colliding with the RC's sealed (immutable) release.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BR" "$BASE_SHA"
+
+          sed -i -E "s|(<!-- latest-release:begin -->).*(<!-- latest-release:end -->)|\1**Latest release:** [${TAG}](https://github.com/anchore/k8s-inventory/releases/tag/${TAG})\2|" README.md
+          if git diff --quiet -- README.md; then
+            echo "::error::README.md has no <!-- latest-release:begin/end --> marker to update (or it is already at ${TAG}). Restore the marker line." >&2
+            exit 1
+          fi
+          git add README.md
+          git commit -m "chore: release ${TAG}"
+          echo "marker_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          # push the marker branch (App token) so the PR can be opened from it.
+          # branches are unprotected; only main requires PR + checks.
+          git -c credential.helper= \
+              -c credential.helper='!f() { echo username=x-access-token; echo "password=$TAG_TOKEN"; }; f' \
+              push origin "$BR"
 
       - name: Push tag
         env:
           TAG_TOKEN: ${{ secrets.TAG_TOKEN }}
           TAG: ${{ steps.plan.outputs.tag }}
-          TARGET_SHA: ${{ steps.plan.outputs.target_sha }}
+          # GA tags the marker commit; RC tags the base (main HEAD).
+          TARGET_SHA: ${{ steps.marker.outputs.marker_sha || steps.plan.outputs.base_sha }}
         run: |
           set -eu
-          # Idempotent: if the remote already has this tag (e.g. a duplicate GA
-          # dispatch — CircleCI fires a workflow-completed webhook per workflow),
-          # succeed if it points at the same commit, fail only on a real
-          # conflict. Keeps a redundant dispatch from spuriously failing.
+          # Idempotent: if the remote already has this tag, succeed if it points
+          # at the same commit, fail only on a real conflict.
           EXISTING=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}')
           if [ -n "$EXISTING" ]; then
             if [ "$EXISTING" = "$TARGET_SHA" ]; then
@@ -188,3 +237,19 @@ jobs:
           git -c credential.helper= \
               -c credential.helper='!f() { echo username=x-access-token; echo "password=$TAG_TOKEN"; }; f' \
               push origin "$TAG"
+
+      - name: Open release PR (GA)
+        if: ${{ steps.plan.outputs.stage == 'ga' }}
+        env:
+          # GITHUB_TOKEN (not the App token): a human approves the workflow run
+          # on this PR and merges it, so it doesn't need the recursion-immune App
+          # token. The GA release is already cut from the tag above; this PR only
+          # records the marker commit on main.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -eu
+          BR="${TAG}-release"
+          gh pr create --base main --head "$BR" \
+            --title "chore: release ${TAG}" \
+            --body "$(printf 'Release marker for **%s**.\n\nThe GA tag has been cut and binaries are building — this PR only records %s in the README on main.\n\nTo land it: approve the workflow run on this PR, wait for checks to pass, then **merge with a merge commit** (keeps the tagged commit on main).' "$TAG" "$TAG")"
