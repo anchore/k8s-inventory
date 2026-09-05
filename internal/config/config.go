@@ -58,6 +58,7 @@ type Application struct {
 	HealthReportIntervalSeconds     int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
 	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
 	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
+	InventoryCollection             InventoryCollection   `mapstructure:"inventory-collection" json:"inventory-collection,omitempty" yaml:"inventory-collection"`
 	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
 	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
 }
@@ -120,6 +121,29 @@ type MetadataCollection struct {
 	Pods      ResourceMetadata `mapstructure:"pods" json:"pods,omitempty" yaml:"pods"`
 }
 
+// Inventory collection methods. "informer" watches the Kubernetes event stream
+// so that resources that come and go between reports are still reported.
+// "poll" is the legacy behaviour of listing the whole cluster every interval.
+const (
+	InventoryCollectionMethodInformer = "informer"
+	InventoryCollectionMethodPoll     = "poll"
+)
+
+// InventoryCollection details how inventory is gathered from the cluster when
+// running in periodic mode. Adhoc mode always uses the poll method.
+type InventoryCollection struct {
+	Method   string   `mapstructure:"method" json:"method,omitempty" yaml:"method"`
+	Informer Informer `mapstructure:"informer" json:"informer,omitempty" yaml:"informer"`
+}
+
+// Informer details the tuning options for the informer collection method
+type Informer struct {
+	// How long to wait for the informer caches to fill on startup. The initial
+	// listing covers the whole cluster, so this needs to be more generous than
+	// the timeout for an individual api-server request. 0 waits indefinitely.
+	CacheSyncTimeoutSeconds int `mapstructure:"cache-sync-timeout-seconds" json:"cache-sync-timeout-seconds,omitempty" yaml:"cache-sync-timeout-seconds"`
+}
+
 // Information for posting in-use image details to Anchore (or any URL for that matter)
 type AnchoreInfo struct {
 	URL      string     `mapstructure:"url" json:"url,omitempty" yaml:"url"`
@@ -179,6 +203,8 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})
 	v.SetDefault("namespace-selectors.ignore-empty", false)
+	v.SetDefault("inventory-collection.method", InventoryCollectionMethodInformer)
+	v.SetDefault("inventory-collection.informer.cache-sync-timeout-seconds", 300)
 }
 
 // Load the Application Configuration from the Viper specifications
@@ -268,6 +294,30 @@ func (cfg *Application) Build() error {
 
 	if cfg.HealthReportIntervalSeconds < 30 || cfg.HealthReportIntervalSeconds > 600 {
 		return fmt.Errorf("health-report-interval-seconds must be between 30 and 600")
+	}
+
+	if err := cfg.InventoryCollection.validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ic *InventoryCollection) validate() error {
+	methods := []string{InventoryCollectionMethodInformer, InventoryCollectionMethodPoll}
+	validMethod := false
+	for _, m := range methods {
+		if ic.Method == m {
+			validMethod = true
+			break
+		}
+	}
+	if !validMethod {
+		return fmt.Errorf("inventory-collection.method must be one of %v", methods)
+	}
+
+	if ic.Informer.CacheSyncTimeoutSeconds < 0 {
+		return fmt.Errorf("inventory-collection.informer.cache-sync-timeout-seconds must not be negative")
 	}
 
 	return nil
