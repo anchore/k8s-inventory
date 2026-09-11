@@ -1,6 +1,6 @@
 module github.com/anchore/k8s-inventory
 
-go 1.26.3
+go 1.26.8
 
 require (
 	github.com/adrg/xdg v0.5.3
