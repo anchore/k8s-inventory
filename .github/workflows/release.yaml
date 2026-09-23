@@ -185,5 +185,6 @@ jobs:
     with:
       subject: ${{ github.ref_name }}
     secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      # left name = the reusable workflow's generic input; right = the actual repo/org secret.
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL_ANCHORE_INTEGRATION_RELEASE_ALERTS }}
 

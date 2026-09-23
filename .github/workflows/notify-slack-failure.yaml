@@ -15,9 +15,14 @@
 # on a deliberate reviewer rejection too — that's intended: "the GA did not go
 # through" is worth a channel note.
 #
-# Config: secrets.SLACK_WEBHOOK_URL — a Slack incoming-webhook URL whose channel
-# is fixed on the Slack side (point it at the same alerts channel the CircleCI
-# e2e notifications use). Store it as a repo/org secret.
+# Config: the SLACK_WEBHOOK_URL input below is a generic alias — a Slack
+# incoming-webhook URL whose channel is fixed on the Slack side (currently
+# #anchore-integration-release-alerts). NOTE: the CircleCI e2e failure alerts
+# post to a different channel (#platform-alerts, hardcoded in the e2e project),
+# so release alerts are split across the two today. The callers map the ACTUAL
+# repo/org secret to it:
+#   secrets: { SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL_ANCHORE_INTEGRATION_RELEASE_ALERTS }} }
+# so the real secret name lives only in the caller, and this file stays reusable.
 
 name: Notify Slack on failure
 
