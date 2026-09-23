@@ -188,3 +188,16 @@ jobs:
           git -c credential.helper= \
               -c credential.helper='!f() { echo username=x-access-token; echo "password=$TAG_TOKEN"; }; f' \
               push origin "$TAG"
+
+  # Alert Slack if the tagger fails. This also fires when a reviewer REJECTS the
+  # ga-release gate (a rejected deployment marks the job failed) — intended: "the
+  # GA did not go through" is worth a channel note. subject is inputs.version
+  # because this runs on main (github.ref_name would be the branch, not the tag).
+  notify-failure:
+    needs: [tag]
+    if: ${{ failure() }}
+    uses: $/.github/workflows/notify-slack-failure.yaml
+    with:
+      subject: ${{ inputs.version }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

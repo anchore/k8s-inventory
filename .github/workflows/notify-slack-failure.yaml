@@ -1,0 +1,80 @@
+# Posts a failure alert to Slack for the release pipeline's GitHub Actions side.
+#
+# Why this exists: e2e failures are alerted from CircleCI (the e2e project's
+# Slack step, keyed on CALLBACK_RC_TAG). The GitHub Actions steps had no
+# equivalent — an RC/GA build failure, or a rejected ga-release gate, surfaced
+# nowhere. The GA build is the worst blind spot: it's dispatched by the App, so
+# there is no human actor for GitHub's default failure email to reach.
+#
+# Called as a reusable workflow from an `if: failure()` job in release.yaml and
+# release-integrations.yaml, so ONE completed-with-failure ping covers whichever
+# job failed. It intentionally has no permissions and does no checkout: it only
+# POSTs to a Slack incoming webhook.
+#
+# A rejected ga-release deployment marks the tagger job as failed, so this fires
+# on a deliberate reviewer rejection too — that's intended: "the GA did not go
+# through" is worth a channel note.
+#
+# Config: secrets.SLACK_WEBHOOK_URL — a Slack incoming-webhook URL whose channel
+# is fixed on the Slack side (point it at the same alerts channel the CircleCI
+# e2e notifications use). Store it as a repo/org secret.
+
+name: Notify Slack on failure
+
+permissions: {}
+
+on:
+  workflow_call:
+    inputs:
+      subject:
+        description: what was being released (tag or version), shown in the alert
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        description: Slack incoming-webhook URL that posts to the alerts channel
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Post failure to Slack
+        env:
+          # Everything the message needs goes through the env, never interpolated
+          # into the script body — `subject` is workflow input and must not reach
+          # the shell as code.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          REPO: ${{ github.repository }}
+          WORKFLOW: ${{ github.workflow }}
+          SUBJECT: ${{ inputs.subject }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          : "${SLACK_WEBHOOK_URL:?secret not set}"
+
+          payload=$(jq -cn \
+            --arg repo "$REPO" \
+            --arg wf "$WORKFLOW" \
+            --arg subject "$SUBJECT" \
+            --arg url "$RUN_URL" \
+            '{
+              text: ("Release failed: " + $repo + " " + $subject),
+              blocks: [
+                { type: "header",
+                  text: { type: "plain_text", text: ("❌ Release failed: " + $repo) } },
+                { type: "section",
+                  text: { type: "mrkdwn",
+                          text: ("*Version/tag:* " + $subject + "\n*Workflow:* " + $wf) } },
+                { type: "actions",
+                  elements: [ { type: "button",
+                               text: { type: "plain_text", text: "View run" },
+                               url: $url } ] }
+              ]
+            }')
+
+          # -f: fail the step on any 4xx/5xx from Slack so a broken webhook is
+          # itself visible (as a failed notify job) rather than silently dropped.
+          curl -fsS -X POST -H 'content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
