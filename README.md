@@ -392,6 +392,12 @@ kubernetes:
   worker-pool-size: 100
 ```
 
+`request-batch-size` and `worker-pool-size` only apply to the `poll` inventory
+collection method - the informers page and dispatch their own work.
+`request-timeout-seconds` still bounds the individual requests the agent makes
+outside of the informers; see `inventory-collection.informer.cache-sync-timeout-seconds`
+for the informer startup deadline.
+
 ### anchore-k8s-inventory mode of operation
 
 ```yaml
@@ -401,6 +407,97 @@ mode: adhoc
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 ```
+
+### Inventory collection
+
+When running in `periodic` mode, `anchore-k8s-inventory` collects the inventory
+by watching the Kubernetes event stream (using
+[informers](https://pkg.go.dev/k8s.io/client-go/informers)) rather than listing
+the whole cluster from the api-server on every polling interval. This means:
+
+* Pods and containers that are created *and* deleted in between two reports are
+  still included in the next report, instead of being missed entirely.
+* The api-server is not asked for a full listing of every namespace, pod and
+  node on each interval, which noticeably reduces its load on large clusters.
+
+Anything deleted since the previous report is buffered by the agent and included
+in the next one, so short lived containers are recorded in Anchore with a
+`last_seen` timestamp of that report. Note that this means reports can be larger
+than they were with the previous polling behaviour.
+
+There are two trade-offs to be aware of:
+
+* The agent keeps a cache of the pods it is watching, so its memory use scales
+  with the size of that cache rather than with the reporting interval.
+* Unless exactly one namespace is configured in `namespace-selectors.include`
+  (in which case the agent watches only that namespace), the agent watches pods
+  cluster-wide and discards the ones the selectors reject when it builds the
+  report. If you scope the agent to a handful of namespaces on a large cluster,
+  `method: poll` may still use less memory, since it only ever lists the
+  namespaces it reports on.
+
+The previous behaviour is still available by setting the collection method to
+`poll`:
+
+```yaml
+# How inventory is collected from the cluster. Only respected if mode is
+# periodic, adhoc mode always collects inventory by polling.
+inventory-collection:
+  # One of the following options [informer, poll]. Default is 'informer'
+  #
+  # [informer] watches the kubernetes event stream so that pods and containers
+  #            that are created and deleted between two reports are still
+  #            reported, and so that the api-server is not asked to list the
+  #            whole cluster on every polling interval.
+  #
+  # [poll] lists every namespace, pod and node from the api-server on each
+  #        polling interval. This is the behaviour of releases before the
+  #        informer method was introduced. Resources that come and go between
+  #        two polls are not reported.
+  method: informer
+
+  # Tuning options for the informer collection method
+  informer:
+    # How long to wait on startup for the initial listing of the cluster to
+    # complete. This listing covers every pod in the cluster, so it needs to be
+    # more generous than kubernetes.request-timeout-seconds, which bounds a
+    # single api-server request. Set to 0 to wait for as long as it takes.
+    cache-sync-timeout-seconds: 300
+```
+
+or via the equivalent environment variable:
+
+```sh
+ANCHORE_K8S_INVENTORY_INVENTORY_COLLECTION_METHOD=poll
+```
+
+Watching the event stream requires the `watch` verb, in addition to `get` and
+`list`, on `pods`, `namespaces` and `nodes`. The ClusterRole in the
+[Helm chart](https://github.com/anchore/anchore-charts/tree/main/stable/k8s-inventory)
+already grants these; if you are deploying with your own RBAC, make sure the
+agent's role does too. Scoping the agent with a namespaced `Role` instead of a
+ClusterRole is not enough for this collection method, because the namespace and
+node informers are cluster-scoped.
+
+As with the polling collection method, not being permitted to read nodes is
+tolerated - a warning is logged and node inventory is not collected.
+
+The informers are started in the background, so the agent polls the api-server
+for inventory until their caches have filled and then switches over. Reporting
+is never held up waiting for them. If they cannot be started at all - RBAC, an
+unreachable api-server, or an initial listing that takes longer than
+`cache-sync-timeout-seconds` - the agent logs a warning, carries on polling, and
+retries in the background after a delay that grows with each consecutive
+failure, from one minute up to one hour. A cluster the agent is not allowed to
+watch therefore settles into steady polling rather than retrying on every
+report.
+
+One case the agent cannot currently detect: if it is allowed to `list` pods but
+not to `watch` them, the caches fill successfully and the agent reports
+inventory that looks correct, but it captures no transient pods and re-lists the
+cluster far more often than the `poll` method would. Grant `watch` alongside
+`list`, or set `method: poll`, rather than relying on the fallback to catch
+this.
 
 ### Missing Tag Policy
 

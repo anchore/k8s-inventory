@@ -4,11 +4,32 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/anchore/k8s-inventory/internal/log"
-	"github.com/anchore/k8s-inventory/pkg/client"
+	v1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/anchore/k8s-inventory/internal/log"
+	"github.com/anchore/k8s-inventory/pkg/client"
 )
+
+// NodeFromV1 converts a kubernetes node into its inventory representation,
+// applying the configured metadata collection rules
+func NodeFromV1(n *v1.Node, includeAnnotations, includeLabels []string, disableMetadata bool) Node {
+	node := Node{
+		Name:                    n.Name,
+		UID:                     string(n.UID),
+		Arch:                    n.Status.NodeInfo.Architecture,
+		ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
+		KernelVersion:           n.Status.NodeInfo.KernelVersion,
+		KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
+		OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
+	}
+	if !disableMetadata {
+		node.Annotations = processAnnotationsOrLabels(n.Annotations, includeAnnotations)
+		node.Labels = processAnnotationsOrLabels(n.Labels, includeLabels)
+	}
+	return node
+}
 
 func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, includeLabels []string, disableMetadata bool) (map[string]Node, error) {
 	nodes := make(map[string]Node)
@@ -30,32 +51,9 @@ func FetchNodes(c client.Client, batchSize, timeout int64, includeAnnotations, i
 			return nil, fmt.Errorf("failed to list nodes: %w", err)
 		}
 
-		for _, n := range list.Items {
-			if !disableMetadata {
-				annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
-				labels := processAnnotationsOrLabels(n.Labels, includeLabels)
-				nodes[n.Name] = Node{
-					Name:                    n.Name,
-					UID:                     string(n.UID),
-					Annotations:             annotations,
-					Arch:                    n.Status.NodeInfo.Architecture,
-					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
-					KernelVersion:           n.Status.NodeInfo.KernelVersion,
-					KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
-					Labels:                  labels,
-					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
-				}
-			} else {
-				nodes[n.Name] = Node{
-					Name:                    n.Name,
-					UID:                     string(n.UID),
-					Arch:                    n.Status.NodeInfo.Architecture,
-					ContainerRuntimeVersion: n.Status.NodeInfo.ContainerRuntimeVersion,
-					KernelVersion:           n.Status.NodeInfo.KernelVersion,
-					KubeletVersion:          n.Status.NodeInfo.KubeletVersion,
-					OperatingSystem:         n.Status.NodeInfo.OperatingSystem,
-				}
-			}
+		for i := range list.Items {
+			n := &list.Items[i]
+			nodes[n.Name] = NodeFromV1(n, includeAnnotations, includeLabels, disableMetadata)
 		}
 
 		cont = list.GetListMeta().GetContinue()

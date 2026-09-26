@@ -128,6 +128,32 @@ ignore-not-running: true
 # Only respected if mode is periodic
 polling-interval-seconds: 300
 
+# How inventory is collected from the cluster. Only respected if mode is
+# periodic, adhoc mode always collects inventory by polling.
+inventory-collection:
+  # One of the following options [informer, poll]. Default is 'informer'
+  #
+  # [informer] watches the kubernetes event stream so that pods and containers
+  #            that are created and deleted between two reports are still
+  #            reported, and so that the api-server is not asked to list the
+  #            whole cluster on every polling interval.
+  #
+  # [poll] lists every namespace, pod and node from the api-server on each
+  #        polling interval. This is the behaviour of releases before the
+  #        informer method was introduced. Resources that come and go between
+  #        two polls are not reported.
+  method: informer
+
+  # Tuning options for the informer collection method
+  informer:
+    # How long to wait on startup for the initial listing of the cluster to
+    # complete. This listing covers every pod in the cluster, so it needs to be
+    # more generous than kubernetes.request-timeout-seconds, which bounds a
+    # single api-server request. Set to 0 to wait for as long as it takes.
+    # The agent polls for inventory while the caches are filling, so exceeding
+    # this does not stop reporting.
+    cache-sync-timeout-seconds: 300
+
 # Only respected if mode is periodic
 health-report-interval-seconds: 60
 
