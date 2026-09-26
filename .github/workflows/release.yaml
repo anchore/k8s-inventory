@@ -174,3 +174,17 @@ jobs:
     # this caller job (which has no environment) and force a repo-level copy.
     secrets: inherit # zizmor: ignore[secrets-inherit] required to reach the e2e env secrets from the reusable workflow
 
+  # Alert Slack if any step of the build/publish/trigger chain fails. Covers RC
+  # and GA runs (trigger-e2e is skipped on GA — a skipped need is not a failure,
+  # so this stays quiet on a clean GA). e2e failures are alerted separately from
+  # CircleCI; this is the GitHub Actions half. github.ref_name is the tag here.
+  notify-failure:
+    needs: [wait-for-checks, release, trigger-e2e]
+    if: ${{ failure() }}
+    uses: $/.github/workflows/notify-slack-failure.yaml
+    with:
+      subject: ${{ github.ref_name }}
+    secrets:
+      # left name = the reusable workflow's generic input; right = the actual repo/org secret.
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL_ANCHORE_INTEGRATION_RELEASE_ALERTS }}
+
