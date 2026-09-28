@@ -84,3 +84,4 @@ anchore:
     insecure: false
     timeout-seconds: 10
 verbose-inventory-reports: false
+create-applications-from-deployments: false

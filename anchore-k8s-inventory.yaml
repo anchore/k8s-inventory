@@ -160,3 +160,16 @@ anchore:
 #  http:
 #    insecure: true
 #    timeout-seconds: 10
+
+# Create Anchore applications and application versions from Kubernetes Deployments (default: false).
+# Each Deployment becomes an app named <cluster>/<namespace>/<deployment>, and each rollout of the Deployment
+# (a new ReplicaSet revision) becomes a new app version with the running container images added as container assets.
+# Requires:
+#   - Anchore Enterprise v6+ (the /v2/apps API)
+#   - Anchore permissions for the reporting user: readApplications, createApplications, createAssets
+#   - Kubernetes RBAC for the agent to list deployments and replicasets:
+#       - apiGroups: ["apps"]
+#         resources: ["deployments", "replicasets"]
+#         verbs: ["get", "list", "watch"]
+# Failures creating applications are logged and never block inventory reporting.
+create-applications-from-deployments: false

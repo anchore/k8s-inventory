@@ -490,6 +490,40 @@ metadata-collection:
     disable: false # Remove all optional pod metadata from the inventory report
 ```
 
+### Create applications from Deployments
+
+When enabled, the agent also creates Anchore applications and application versions from Kubernetes
+Deployments after reporting inventory. This is disabled by default.
+
+```yaml
+# Can also be set with ANCHORE_K8S_INVENTORY_CREATE_APPLICATIONS_FROM_DEPLOYMENTS=true
+# or the --create-applications-from-deployments flag
+create-applications-from-deployments: false
+```
+
+- Each Deployment maps to an app named `<cluster>/<namespace>/<deployment>` (or `<namespace>/<deployment>` when
+  `kubeconfig.cluster` is not set), in the Anchore account the namespace is routed to.
+- Each rollout of a Deployment (a new ReplicaSet, e.g. after changing the pod template) creates a new app version
+  named `revision-<revision>-<pod-template-hash>`, with `status: released` and linked to the previous version.
+- The container images running in the current rollout are added to the version as `container` assets, named after
+  the container. Anchore Enterprise analyzes the images asynchronously, so it needs access to the image registries.
+- Deployments whose current rollout has no running pods are picked up on a later poll. Existing apps and versions
+  are never modified or deleted.
+
+Requirements:
+
+- Anchore Enterprise v6 or later (the `/v2/apps` API). Older versions log a warning and are skipped.
+- The Anchore user needs the `readApplications`, `createApplications` and `createAssets` permissions.
+- The agent needs Kubernetes RBAC to list Deployments and ReplicaSets, for example by adding this rule to its ClusterRole:
+
+```yaml
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+```
+
+Failures while creating applications are logged and do not affect inventory reporting.
+
 ### Anchore API configuration
 
 Use this section to configure the Anchore Enterprise API endpoint
