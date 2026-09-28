@@ -64,7 +64,7 @@ var rootCmd = &cobra.Command{
 
 			<-neverDone
 		default:
-			reports, err := pkg.GetInventoryReports(appConfig)
+			reports, deployments, err := pkg.GetInventory(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -75,6 +75,8 @@ var rootCmd = &cobra.Command{
 			anErrorOccurred := false
 			reportInfo := healthreporter.InventoryReportInfo{}
 			for account, reportsForAccount := range reports {
+				syncAccount := account
+				accountReported := false
 				for count, report := range reportsForAccount {
 					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
 					err = pkg.HandleReport(report, &reportInfo, appConfig, account)
@@ -86,11 +88,20 @@ var rootCmd = &cobra.Command{
 						}
 						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
 						err = pkg.HandleReport(report, &reportInfo, appConfig, retryAccount)
+						if err == nil {
+							syncAccount = retryAccount
+						}
 					}
 					if err != nil {
 						log.Errorf("Failed to handle Image Results: %+v", err)
 						anErrorOccurred = true
+					} else {
+						accountReported = true
 					}
+				}
+				// Application sync failures are logged only and do not affect the exit code
+				if accountReported {
+					pkg.SyncApplications(appConfig, syncAccount, deployments[account])
 				}
 			}
 			if anErrorOccurred {
@@ -117,6 +128,13 @@ func init() {
 
 	opt = "polling-interval-seconds"
 	rootCmd.Flags().StringP(opt, "p", "300", "If mode is 'periodic', this specifies the interval")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
+	opt = "create-applications-from-deployments"
+	rootCmd.Flags().Bool(opt, false, "If true, will create Anchore applications and versions from Kubernetes deployments")
 	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)

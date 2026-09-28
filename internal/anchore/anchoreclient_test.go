@@ -712,3 +712,79 @@ func TestIncorrectCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestGet(t *testing.T) {
+	defer gock.Off()
+	details := config.AnchoreInfo{
+		URL:      "https://ancho.re",
+		User:     "admin",
+		Password: "foobar",
+		Account:  "acct",
+		HTTP:     config.HTTPConfig{TimeoutSeconds: 10},
+	}
+
+	gock.New("https://ancho.re").
+		Get("/v2/apps").
+		MatchParam("name", "^my/app$").
+		MatchHeader("x-anchore-account", "acct").
+		MatchHeader("Accept", "application/json").
+		BasicAuth("admin", "foobar").
+		Reply(200).
+		JSON(map[string]interface{}{"items": []interface{}{}})
+
+	body, err := Get("v2/apps", url.Values{"name": []string{"my/app"}}, details, "list apps")
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"items":[]}`, string(*body))
+	assert.True(t, gock.IsDone())
+
+	gock.New("https://ancho.re").
+		Get("/v2/apps").
+		Reply(404).
+		JSON(map[string]interface{}{"detail": "The requested URL was not found", "status": 404})
+	_, err = Get("v2/apps", nil, details, "list apps")
+	assert.True(t, IsHTTPStatus(err, http.StatusNotFound))
+	assert.False(t, IsHTTPStatus(err, http.StatusConflict))
+}
+
+func TestPostMultipart(t *testing.T) {
+	defer gock.Off()
+	details := config.AnchoreInfo{
+		URL:      "https://ancho.re",
+		User:     "admin",
+		Password: "foobar",
+		Account:  "acct",
+		HTTP:     config.HTTPConfig{TimeoutSeconds: 10},
+	}
+
+	var gotFields map[string]string
+	gock.New("https://ancho.re").
+		Post("/v2/apps/app-id/jobs/add-container-image-asset").
+		MatchHeader("x-anchore-account", "acct").
+		MatchHeader("Content-Type", "^multipart/form-data; boundary=").
+		BasicAuth("admin", "foobar").
+		AddMatcher(func(req *http.Request, _ *gock.Request) (bool, error) {
+			if err := req.ParseMultipartForm(1 << 20); err != nil { //nolint:gosec // test request parsing
+				return false, err
+			}
+			gotFields = map[string]string{}
+			for k, v := range req.MultipartForm.Value {
+				gotFields[k] = v[0]
+			}
+			return true, nil
+		}).
+		Reply(201).
+		JSON(map[string]interface{}{"status": "pending"})
+
+	fields := map[string]string{"asset_name": "nginx", "asset_type": "container"}
+	_, err := PostMultipart(fields, "v2/apps/app-id/jobs/add-container-image-asset", details, "add asset")
+	assert.NoError(t, err)
+	assert.Equal(t, fields, gotFields)
+	assert.True(t, gock.IsDone())
+
+	gock.New("https://ancho.re").
+		Post("/v2/apps/app-id/jobs/add-container-image-asset").
+		Reply(409).
+		JSON(map[string]interface{}{"detail": "conflict", "status": 409})
+	_, err = PostMultipart(fields, "v2/apps/app-id/jobs/add-container-image-asset", details, "add asset")
+	assert.True(t, IsHTTPStatus(err, http.StatusConflict))
+}

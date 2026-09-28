@@ -12,8 +12,10 @@ import (
 	"time"
 
 	jstime "github.com/anchore/k8s-inventory/internal/time"
+	"github.com/anchore/k8s-inventory/pkg/applications"
 	"github.com/anchore/k8s-inventory/pkg/integration"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -27,9 +29,10 @@ import (
 )
 
 type ReportItem struct {
-	Namespace  inventory.Namespace
-	Pods       []inventory.Pod
-	Containers []inventory.Container
+	Namespace   inventory.Namespace
+	Pods        []inventory.Pod
+	Containers  []inventory.Container
+	Deployments []inventory.Deployment
 }
 
 type channels struct {
@@ -40,6 +43,9 @@ type channels struct {
 
 type AccountRoutedReports map[string]inventory.Report
 type BatchedReports map[string][]inventory.Report
+
+// AccountDeployments holds the deployments found in the namespaces routed to each account
+type AccountDeployments map[string][]inventory.Deployment
 
 type batchState struct {
 	currNS   []inventory.Namespace
@@ -68,23 +74,16 @@ func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryR
 		}
 	}
 
-	anchoreDetails := cfg.AnchoreDetails
 	// Look for account credentials in the account routes first then fall back to the global anchore credentials
 	if account == "" {
 		return fmt.Errorf("account name is required")
 	}
-	anchoreDetails.Account = account
-	if cfg.AccountRoutes != nil {
-		if route, ok := cfg.AccountRoutes[account]; ok {
-			log.Debugf("Using account details specified from account-routes config for account %s", account)
-			anchoreDetails.User = route.User
-			anchoreDetails.Password = route.Password
-		} else {
-			log.Debugf("Using default account details for account %s", account)
-		}
+	if _, ok := cfg.AccountRoutes[account]; ok {
+		log.Debugf("Using account details specified from account-routes config for account %s", account)
 	} else {
 		log.Debugf("Using default account details for account %s", account)
 	}
+	anchoreDetails := cfg.AnchoreDetailsForAccount(account)
 
 	if anchoreDetails.IsValid() {
 		reportInfo.SentAsUser = anchoreDetails.User
@@ -101,10 +100,26 @@ func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryR
 	return nil
 }
 
+// SyncApplications creates Anchore applications from the deployments reported to the account, if enabled.
+// Failures are logged and never affect inventory reporting.
+func SyncApplications(cfg *config.Application, account string, deployments []inventory.Deployment) {
+	if !cfg.CreateApplicationsFromDeployments {
+		return
+	}
+	log.Infof("Syncing applications for %d deployments to Anchore account %s", len(deployments), account)
+	err := applications.SyncApplications(cfg, account, deployments)
+	switch {
+	case errors.Is(err, applications.ErrAppsAPIUnsupported):
+		log.Warnf("Skipping application creation for Anchore account %s: %v", account, err)
+	case err != nil:
+		log.Errorf("Failed to sync applications to Anchore account %s: %v", account, err)
+	}
+}
+
 // PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
 //
-//nolint:gocognit
+//nolint:gocognit,funlen
 func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Channels, gatedReportInfo *healthreporter.GatedReportInfo) {
 	// Wait for registration with Enterprise to be disabled or completed
 	<-ch.InventoryReportingEnabled
@@ -115,7 +130,7 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
 	for {
-		reports, err := GetInventoryReports(cfg)
+		reports, deployments, err := GetInventory(cfg)
 		if err != nil {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
@@ -127,6 +142,7 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 					Batches:             make([]healthreporter.BatchInfo, 0),
 					HasErrors:           false,
 				}
+				syncAccount := account
 				for count, report := range reportsForAccount {
 					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
 
@@ -149,6 +165,9 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 						}
 						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
 						err = HandleReport(report, &reportInfo, cfg, retryAccount)
+						if err == nil {
+							syncAccount = retryAccount
+						}
 					}
 					if err != nil {
 						log.Errorf("Failed to handle Inventory Report: %w", err)
@@ -171,6 +190,9 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 						reportInfo.Batches = append(reportInfo.Batches, batchInfo)
 						healthreporter.SetReportInfoNoBlocking(account, count, reportInfo, gatedReportInfo)
 					}
+				}
+				if reportInfo.LastSuccessfulIndex > 0 {
+					SyncApplications(cfg, syncAccount, deployments[account])
 				}
 			}
 		}
@@ -213,12 +235,21 @@ func launchWorkerPool(
 }
 
 // GetInventoryReportForNamespaces is an atomic method for getting in-use image results, in parallel for multiple namespaces
-//
-//nolint:funlen
 func GetInventoryReportForNamespaces(
 	cfg *config.Application,
 	namespaces []inventory.Namespace,
 ) (inventory.Report, error) {
+	report, _, err := getInventoryForNamespaces(cfg, namespaces)
+	return report, err
+}
+
+// getInventoryForNamespaces gets the inventory report and deployments for the namespaces
+//
+//nolint:funlen
+func getInventoryForNamespaces(
+	cfg *config.Application,
+	namespaces []inventory.Namespace,
+) (inventory.Report, []inventory.Deployment, error) {
 	nsNames := make([]string, 0)
 	for _, ns := range namespaces {
 		nsNames = append(nsNames, ns.Name)
@@ -227,12 +258,12 @@ func GetInventoryReportForNamespaces(
 
 	kubeconfig, err := client.GetKubeConfig(cfg)
 	if err != nil {
-		return inventory.Report{}, err
+		return inventory.Report{}, nil, err
 	}
 
 	clientset, err := client.GetClientSet(kubeconfig)
 	if err != nil {
-		return inventory.Report{}, fmt.Errorf("failed to get k8s client set: %w", err)
+		return inventory.Report{}, nil, fmt.Errorf("failed to get k8s client set: %w", err)
 	}
 	client := client.Client{
 		Clientset: clientset,
@@ -260,7 +291,7 @@ func GetInventoryReportForNamespaces(
 		cfg.MetadataCollection.Nodes.Disable,
 	)
 	if err != nil {
-		return inventory.Report{}, err
+		return inventory.Report{}, nil, err
 	}
 
 	launchWorkerPool(cfg, kubeconfig, ch, queue, nodeMap) // get pods/containers from namespaces using a worker pool pattern
@@ -268,6 +299,7 @@ func GetInventoryReportForNamespaces(
 	results := make([]ReportItem, 0)
 	pods := make([]inventory.Pod, 0)
 	containers := make([]inventory.Container, 0)
+	deployments := make([]inventory.Deployment, 0)
 	processedNamespaces := make([]inventory.Namespace, 0)
 	for len(results) < len(namespaces) {
 		select {
@@ -280,11 +312,12 @@ func GetInventoryReportForNamespaces(
 			processedNamespaces = append(processedNamespaces, item.Namespace)
 			pods = append(pods, item.Pods...)
 			containers = append(containers, item.Containers...)
+			deployments = append(deployments, item.Deployments...)
 		case err := <-ch.errors:
 			close(ch.stopper)
-			return inventory.Report{}, err
+			return inventory.Report{}, nil, err
 		case <-time.After(time.Second * time.Duration(cfg.Kubernetes.RequestTimeoutSeconds)):
-			return inventory.Report{}, fmt.Errorf("timed out waiting for results")
+			return inventory.Report{}, nil, fmt.Errorf("timed out waiting for results")
 		}
 	}
 	close(ch.reportItem)
@@ -293,7 +326,7 @@ func GetInventoryReportForNamespaces(
 
 	serverVersion, err := clientset.Discovery().ServerVersion()
 	if err != nil {
-		return inventory.Report{}, fmt.Errorf("failed to get Cluster Server Version: %w", err)
+		return inventory.Report{}, nil, fmt.Errorf("failed to get Cluster Server Version: %w", err)
 	}
 
 	var nodes []inventory.Node
@@ -310,7 +343,7 @@ func GetInventoryReportForNamespaces(
 		Nodes:                 nodes,
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
-	}, nil
+	}, deployments, nil
 }
 
 func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {
@@ -402,17 +435,26 @@ func GetNamespacesBatches(namespaces []inventory.Namespace, batchSize int) [][]i
 }
 
 func GetInventoryReports(cfg *config.Application) (BatchedReports, error) {
+	reports, _, err := GetInventory(cfg)
+	return reports, err
+}
+
+// GetInventory gets the batched inventory reports for each account, along with the deployments in the namespaces
+// routed to each account (only collected when create-applications-from-deployments is enabled)
+func GetInventory(cfg *config.Application) (BatchedReports, AccountDeployments, error) {
 	log.Info("Starting image inventory collection")
 
 	reports := AccountRoutedReports{}
+	deployments := AccountDeployments{}
 	namespaces, _ := GetAllNamespaces(cfg)
 
 	if len(cfg.AccountRoutes) == 0 && cfg.AccountRouteByNamespaceLabel.LabelKey == "" {
-		allNamespacesReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
+		allNamespacesReport, allDeployments, err := getInventoryForNamespaces(cfg, namespaces)
 		if err != nil {
-			return BatchedReports{}, err
+			return BatchedReports{}, AccountDeployments{}, err
 		}
 		reports[cfg.AnchoreDetails.Account] = allNamespacesReport
+		deployments[cfg.AnchoreDetails.Account] = allDeployments
 	} else {
 		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(cfg.AnchoreDetails.Account, namespaces, cfg.AccountRoutes, cfg.AccountRouteByNamespaceLabel)
 
@@ -426,15 +468,16 @@ func GetInventoryReports(cfg *config.Application) (BatchedReports, error) {
 
 		// Get inventory reports for each account
 		for account, namespaces := range accountRoutesForAllNamespaces {
-			accountReport, err := GetInventoryReportForNamespaces(cfg, namespaces)
+			accountReport, accountDeployments, err := getInventoryForNamespaces(cfg, namespaces)
 			if err != nil {
-				return BatchedReports{}, err
+				return BatchedReports{}, AccountDeployments{}, err
 			}
 			reports[account] = accountReport
+			deployments[account] = accountDeployments
 		}
 	}
 
-	return getBatchedInventoryReports(reports, cfg.InventoryReportLimits), nil
+	return getBatchedInventoryReports(reports, cfg.InventoryReportLimits), deployments, nil
 }
 
 func (state *batchState) createReportBatch(accountReport inventory.Report) *inventory.Report {
@@ -628,9 +671,38 @@ func processNamespace(
 		Pods:       pods,
 		Containers: containers,
 	}
+	if cfg.CreateApplicationsFromDeployments {
+		reportItem.Deployments = getDeploymentsInNamespace(clientset, cfg, ns, v1pods, containers)
+	}
 
 	log.Infof("There are %d pods in namespace \"%s\"", len(pods), ns.Name)
 	ch.reportItem <- reportItem
+}
+
+// getDeploymentsInNamespace returns the current rollout of each deployment in the namespace. Failures are logged and
+// result in no deployments so that inventory reporting is unaffected (e.g. missing RBAC for deployments/replicasets).
+func getDeploymentsInNamespace(
+	clientset kubernetes.Interface,
+	cfg *config.Application,
+	ns inventory.Namespace,
+	v1pods []v1.Pod,
+	containers []inventory.Container,
+) []inventory.Deployment {
+	c := client.Client{Clientset: clientset}
+	deps, err := inventory.FetchDeploymentsInNamespace(c, cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds, ns.Name)
+	if err != nil {
+		log.Warnf("Unable to collect deployments for application creation: %v", err)
+		return nil
+	}
+	if len(deps) == 0 {
+		return nil
+	}
+	rss, err := inventory.FetchReplicaSetsInNamespace(c, cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds, ns.Name)
+	if err != nil {
+		log.Warnf("Unable to collect replicasets for application creation: %v", err)
+		return nil
+	}
+	return inventory.ProcessDeployments(deps, rss, v1pods, containers, ns.UID)
 }
 
 func SetLogger(logger logger.Logger) {

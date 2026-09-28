@@ -11,10 +11,12 @@ import (
 	"github.com/anchore/k8s-inventory/internal/tracker"
 	"github.com/h2non/gock"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -114,6 +116,73 @@ func Post(requestBody []byte, id string, path string, anchoreDetails config.Anch
 	return doPost(client, request, operation)
 }
 
+// Get performs a GET request against the Anchore API with the given query parameters
+func Get(path string, query url.Values, anchoreDetails config.AnchoreInfo, operation string) (*[]byte, error) {
+	defer tracker.TrackFunctionTime(time.Now(), fmt.Sprintf("Sent %s request to Anchore", operation))
+
+	log.Debugf("Performing %s to Anchore using endpoint: %s", operation, path)
+
+	client := getClient(anchoreDetails)
+
+	anchoreURL, err := getURL(anchoreDetails, path, "")
+	if err != nil {
+		return nil, err
+	}
+	parsedURL, err := url.Parse(anchoreURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build path (%s) url: %w", path, err)
+	}
+	parsedURL.RawQuery = query.Encode()
+
+	request, err := http.NewRequest("GET", parsedURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare %s request to Anchore: %w", operation, err)
+	}
+	setAuthHeaders(request, anchoreDetails)
+	request.Header.Set("Accept", "application/json")
+
+	return doPost(client, request, operation)
+}
+
+// PostMultipart performs a POST request against the Anchore API with a multipart/form-data body built from fields
+func PostMultipart(fields map[string]string, path string, anchoreDetails config.AnchoreInfo, operation string) (*[]byte, error) {
+	defer tracker.TrackFunctionTime(time.Now(), fmt.Sprintf("Sent %s request to Anchore", operation))
+
+	log.Debugf("Performing %s to Anchore using endpoint: %s", operation, path)
+
+	client := getClient(anchoreDetails)
+
+	anchoreURL, err := getURL(anchoreDetails, path, "")
+	if err != nil {
+		return nil, err
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	keys := make([]string, 0, len(fields))
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if err := writer.WriteField(k, fields[k]); err != nil {
+			return nil, fmt.Errorf("failed to prepare %s request to Anchore: %w", operation, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to prepare %s request to Anchore: %w", operation, err)
+	}
+
+	request, err := http.NewRequest("POST", anchoreURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare %s request to Anchore: %w", operation, err)
+	}
+	setAuthHeaders(request, anchoreDetails)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	return doPost(client, request, operation)
+}
+
 func getClient(anchoreDetails config.AnchoreInfo) *http.Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: anchoreDetails.HTTP.Insecure},
@@ -144,10 +213,14 @@ func getPostRequest(anchoreDetails config.AnchoreInfo, endpointURL string, reqBo
 		return nil, fmt.Errorf("failed to prepare %s request to Anchore: %w", operation, err)
 	}
 
-	request.SetBasicAuth(anchoreDetails.User, anchoreDetails.Password)
+	setAuthHeaders(request, anchoreDetails)
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("x-anchore-account", anchoreDetails.Account)
 	return request, nil
+}
+
+func setAuthHeaders(request *http.Request, anchoreDetails config.AnchoreInfo) {
+	request.SetBasicAuth(anchoreDetails.User, anchoreDetails.Password)
+	request.Header.Set("x-anchore-account", anchoreDetails.Account)
 }
 
 func doPost(client *http.Client, request *http.Request, operation string) (*[]byte, error) {
@@ -170,7 +243,12 @@ func checkHTTPErrors(response *http.Response, operation string) error {
 	switch {
 	case response.StatusCode >= 400 && response.StatusCode <= 599:
 		msg := fmt.Sprintf("%s response from Anchore (during %s)", response.Status, operation)
-		log.Errorf(msg)
+		if response.StatusCode == http.StatusConflict {
+			// Conflicts are expected when creating resources that already exist, callers decide how to handle them
+			log.Debugf(msg)
+		} else {
+			log.Errorf(msg)
+		}
 
 		respBody, _ := getBody(response, operation)
 		if respBody == nil {
@@ -261,6 +339,12 @@ func ServerIsOffline(err error) bool {
 	}
 
 	return false
+}
+
+// IsHTTPStatus returns true if the error is an APIClientError with the given HTTP status code
+func IsHTTPStatus(err error, code int) bool {
+	var apiClientError *APIClientError
+	return errors.As(err, &apiClientError) && apiClientError.HTTPStatusCode == code
 }
 
 func ServerLacksAgentHealthAPISupport(err error) bool {

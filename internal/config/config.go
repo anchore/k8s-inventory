@@ -36,30 +36,31 @@ type CliOnlyOptions struct {
 
 // All Application configurations
 type Application struct {
-	ConfigPath                      string
-	Quiet                           bool                `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
-	Log                             Logging             `mapstructure:"log" json:"log,omitempty" yaml:"log"`
-	Registration                    RegistrationOptions `mapstructure:"anchore-registration" json:"anchore-registration,omitempty" yaml:"anchore-registration"`
-	CliOptions                      CliOnlyOptions
-	Dev                             Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
-	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
-	Kubernetes                      KubernetesAPI                `mapstructure:"kubernetes" json:"kubernetes,omitempty" yaml:"kubernetes"`
-	Namespaces                      []string                     `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
-	KubernetesRequestTimeoutSeconds int64                        `mapstructure:"kubernetes-request-timeout-seconds" json:"kubernetes-request-timeout-seconds,omitempty" yaml:"kubernetes-request-timeout-seconds"`
-	NamespaceSelectors              NamespaceSelector            `mapstructure:"namespace-selectors" json:"namespace-selectors,omitempty" yaml:"namespace-selectors"`
-	AccountRoutes                   AccountRoutes                `mapstructure:"account-routes" json:"account-routes,omitempty" yaml:"account-routes"`
-	AccountRouteByNamespaceLabel    AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label" json:"account-route-by-namespace-label,omitempty" yaml:"account-route-by-namespace-label"`
-	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override" json:"missing-registry-override,omitempty" yaml:"missing-registry-override"`
-	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy" json:"missing-tag-policy,omitempty" yaml:"missing-tag-policy"`
-	RunMode                         mode.Mode
-	Mode                            string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
-	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
-	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
-	HealthReportIntervalSeconds     int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
-	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
-	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
-	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
-	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
+	ConfigPath                        string
+	Quiet                             bool                `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
+	Log                               Logging             `mapstructure:"log" json:"log,omitempty" yaml:"log"`
+	Registration                      RegistrationOptions `mapstructure:"anchore-registration" json:"anchore-registration,omitempty" yaml:"anchore-registration"`
+	CliOptions                        CliOnlyOptions
+	Dev                               Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
+	KubeConfig                        KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
+	Kubernetes                        KubernetesAPI                `mapstructure:"kubernetes" json:"kubernetes,omitempty" yaml:"kubernetes"`
+	Namespaces                        []string                     `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
+	KubernetesRequestTimeoutSeconds   int64                        `mapstructure:"kubernetes-request-timeout-seconds" json:"kubernetes-request-timeout-seconds,omitempty" yaml:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors                NamespaceSelector            `mapstructure:"namespace-selectors" json:"namespace-selectors,omitempty" yaml:"namespace-selectors"`
+	AccountRoutes                     AccountRoutes                `mapstructure:"account-routes" json:"account-routes,omitempty" yaml:"account-routes"`
+	AccountRouteByNamespaceLabel      AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label" json:"account-route-by-namespace-label,omitempty" yaml:"account-route-by-namespace-label"`
+	MissingRegistryOverride           string                       `mapstructure:"missing-registry-override" json:"missing-registry-override,omitempty" yaml:"missing-registry-override"`
+	MissingTagPolicy                  MissingTagConf               `mapstructure:"missing-tag-policy" json:"missing-tag-policy,omitempty" yaml:"missing-tag-policy"`
+	RunMode                           mode.Mode
+	Mode                              string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
+	IgnoreNotRunning                  bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
+	PollingIntervalSeconds            int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
+	HealthReportIntervalSeconds       int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
+	InventoryReportLimits             InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
+	MetadataCollection                MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
+	AnchoreDetails                    AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
+	VerboseInventoryReports           bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
+	CreateApplicationsFromDeployments bool                  `mapstructure:"create-applications-from-deployments" json:"create-applications-from-deployments,omitempty" yaml:"create-applications-from-deployments"`
 }
 
 type RegistrationOptions struct {
@@ -179,6 +180,19 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})
 	v.SetDefault("namespace-selectors.ignore-empty", false)
+	v.SetDefault("create-applications-from-deployments", false)
+}
+
+// AnchoreDetailsForAccount returns the Anchore connection details to use for the given account. Credentials from
+// account-routes are used when the account has a route configured, otherwise the global anchore credentials are used.
+func (cfg *Application) AnchoreDetailsForAccount(account string) AnchoreInfo {
+	anchoreDetails := cfg.AnchoreDetails
+	anchoreDetails.Account = account
+	if route, ok := cfg.AccountRoutes[account]; ok {
+		anchoreDetails.User = route.User
+		anchoreDetails.Password = route.Password
+	}
+	return anchoreDetails
 }
 
 // Load the Application Configuration from the Viper specifications
