@@ -59,9 +59,19 @@ type APIClientError struct {
 	ControllerErrorDetails *ControllerErrorDetails
 }
 
+const maxErrorBodyLength = 1024
+
 func (e *APIClientError) Error() string {
-	return fmt.Sprintf("API errorMsg(%d): %s Path: %q %v %v", e.HTTPStatusCode, e.Message, e.Path,
+	msg := fmt.Sprintf("API errorMsg(%d): %s Path: %q %v %v", e.HTTPStatusCode, e.Message, e.Path,
 		e.APIErrorDetails, e.ControllerErrorDetails)
+	if e.Body != nil && len(*e.Body) > 0 {
+		body := string(*e.Body)
+		if len(body) > maxErrorBodyLength {
+			body = body[:maxErrorBodyLength] + "..."
+		}
+		msg += " Response: " + body
+	}
+	return msg
 }
 
 func GetVersion(anchoreDetails config.AnchoreInfo) (*Version, error) {
@@ -272,8 +282,14 @@ func checkHTTPErrors(response *http.Response, operation string) error {
 				Body: nil, HTTPStatusCode: response.StatusCode, ControllerErrorDetails: &controllerError}
 		}
 
+		// Keep the raw body when it is in neither known format (e.g. validation errors with a list of details) so
+		// the reason is not lost
+		var body *[]byte
+		if len(*respBody) > 0 {
+			body = respBody
+		}
 		return &APIClientError{Message: msg, Path: response.Request.URL.Path, Method: response.Request.Method,
-			Body: nil, HTTPStatusCode: response.StatusCode}
+			Body: body, HTTPStatusCode: response.StatusCode}
 	case response.StatusCode < 200 || response.StatusCode > 299:
 		msg := fmt.Sprintf("failed to perform %s to Anchore: %+v", operation, response)
 		log.Debugf(msg)

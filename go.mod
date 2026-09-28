@@ -5,6 +5,7 @@ go 1.26.8
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/anchore/go-testutils v0.0.0-20200925183923-d5f45b0d3c04
+	github.com/distribution/reference v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/h2non/gock v1.2.0
 	github.com/hashicorp/go-version v1.9.0
@@ -55,6 +56,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect

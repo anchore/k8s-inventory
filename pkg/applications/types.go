@@ -45,6 +45,18 @@ type assetListResponse struct {
 type addContainerImageAssetJobResponse struct {
 	Status         string         `json:"status"`
 	SystemMetadata SystemMetadata `json:"system_metadata"`
+	JobSpec        imageJobSpec   `json:"job_spec"`
+}
+
+type imageJobSpec struct {
+	Asset struct {
+		Name string `json:"name"`
+	} `json:"asset"`
+}
+
+type addContainerImageAssetJobListResponse struct {
+	Pagination Pagination                          `json:"pagination"`
+	Items      []addContainerImageAssetJobResponse `json:"items"`
 }
 
 type contact struct {
