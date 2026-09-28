@@ -74,6 +74,7 @@ var rootCmd = &cobra.Command{
 			}
 			anErrorOccurred := false
 			reportInfo := healthreporter.InventoryReportInfo{}
+			appSyncs := pkg.ApplicationSyncs{}
 			for account, reportsForAccount := range reports {
 				syncAccount := account
 				accountReported := false
@@ -99,11 +100,13 @@ var rootCmd = &cobra.Command{
 						accountReported = true
 					}
 				}
-				// Application sync failures are logged only and do not affect the exit code
 				if accountReported {
-					pkg.SyncApplications(appConfig, syncAccount, deployments[account])
+					appSyncs.Add(appConfig, syncAccount, deployments[account])
 				}
 			}
+			// Applications are synced after all inventory is reported; failures are logged only and do not
+			// affect the exit code
+			pkg.SyncAllApplications(appConfig, appSyncs)
 			if anErrorOccurred {
 				os.Exit(1)
 			}

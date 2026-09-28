@@ -58,7 +58,7 @@ func testDeployment() inventory.Deployment {
 		ReplicaSetCreated: released,
 		Containers: []inventory.Container{
 			{Name: "nginx", ImageTag: "docker.io/nginx:1.27", ImageDigest: "sha256:aaaa"},
-			{Name: "sidecar", ImageTag: "docker.io/busybox:1.36"},
+			{Name: "sidecar", ImageTag: "docker.io/busybox:1.36", ImageDigest: "sha256:bbbb"},
 		},
 	}
 }
@@ -178,7 +178,7 @@ func TestSyncCreatesAppVersionAndAssets(t *testing.T) {
 		"k8s.image_tag":           "docker.io/nginx:1.27",
 		"k8s.image_digest":        "sha256:aaaa",
 	}, annotations)
-	assert.Equal(t, "docker.io/busybox:1.36", sidecar["image_reference"])
+	assert.Equal(t, "docker.io/busybox:1.36@sha256:bbbb", sidecar["image_reference"])
 
 	// A second sync with no changes must not make any requests
 	err = s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
@@ -295,7 +295,7 @@ func TestSyncErrorDoesNotStopOtherDeployments(t *testing.T) {
 	failing := testDeployment()
 	failing.Name = "failing"
 	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/failing$").
-		Reply(500).JSON(map[string]interface{}{"message": "boom", "httpcode": 500})
+		Reply(400).JSON(map[string]interface{}{"message": "bad request", "httpcode": 400})
 	mockFindApp(appJSON(testAppID, appName))
 	mockFindVersion(appJSON(testVersionID, versionName))
 	mockListAssets("nginx", "sidecar")
@@ -325,8 +325,105 @@ func TestNames(t *testing.T) {
 
 func TestAssetAnnotationsOmitsEmpty(t *testing.T) {
 	dep := testDeployment()
+	dep.Containers[1].ImageDigest = ""
 	got := assetAnnotations("", dep, dep.Containers[1])
 	assert.NotContains(t, got, "k8s.cluster")
 	assert.NotContains(t, got, "k8s.image_digest")
 	assert.Equal(t, "sidecar", got["k8s.container"])
+}
+
+func TestSyncStopsWhenAppsAPIUnavailable(t *testing.T) {
+	tests := []struct {
+		name string
+		mock func(*gock.Response)
+	}{
+		{
+			name: "server error",
+			mock: func(r *gock.Response) {
+				r.Status(500).JSON(map[string]interface{}{"message": "boom", "httpcode": 500})
+			},
+		},
+		{
+			name: "timeout",
+			mock: func(r *gock.Response) {
+				r.SetError(&timeoutError{})
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setup(t)
+
+			failing := testDeployment()
+			failing.Name = "failing"
+			tt.mock(gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/failing$").Reply(200))
+
+			// No mocks are registered for the second deployment: any request for it fails the test via the
+			// pending/unmatched checks below
+			err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{failing, testDeployment()})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unavailable")
+			assert.True(t, gock.IsDone())
+			assert.False(t, gock.HasUnmatchedRequest(), "unexpected requests: %v", gock.GetUnmatchedRequests())
+		})
+	}
+}
+
+type timeoutError struct{}
+
+func (e *timeoutError) Error() string   { return "i/o timeout" }
+func (e *timeoutError) Timeout() bool   { return true }
+func (e *timeoutError) Temporary() bool { return true }
+
+func TestSyncSkipsContainersWithoutDigest(t *testing.T) {
+	setup(t)
+
+	dep := testDeployment()
+	dep.Containers[1].ImageDigest = ""
+
+	mockFindApp(appJSON(testAppID, appName))
+	mockFindVersion(appJSON(testVersionID, versionName))
+	mockListAssets("nginx")
+
+	s := NewSyncer()
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+	assert.False(t, gock.HasUnmatchedRequest())
+
+	// Once the digest is known the asset is added, using the cached app and version
+	dep.Containers[1].ImageDigest = "sha256:bbbb"
+	var sidecar capturedAsset
+	mockAddAsset("sidecar", 201, &sidecar)
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+	assert.Equal(t, "docker.io/busybox:1.36@sha256:bbbb", sidecar["image_reference"])
+}
+
+func TestSyncSkipsDeploymentWithNoDigests(t *testing.T) {
+	setup(t)
+
+	dep := testDeployment()
+	for i := range dep.Containers {
+		dep.Containers[i].ImageDigest = ""
+	}
+	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	assert.False(t, gock.HasUnmatchedRequest())
+}
+
+func TestSyncPrunesCache(t *testing.T) {
+	setup(t)
+
+	s := NewSyncer()
+	current := s.key(testConfig(), testDetails(), testDeployment())
+	stale := cacheKey{account: "admin", appName: appName, versionName: "revision-1-old"}
+	otherAccount := cacheKey{account: "other", appName: appName, versionName: "revision-1-old"}
+	for _, k := range []cacheKey{current, stale, otherAccount} {
+		s.cache[k] = &versionState{appID: testAppID, versionID: testVersionID,
+			assets: map[string]struct{}{"nginx": {}, "sidecar": {}}}
+	}
+
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()}))
+	assert.Contains(t, s.cache, current)
+	assert.NotContains(t, s.cache, stale)
+	assert.Contains(t, s.cache, otherAccount)
 }

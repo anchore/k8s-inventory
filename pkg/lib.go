@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
+	"sync/atomic"
 	"time"
 
 	jstime "github.com/anchore/k8s-inventory/internal/time"
@@ -16,6 +18,7 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/integration"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -100,13 +103,39 @@ func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryR
 	return nil
 }
 
+// ApplicationSyncs collects the deployments to create Anchore applications for, keyed by the Anchore account the
+// inventory was actually reported to. Syncing is deferred until inventory has been reported for every account, so
+// that a slow or failing Apps API can never delay inventory reporting.
+type ApplicationSyncs map[string][]inventory.Deployment
+
+// Add records the deployments for the account if application creation is enabled
+func (a ApplicationSyncs) Add(cfg *config.Application, account string, deployments []inventory.Deployment) {
+	if !cfg.CreateApplicationsFromDeployments || len(deployments) == 0 {
+		return
+	}
+	a[account] = append(a[account], deployments...)
+}
+
+// SyncAllApplications creates Anchore applications for every account recorded in syncs.
+// Failures are logged and never affect inventory reporting.
+func SyncAllApplications(cfg *config.Application, syncs ApplicationSyncs) {
+	accounts := make([]string, 0, len(syncs))
+	for account := range syncs {
+		accounts = append(accounts, account)
+	}
+	sort.Strings(accounts)
+	for _, account := range accounts {
+		SyncApplications(cfg, account, syncs[account])
+	}
+}
+
 // SyncApplications creates Anchore applications from the deployments reported to the account, if enabled.
 // Failures are logged and never affect inventory reporting.
 func SyncApplications(cfg *config.Application, account string, deployments []inventory.Deployment) {
 	if !cfg.CreateApplicationsFromDeployments {
 		return
 	}
-	log.Infof("Syncing applications for %d deployments to Anchore account %s", len(deployments), account)
+	log.Debugf("Syncing applications for %d deployments to Anchore account %s", len(deployments), account)
 	err := applications.SyncApplications(cfg, account, deployments)
 	switch {
 	case errors.Is(err, applications.ErrAppsAPIUnsupported):
@@ -134,6 +163,7 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 		if err != nil {
 			log.Errorf("Failed to get Inventory Report: %w", err)
 		} else {
+			appSyncs := ApplicationSyncs{}
 			for account, reportsForAccount := range reports {
 				reportInfo := healthreporter.InventoryReportInfo{
 					Account:             account,
@@ -192,9 +222,10 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 					}
 				}
 				if reportInfo.LastSuccessfulIndex > 0 {
-					SyncApplications(cfg, syncAccount, deployments[account])
+					appSyncs.Add(cfg, syncAccount, deployments[account])
 				}
 			}
+			SyncAllApplications(cfg, appSyncs)
 		}
 
 		log.Infof("Waiting %d seconds for next poll...", cfg.PollingIntervalSeconds)
@@ -443,6 +474,7 @@ func GetInventoryReports(cfg *config.Application) (BatchedReports, error) {
 // routed to each account (only collected when create-applications-from-deployments is enabled)
 func GetInventory(cfg *config.Application) (BatchedReports, AccountDeployments, error) {
 	log.Info("Starting image inventory collection")
+	deploymentsForbiddenWarned.Store(false)
 
 	reports := AccountRoutedReports{}
 	deployments := AccountDeployments{}
@@ -679,6 +711,25 @@ func processNamespace(
 	ch.reportItem <- reportItem
 }
 
+// deploymentsForbiddenWarned limits the warning about missing RBAC for deployments/replicasets to once per poll
+var deploymentsForbiddenWarned atomic.Bool
+
+const deploymentsRBACHint = "grant the agent get/list/watch on apps/deployments and apps/replicasets in its ClusterRole " +
+	"to create applications from deployments"
+
+func logDeploymentsListError(ns string, err error) {
+	if !apierrors.IsForbidden(err) {
+		log.Warnf("Unable to collect deployments in namespace %s for application creation: %v", ns, err)
+		return
+	}
+	if deploymentsForbiddenWarned.CompareAndSwap(false, true) {
+		log.Warnf("Unable to collect deployments in namespace %s for application creation, %s "+
+			"(further namespaces are logged at debug level): %v", ns, deploymentsRBACHint, err)
+		return
+	}
+	log.Debugf("Unable to collect deployments in namespace %s for application creation: %v", ns, err)
+}
+
 // getDeploymentsInNamespace returns the current rollout of each deployment in the namespace. Failures are logged and
 // result in no deployments so that inventory reporting is unaffected (e.g. missing RBAC for deployments/replicasets).
 func getDeploymentsInNamespace(
@@ -691,7 +742,7 @@ func getDeploymentsInNamespace(
 	c := client.Client{Clientset: clientset}
 	deps, err := inventory.FetchDeploymentsInNamespace(c, cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds, ns.Name)
 	if err != nil {
-		log.Warnf("Unable to collect deployments for application creation: %v", err)
+		logDeploymentsListError(ns.Name, err)
 		return nil
 	}
 	if len(deps) == 0 {
@@ -699,7 +750,7 @@ func getDeploymentsInNamespace(
 	}
 	rss, err := inventory.FetchReplicaSetsInNamespace(c, cfg.Kubernetes.RequestBatchSize, cfg.Kubernetes.RequestTimeoutSeconds, ns.Name)
 	if err != nil {
-		log.Warnf("Unable to collect replicasets for application creation: %v", err)
+		logDeploymentsListError(ns.Name, err)
 		return nil
 	}
 	return inventory.ProcessDeployments(deps, rss, v1pods, containers, ns.UID)

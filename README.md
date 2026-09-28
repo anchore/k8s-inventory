@@ -507,8 +507,14 @@ create-applications-from-deployments: false
   named `revision-<revision>-<pod-template-hash>`, with `status: released` and linked to the previous version.
 - The container images running in the current rollout are added to the version as `container` assets, named after
   the container. Anchore Enterprise analyzes the images asynchronously, so it needs access to the image registries.
-- Deployments whose current rollout has no running pods are picked up on a later poll. Existing apps and versions
-  are never modified or deleted.
+- Only containers with a known image digest are added, so each asset references exactly the image that is running.
+  Containers without a digest yet (for example still pulling their image), and Deployments whose current rollout has
+  no running pods, are picked up on a later poll.
+- Existing apps and versions are never modified or deleted. The agent remembers what it has already created, so if
+  an app or version is deleted in Anchore while the agent is running it is not recreated until the agent restarts
+  or the Deployment is rolled out again.
+- Applications are created after inventory has been reported to every account. If Anchore Enterprise or its Apps
+  API is unavailable (timeouts, server errors), application creation for that account is skipped until the next poll.
 
 Requirements:
 
@@ -522,7 +528,8 @@ Requirements:
   verbs: ["get", "list", "watch"]
 ```
 
-Failures while creating applications are logged and do not affect inventory reporting.
+Failures while creating applications are logged and do not affect inventory reporting. If the RBAC rule is
+missing, a single warning is logged per poll.
 
 ### Anchore API configuration
 
