@@ -788,3 +788,20 @@ func TestPostMultipart(t *testing.T) {
 	_, err = PostMultipart(fields, "v2/apps/app-id/jobs/add-container-image-asset", details, "add asset")
 	assert.True(t, IsHTTPStatus(err, http.StatusConflict))
 }
+
+func TestValidationErrorIncludesResponseBody(t *testing.T) {
+	defer gock.Off()
+	details := config.AnchoreInfo{URL: "https://ancho.re", User: "admin", Password: "foobar", Account: "acct",
+		HTTP: config.HTTPConfig{TimeoutSeconds: 10}}
+
+	gock.New("https://ancho.re").
+		Post("/v2/apps/app-id/jobs/add-container-image-asset").
+		Reply(422).
+		JSON(map[string]interface{}{"detail": []interface{}{
+			map[string]interface{}{"loc": []string{"body", "image_reference"}, "msg": "must include a registry"},
+		}})
+
+	_, err := PostMultipart(map[string]string{"asset_name": "nginx"}, "v2/apps/app-id/jobs/add-container-image-asset", details, "add asset")
+	assert.True(t, IsHTTPStatus(err, http.StatusUnprocessableEntity))
+	assert.Contains(t, err.Error(), "must include a registry")
+}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
+	"github.com/anchore/k8s-inventory/internal/log"
 )
 
 const (
@@ -16,6 +17,10 @@ const (
 	appVersionsAPIPath            = "v2/apps/{{app_id}}/versions"
 	appVersionAssetsAPIPath       = "v2/apps/{{app_id}}/versions/{{version_id}}/assets"
 	addContainerImageAssetAPIPath = "v2/apps/{{app_id}}/jobs/add-container-image-asset"
+
+	queryVersionID = "version_id"
+	jobPending     = "pending"
+	jobProcessing  = "processing"
 
 	queryName             = "name"
 	queryLimit            = "limit"
@@ -86,11 +91,13 @@ func createApp(details config.AnchoreInfo, req appCreateRequest) (*App, error) {
 		if found == nil {
 			return nil, fmt.Errorf("app %q reported as existing but could not be found: %w", req.Name, err)
 		}
+		log.Debugf("App %s already exists", req.Name)
 		return found, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("Created app %s", req.Name)
 	return &app, nil
 }
 
@@ -136,11 +143,13 @@ func createVersion(details config.AnchoreInfo, appID string, req appVersionCreat
 		if found == nil {
 			return nil, fmt.Errorf("app version %q reported as existing but could not be found: %w", req.Name, err)
 		}
+		log.Debugf("App version %s already exists", req.Name)
 		return found, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("Created app version %s", req.Name)
 	return &version, nil
 }
 
@@ -154,6 +163,28 @@ func listAssetNames(details config.AnchoreInfo, appID, versionID string) (map[st
 		}
 		for _, a := range resp.Items {
 			names[a.Name] = struct{}{}
+		}
+		if resp.Pagination.NextCursor == nil || *resp.Pagination.NextCursor == "" {
+			return names, nil
+		}
+		query.Set(queryCursor, *resp.Pagination.NextCursor)
+	}
+}
+
+// listInFlightAssetNames returns the names of assets with an add-container-image-asset job still pending or
+// processing for the version, so a job is not submitted twice before the asset appears
+func listInFlightAssetNames(details config.AnchoreInfo, appID, versionID string) (map[string]struct{}, error) {
+	names := make(map[string]struct{})
+	query := url.Values{queryVersionID: []string{versionID}, queryLimit: []string{pageLimit}}
+	for {
+		resp := addContainerImageAssetJobListResponse{}
+		if err := getJSON(details, appPath(addContainerImageAssetAPIPath, appID), query, "add container image asset job list", &resp); err != nil {
+			return nil, err
+		}
+		for _, job := range resp.Items {
+			if job.Status == jobPending || job.Status == jobProcessing {
+				names[job.JobSpec.Asset.Name] = struct{}{}
+			}
 		}
 		if resp.Pagination.NextCursor == nil || *resp.Pagination.NextCursor == "" {
 			return names, nil

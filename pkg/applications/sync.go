@@ -13,13 +13,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/distribution/reference"
+
 	"github.com/anchore/k8s-inventory/internal/anchore"
 	"github.com/anchore/k8s-inventory/internal/config"
 	"github.com/anchore/k8s-inventory/internal/log"
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 )
 
-const defaultContactName = "anchore-k8s-inventory"
+const (
+	defaultContactName = "anchore-k8s-inventory"
+	// maxImageReferenceLength is the longest image_reference accepted by the add-container-image-asset API
+	maxImageReferenceLength = 512
+	// maxConsecutiveServerErrors is the number of deployments in a row failing with a server error after which the
+	// sync for the account is stopped
+	maxConsecutiveServerErrors = 3
+)
 
 // ErrAppsAPIUnsupported is returned when the Anchore Enterprise instance does not provide the Apps API
 var ErrAppsAPIUnsupported = errors.New("anchore enterprise does not support the Apps API (requires Anchore Enterprise v6+)")
@@ -78,11 +87,30 @@ func VersionName(dep inventory.Deployment) string {
 	return fmt.Sprintf("revision-%s-%s", dep.Revision, dep.PodTemplateHash)
 }
 
-func imageReference(c inventory.Container) string {
-	if c.ImageDigest != "" {
-		return c.ImageTag + "@" + c.ImageDigest
+// imageReference returns the fully qualified, digest pinned reference for the container image, as required by the
+// add-container-image-asset API (e.g. nginx:1.27 -> docker.io/library/nginx:1.27@sha256:...)
+func imageReference(c inventory.Container) (string, error) {
+	named, err := reference.ParseNormalizedNamed(c.ImageTag)
+	if err != nil {
+		return "", fmt.Errorf("invalid image reference %q: %w", c.ImageTag, err)
 	}
-	return c.ImageTag
+	ref := reference.TagNameOnly(named).String()
+	if c.ImageDigest != "" {
+		ref += "@" + c.ImageDigest
+		if _, err := reference.ParseNormalizedNamed(ref); err != nil {
+			return "", fmt.Errorf("invalid image reference %q: %w", ref, err)
+		}
+	}
+	if len(ref) > maxImageReferenceLength {
+		return "", fmt.Errorf("image reference %q is longer than %d characters", ref, maxImageReferenceLength)
+	}
+	return ref, nil
+}
+
+// assetContainer is a container to add as an asset, with its image reference
+type assetContainer struct {
+	inventory.Container
+	ref string
 }
 
 func assetAnnotations(cluster string, dep inventory.Deployment, c inventory.Container) map[string]string {
@@ -105,15 +133,19 @@ func assetAnnotations(cluster string, dep inventory.Deployment, c inventory.Cont
 	return annotations
 }
 
-// isUnavailable reports whether Anchore (or its Apps API backend) is unreachable, timing out or failing
+// isUnavailable reports whether Anchore (or its Apps API backend) is unreachable, timing out or unavailable
+// (502/503/504), in which case every further request is expected to fail as well
 func isUnavailable(err error) bool {
 	if anchore.ServerIsOffline(err) {
 		return true
 	}
 	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
-		return true
-	}
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// isServerError reports whether the error is a 5xx response. A single server error may be specific to one request
+// (e.g. one image), so only repeated server errors stop the sync.
+func isServerError(err error) bool {
 	var apiErr *anchore.APIClientError
 	return errors.As(err, &apiErr) && apiErr.HTTPStatusCode >= 500 && apiErr.HTTPStatusCode <= 599
 }
@@ -133,11 +165,23 @@ func (s *Syncer) Sync(cfg *config.Application, details config.AnchoreInfo, deplo
 
 	desired := make(map[cacheKey]struct{}, len(deployments))
 	var errs []error
+	consecutiveServerErrors := 0
 	for _, dep := range deployments {
 		desired[s.key(cfg, details, dep)] = struct{}{}
 		err := s.syncDeployment(cfg, details, dep)
 		if err == nil {
+			consecutiveServerErrors = 0
 			continue
+		}
+		if isServerError(err) {
+			consecutiveServerErrors++
+		} else {
+			consecutiveServerErrors = 0
+		}
+		if consecutiveServerErrors >= maxConsecutiveServerErrors {
+			errs = append(errs, fmt.Errorf("failed to sync application for deployment %s/%s: %w", dep.Namespace, dep.Name, err))
+			return fmt.Errorf("anchore apps API unavailable (%d consecutive server errors), skipping remaining application "+
+				"sync for account %s: %w", consecutiveServerErrors, details.Account, errors.Join(errs...))
 		}
 		if isFatal(err) {
 			switch {
@@ -177,15 +221,21 @@ func (s *Syncer) syncDeployment(cfg *config.Application, details config.AnchoreI
 	key := s.key(cfg, details, dep)
 	appName, versionName := key.appName, key.versionName
 
-	// Only containers with a known image digest are added, so the asset references exactly what is running.
+	// Only containers with a known image digest and a valid reference are added, so the asset references exactly
+	// what is running and no version is created for a deployment whose images cannot be added.
 	// Containers without a digest yet (e.g. still pulling) are retried on a later poll.
-	var containers []inventory.Container
+	var containers []assetContainer
 	for _, c := range dep.Containers {
 		if c.ImageDigest == "" {
 			log.Debugf("Container %s of deployment %s/%s has no image digest yet, will retry on a later poll", c.Name, dep.Namespace, dep.Name)
 			continue
 		}
-		containers = append(containers, c)
+		ref, err := imageReference(c)
+		if err != nil {
+			log.Warnf("Not adding container %s of deployment %s/%s as an application asset: %v", c.Name, dep.Namespace, dep.Name, err)
+			continue
+		}
+		containers = append(containers, assetContainer{Container: c, ref: ref})
 	}
 	if len(containers) == 0 {
 		return nil
@@ -205,8 +255,8 @@ func (s *Syncer) syncDeployment(cfg *config.Application, details config.AnchoreI
 		if _, ok := state.assets[c.Name]; ok {
 			continue
 		}
-		ref := imageReference(c)
-		jobID, err := addImageAsset(details, state.appID, state.versionID, c.Name, ref, assetAnnotations(cluster, dep, c))
+		ref := c.ref
+		jobID, err := addImageAsset(details, state.appID, state.versionID, c.Name, ref, assetAnnotations(cluster, dep, c.Container))
 		if err != nil {
 			if anchore.IsHTTPStatus(err, http.StatusNotFound) {
 				// The version was removed from Anchore, resolve it again next time
@@ -250,13 +300,19 @@ func resolveVersion(cfg *config.Application, details config.AnchoreInfo, dep inv
 		if err != nil {
 			return nil, err
 		}
-		log.Infof("Created app version %s for app %s", versionName, appName)
 	}
 	versionID := version.SystemMetadata.ID
 
 	assets, err := listAssetNames(details, appID, versionID)
 	if err != nil {
 		return nil, err
+	}
+	inFlight, err := listInFlightAssetNames(details, appID, versionID)
+	if err != nil {
+		return nil, err
+	}
+	for name := range inFlight {
+		assets[name] = struct{}{}
 	}
 	return &versionState{appID: appID, versionID: versionID, assets: assets}, nil
 }
@@ -291,7 +347,6 @@ func findOrCreateApp(cfg *config.Application, details config.AnchoreInfo, dep in
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("Created app %s", appName)
 	return app, nil
 }
 

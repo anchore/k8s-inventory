@@ -508,13 +508,17 @@ create-applications-from-deployments: false
 - The container images running in the current rollout are added to the version as `container` assets, named after
   the container. Anchore Enterprise analyzes the images asynchronously, so it needs access to the image registries.
 - Only containers with a known image digest are added, so each asset references exactly the image that is running.
-  Containers without a digest yet (for example still pulling their image), and Deployments whose current rollout has
-  no running pods, are picked up on a later poll.
+  Image names are normalized to fully qualified references (for example `nginx:1.27` becomes
+  `docker.io/library/nginx:1.27@sha256:...`). Containers without a digest yet (for example still pulling their
+  image), and Deployments whose current rollout has no running pods, are picked up on a later poll. Images without a
+  registry digest, such as images loaded directly onto nodes (`kind load`), are never added.
 - Existing apps and versions are never modified or deleted. The agent remembers what it has already created, so if
   an app or version is deleted in Anchore while the agent is running it is not recreated until the agent restarts
   or the Deployment is rolled out again.
 - Applications are created after inventory has been reported to every account. If Anchore Enterprise or its Apps
-  API is unavailable (timeouts, server errors), application creation for that account is skipped until the next poll.
+  API is unavailable (timeouts, 502/503/504, or several server errors in a row), application creation for that
+  account is skipped until the next poll. A version created just before such a failure may have no assets until
+  a later poll adds them.
 
 Requirements:
 
