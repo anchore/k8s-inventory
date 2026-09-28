@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,11 +47,40 @@ func TestGetDeploymentsInNamespace(t *testing.T) {
 		assert.Equal(t, containers, got[0].Containers)
 	})
 
-	t.Run("forbidden list returns no deployments", func(t *testing.T) {
+	t.Run("forbidden list returns no deployments and warns once", func(t *testing.T) {
+		deploymentsForbiddenWarned.Store(false)
 		clientset := fake.NewClientset(dep, rs)
 		clientset.PrependReactor("list", "replicasets", func(k8stesting.Action) (bool, runtime.Object, error) {
 			return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "apps", Resource: "replicasets"}, "", nil)
 		})
 		assert.Nil(t, getDeploymentsInNamespace(clientset, cfg, ns, pods, containers))
+		assert.True(t, deploymentsForbiddenWarned.Load())
 	})
+
+	t.Run("other list errors do not consume the forbidden warning", func(t *testing.T) {
+		deploymentsForbiddenWarned.Store(false)
+		clientset := fake.NewClientset(dep, rs)
+		clientset.PrependReactor("list", "deployments", func(k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewInternalError(errors.New("boom"))
+		})
+		assert.Nil(t, getDeploymentsInNamespace(clientset, cfg, ns, pods, containers))
+		assert.False(t, deploymentsForbiddenWarned.Load())
+	})
+}
+
+func TestApplicationSyncsAdd(t *testing.T) {
+	a := inventory.Deployment{Name: "a"}
+	b := inventory.Deployment{Name: "b"}
+
+	disabled := ApplicationSyncs{}
+	disabled.Add(&config.Application{}, "admin", []inventory.Deployment{a})
+	assert.Empty(t, disabled)
+
+	cfg := &config.Application{CreateApplicationsFromDeployments: true}
+	syncs := ApplicationSyncs{}
+	syncs.Add(cfg, "admin", []inventory.Deployment{a})
+	// deployments from an account that fell back to the default account are merged into it
+	syncs.Add(cfg, "admin", []inventory.Deployment{b})
+	syncs.Add(cfg, "other", nil)
+	assert.Equal(t, ApplicationSyncs{"admin": {a, b}}, syncs)
 }

@@ -113,7 +113,7 @@ func Post(requestBody []byte, id string, path string, anchoreDetails config.Anch
 		return nil, err
 	}
 
-	return doPost(client, request, operation)
+	return doRequest(client, request, operation)
 }
 
 // Get performs a GET request against the Anchore API with the given query parameters
@@ -141,7 +141,7 @@ func Get(path string, query url.Values, anchoreDetails config.AnchoreInfo, opera
 	setAuthHeaders(request, anchoreDetails)
 	request.Header.Set("Accept", "application/json")
 
-	return doPost(client, request, operation)
+	return doRequest(client, request, operation)
 }
 
 // PostMultipart performs a POST request against the Anchore API with a multipart/form-data body built from fields
@@ -180,7 +180,7 @@ func PostMultipart(fields map[string]string, path string, anchoreDetails config.
 	setAuthHeaders(request, anchoreDetails)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 
-	return doPost(client, request, operation)
+	return doRequest(client, request, operation)
 }
 
 func getClient(anchoreDetails config.AnchoreInfo) *http.Client {
@@ -223,7 +223,7 @@ func setAuthHeaders(request *http.Request, anchoreDetails config.AnchoreInfo) {
 	request.Header.Set("x-anchore-account", anchoreDetails.Account)
 }
 
-func doPost(client *http.Client, request *http.Request, operation string) (*[]byte, error) {
+func doRequest(client *http.Client, request *http.Request, operation string) (*[]byte, error) {
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err

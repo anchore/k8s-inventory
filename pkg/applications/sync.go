@@ -8,6 +8,7 @@ package applications
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -104,40 +105,91 @@ func assetAnnotations(cluster string, dep inventory.Deployment, c inventory.Cont
 	return annotations
 }
 
-// isFatal reports whether the error will affect every deployment, so syncing should stop for this account
+// isUnavailable reports whether Anchore (or its Apps API backend) is unreachable, timing out or failing
+func isUnavailable(err error) bool {
+	if anchore.ServerIsOffline(err) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	var apiErr *anchore.APIClientError
+	return errors.As(err, &apiErr) && apiErr.HTTPStatusCode >= 500 && apiErr.HTTPStatusCode <= 599
+}
+
+// isFatal reports whether the error will affect every deployment, so syncing should stop for this account rather
+// than making (and possibly waiting out timeouts for) further requests
 func isFatal(err error) bool {
-	return errors.Is(err, ErrAppsAPIUnsupported) || anchore.IsHTTPStatus(err, http.StatusForbidden)
+	return errors.Is(err, ErrAppsAPIUnsupported) || anchore.IsHTTPStatus(err, http.StatusForbidden) || isUnavailable(err)
 }
 
 // Sync reconciles the deployments with Anchore Apps for the account in details. Errors for one deployment do not
-// prevent the others from being synced; they are joined and returned.
+// prevent the others from being synced; they are joined and returned. Errors that would affect every deployment
+// (Apps API unsupported, forbidden, Anchore unavailable) stop the sync for the account immediately.
 func (s *Syncer) Sync(cfg *config.Application, details config.AnchoreInfo, deployments []inventory.Deployment) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	desired := make(map[cacheKey]struct{}, len(deployments))
 	var errs []error
 	for _, dep := range deployments {
+		desired[s.key(cfg, details, dep)] = struct{}{}
 		err := s.syncDeployment(cfg, details, dep)
 		if err == nil {
 			continue
 		}
 		if isFatal(err) {
-			if anchore.IsHTTPStatus(err, http.StatusForbidden) {
+			switch {
+			case anchore.IsHTTPStatus(err, http.StatusForbidden):
 				err = fmt.Errorf("user %s is not authorized to manage applications in account %s "+
 					"(requires readApplications, createApplications and createAssets permissions): %w", details.User, details.Account, err)
+			case isUnavailable(err):
+				err = fmt.Errorf("anchore apps API unavailable, skipping remaining application sync for account %s: %w", details.Account, err)
 			}
 			return err
 		}
 		errs = append(errs, fmt.Errorf("failed to sync application for deployment %s/%s: %w", dep.Namespace, dep.Name, err))
 	}
+	s.prune(details.Account, desired)
 	return errors.Join(errs...)
+}
+
+func (s *Syncer) key(cfg *config.Application, details config.AnchoreInfo, dep inventory.Deployment) cacheKey {
+	return cacheKey{account: details.Account, appName: AppName(cfg.KubeConfig.Cluster, dep), versionName: VersionName(dep)}
+}
+
+// prune removes cached versions for the account that are no longer the current rollout of a deployment, so the
+// cache does not grow without bound as deployments are rolled out
+func (s *Syncer) prune(account string, desired map[cacheKey]struct{}) {
+	for key := range s.cache {
+		if key.account != account {
+			continue
+		}
+		if _, ok := desired[key]; !ok {
+			delete(s.cache, key)
+		}
+	}
 }
 
 func (s *Syncer) syncDeployment(cfg *config.Application, details config.AnchoreInfo, dep inventory.Deployment) error {
 	cluster := cfg.KubeConfig.Cluster
-	appName := AppName(cluster, dep)
-	versionName := VersionName(dep)
-	key := cacheKey{account: details.Account, appName: appName, versionName: versionName}
+	key := s.key(cfg, details, dep)
+	appName, versionName := key.appName, key.versionName
+
+	// Only containers with a known image digest are added, so the asset references exactly what is running.
+	// Containers without a digest yet (e.g. still pulling) are retried on a later poll.
+	var containers []inventory.Container
+	for _, c := range dep.Containers {
+		if c.ImageDigest == "" {
+			log.Debugf("Container %s of deployment %s/%s has no image digest yet, will retry on a later poll", c.Name, dep.Namespace, dep.Name)
+			continue
+		}
+		containers = append(containers, c)
+	}
+	if len(containers) == 0 {
+		return nil
+	}
 
 	state, cached := s.cache[key]
 	if !cached {
@@ -149,7 +201,7 @@ func (s *Syncer) syncDeployment(cfg *config.Application, details config.AnchoreI
 	}
 
 	var errs []error
-	for _, c := range dep.Containers {
+	for _, c := range containers {
 		if _, ok := state.assets[c.Name]; ok {
 			continue
 		}
