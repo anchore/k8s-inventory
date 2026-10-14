@@ -9,11 +9,14 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sync"
 	"time"
 
 	jstime "github.com/anchore/k8s-inventory/internal/time"
 	"github.com/anchore/k8s-inventory/pkg/integration"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -24,6 +27,7 @@ import (
 	"github.com/anchore/k8s-inventory/pkg/inventory"
 	"github.com/anchore/k8s-inventory/pkg/logger"
 	"github.com/anchore/k8s-inventory/pkg/reporter"
+	"github.com/anchore/k8s-inventory/pkg/watcher"
 )
 
 type ReportItem struct {
@@ -103,8 +107,6 @@ func HandleReport(report inventory.Report, reportInfo *healthreporter.InventoryR
 
 // PeriodicallyGetInventoryReport periodically retrieve image results and report/output them according to the configuration.
 // Note: Errors do not cause the function to exit, since this is periodically running
-//
-//nolint:gocognit
 func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Channels, gatedReportInfo *healthreporter.GatedReportInfo) {
 	// Wait for registration with Enterprise to be disabled or completed
 	<-ch.InventoryReportingEnabled
@@ -114,71 +116,241 @@ func PeriodicallyGetInventoryReport(cfg *config.Application, ch integration.Chan
 	// Fire off a ticker that reports according to a configurable polling interval
 	ticker := time.NewTicker(time.Duration(cfg.PollingIntervalSeconds) * time.Second)
 
+	collector := &inventoryCollector{}
 	for {
-		reports, err := GetInventoryReports(cfg)
+		reports, err := collector.collect(cfg)
 		if err != nil {
-			log.Errorf("Failed to get Inventory Report: %w", err)
+			log.Errorf("Failed to get Inventory Report: %v", err)
 		} else {
-			for account, reportsForAccount := range reports {
-				reportInfo := healthreporter.InventoryReportInfo{
-					Account:             account,
-					BatchSize:           len(reportsForAccount),
-					LastSuccessfulIndex: -1,
-					Batches:             make([]healthreporter.BatchInfo, 0),
-					HasErrors:           false,
-				}
-				for count, report := range reportsForAccount {
-					log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
-
-					reportInfo.ReportTimestamp = report.Timestamp
-					batchInfo := healthreporter.BatchInfo{
-						SendTimestamp: jstime.Datetime{Time: time.Now().UTC()},
-						BatchIndex:    count + 1,
-					}
-
-					err := HandleReport(report, &reportInfo, cfg, account)
-					if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
-						// record this error for the health report even if the retry works
-						batchInfo.Error = fmt.Sprintf("%s (%s) | ", err.Error(), account)
-						reportInfo.HasErrors = true
-
-						// Retry with default account
-						retryAccount := cfg.AnchoreDetails.Account
-						if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
-							retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
-						}
-						log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
-						err = HandleReport(report, &reportInfo, cfg, retryAccount)
-					}
-					if err != nil {
-						log.Errorf("Failed to handle Inventory Report: %w", err)
-						// append the error to any error that happened during a retry, so we record both failures
-						batchInfo.Error += err.Error()
-						reportInfo.HasErrors = true
-					} else {
-						reportInfo.LastSuccessfulIndex = count + 1
-					}
-
-					select {
-					case isEnabled, isNotClosed := <-ch.HealthReportingEnabled:
-						if isNotClosed {
-							healthReportingEnabled = isEnabled
-						}
-						log.Infof("Health reporting enabled: %t", healthReportingEnabled)
-					default:
-					}
-					if healthReportingEnabled {
-						reportInfo.Batches = append(reportInfo.Batches, batchInfo)
-						healthreporter.SetReportInfoNoBlocking(account, count, reportInfo, gatedReportInfo)
-					}
-				}
-			}
+			processAndSendReports(cfg, reports, ch, gatedReportInfo, &healthReportingEnabled)
 		}
 
-		log.Infof("Waiting %d seconds for next poll...", cfg.PollingIntervalSeconds)
+		log.Infof("Waiting %d seconds for next report...", cfg.PollingIntervalSeconds)
 
 		// Wait at least as long as the ticker
 		log.Debugf("Start new gather: %s", <-ticker.C)
+	}
+}
+
+// How long to wait before retrying a failed attempt to start watching the
+// event stream. It grows on each consecutive failure so that a cluster the
+// agent is not allowed to watch settles into steady polling instead of
+// re-listing on every reporting interval.
+const (
+	eventStreamInitialRetryDelay = time.Minute
+	eventStreamMaxRetryDelay     = time.Hour
+)
+
+// eventStream is a started, synced set of informers and the client they were
+// built from
+type eventStream struct {
+	watcher   *watcher.Watcher
+	clientset kubernetes.Interface
+}
+
+// inventoryCollector gathers the inventory for one reporting interval, either
+// from the Kubernetes event stream or by polling the api-server, according to
+// the configured collection method.
+type inventoryCollector struct {
+	// guards the state shared with the goroutine that starts the informers
+	mu       sync.Mutex
+	stream   *eventStream
+	starting bool
+	retryIn  time.Duration
+
+	// only touched while building a report
+	serverVersion *version.Info
+}
+
+// collect builds the reports for a single reporting interval
+func (c *inventoryCollector) collect(cfg *config.Application) (BatchedReports, error) {
+	stream := c.eventStream(cfg)
+	if stream == nil {
+		return GetInventoryReports(cfg)
+	}
+
+	snapshot, err := stream.watcher.Snapshot()
+	if err != nil {
+		return BatchedReports{}, err
+	}
+
+	return GetInventoryReportsFromSnapshot(cfg, snapshot, c.refreshServerVersion(stream)), nil
+}
+
+// eventStream returns the synced event stream to collect this interval's
+// inventory from, or nil if it should be collected by polling instead.
+//
+// Starting the informers means waiting for their initial listing of the whole
+// cluster, so it happens in the background: reporting carries on by polling and
+// picks the event stream up on the first interval after it has synced. The
+// reporting cadence is therefore never held up by the cache sync deadline.
+func (c *inventoryCollector) eventStream(cfg *config.Application) *eventStream {
+	if cfg.InventoryCollection.Method != config.InventoryCollectionMethodInformer {
+		return nil
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.stream != nil {
+		return c.stream
+	}
+	if !c.starting {
+		c.starting = true
+		go c.startWatching(cfg)
+	}
+	return nil
+}
+
+// startWatching brings up the informers in the background and publishes them
+// once their caches have synced. On failure everything it started is stopped
+// again and another attempt is allowed after a growing delay.
+func (c *inventoryCollector) startWatching(cfg *config.Application) {
+	stream, err := newEventStream(cfg)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err == nil {
+		log.Info("Watching the Kubernetes event stream for inventory changes")
+		c.stream = stream
+		c.starting = false
+		c.retryIn = 0
+		return
+	}
+
+	c.retryIn = nextRetryDelay(c.retryIn)
+	log.Warnf("Unable to collect inventory from the Kubernetes event stream: %v", err)
+	log.Infof("Polling the api-server for inventory, the event stream will be retried in %s", c.retryIn)
+
+	// keep this attempt marked as in progress until the delay has passed, so
+	// that the reporting loop does not start another one in the meantime
+	time.AfterFunc(c.retryIn, func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.starting = false
+	})
+}
+
+func nextRetryDelay(current time.Duration) time.Duration {
+	if current <= 0 {
+		return eventStreamInitialRetryDelay
+	}
+	if next := current * 2; next < eventStreamMaxRetryDelay {
+		return next
+	}
+	return eventStreamMaxRetryDelay
+}
+
+// newEventStream builds the informers and blocks until their caches have synced
+func newEventStream(cfg *config.Application) (*eventStream, error) {
+	kubeconfig, err := client.GetKubeConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := client.GetClientSet(kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get k8s client set: %w", err)
+	}
+
+	informerCfg := cfg.InventoryCollection.Informer
+	w, err := watcher.New(clientset, watcher.Config{
+		RequestTimeout:   time.Duration(cfg.Kubernetes.RequestTimeoutSeconds) * time.Second,
+		CacheSyncTimeout: time.Duration(informerCfg.CacheSyncTimeoutSeconds) * time.Second,
+		Namespaces:       cfg.NamespaceSelectors.Include,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes watcher: %w", err)
+	}
+
+	// A fresh client and factory are built for each attempt on purpose - the
+	// informers of a failed attempt are stopped and cannot be restarted.
+	stopCh := make(chan struct{})
+	if err := w.Start(stopCh); err != nil {
+		close(stopCh)
+		return nil, fmt.Errorf("failed to watch the kubernetes event stream: %w", err)
+	}
+
+	return &eventStream{watcher: w, clientset: clientset}, nil
+}
+
+// refreshServerVersion re-reads the cluster server version that reports are
+// stamped with, so that a cluster upgrade is picked up without restarting the
+// agent. The last known version is kept if the lookup fails.
+func (c *inventoryCollector) refreshServerVersion(stream *eventStream) *version.Info {
+	serverVersion, err := stream.clientset.Discovery().ServerVersion()
+	if err != nil {
+		log.Warnf("Failed to get Cluster Server Version, reporting the last known version: %v", err)
+		return c.serverVersion
+	}
+
+	c.serverVersion = serverVersion
+	return c.serverVersion
+}
+
+// processAndSendReports sends every batched report to Anchore, recording the
+// outcome of each batch for the health report
+func processAndSendReports(
+	cfg *config.Application,
+	reports BatchedReports,
+	ch integration.Channels,
+	gatedReportInfo *healthreporter.GatedReportInfo,
+	healthReportingEnabled *bool,
+) {
+	for account, reportsForAccount := range reports {
+		reportInfo := healthreporter.InventoryReportInfo{
+			Account:             account,
+			BatchSize:           len(reportsForAccount),
+			LastSuccessfulIndex: -1,
+			Batches:             make([]healthreporter.BatchInfo, 0),
+			HasErrors:           false,
+		}
+		for count, report := range reportsForAccount {
+			log.Infof("Sending Inventory Report to Anchore Account %s, %d of %d", account, count+1, len(reportsForAccount))
+
+			reportInfo.ReportTimestamp = report.Timestamp
+			batchInfo := healthreporter.BatchInfo{
+				SendTimestamp: jstime.Datetime{Time: time.Now().UTC()},
+				BatchIndex:    count + 1,
+			}
+
+			err := HandleReport(report, &reportInfo, cfg, account)
+			if errors.Is(err, reporter.ErrAnchoreAccountDoesNotExist) {
+				// record this error for the health report even if the retry works
+				batchInfo.Error = fmt.Sprintf("%s (%s) | ", err.Error(), account)
+				reportInfo.HasErrors = true
+
+				// Retry with default account
+				retryAccount := cfg.AnchoreDetails.Account
+				if cfg.AccountRouteByNamespaceLabel.DefaultAccount != "" {
+					retryAccount = cfg.AccountRouteByNamespaceLabel.DefaultAccount
+				}
+				log.Warnf("Error sending to Anchore Account %s, sending to default account", account)
+				err = HandleReport(report, &reportInfo, cfg, retryAccount)
+			}
+			if err != nil {
+				log.Errorf("Failed to handle Inventory Report: %w", err)
+				// append the error to any error that happened during a retry, so we record both failures
+				batchInfo.Error += err.Error()
+				reportInfo.HasErrors = true
+			} else {
+				reportInfo.LastSuccessfulIndex = count + 1
+			}
+
+			select {
+			case isEnabled, isNotClosed := <-ch.HealthReportingEnabled:
+				if isNotClosed {
+					*healthReportingEnabled = isEnabled
+				}
+				log.Infof("Health reporting enabled: %t", *healthReportingEnabled)
+			default:
+			}
+			if *healthReportingEnabled {
+				reportInfo.Batches = append(reportInfo.Batches, batchInfo)
+				healthreporter.SetReportInfoNoBlocking(account, count, reportInfo, gatedReportInfo)
+			}
+		}
 	}
 }
 
@@ -311,6 +483,140 @@ func GetInventoryReportForNamespaces(
 		ServerVersionMetadata: serverVersion,
 		ClusterName:           cfg.KubeConfig.Cluster,
 	}, nil
+}
+
+// snapshotInventory is the account agnostic view of a cluster snapshot, indexed
+// so that it can be sliced up per Anchore account
+type snapshotInventory struct {
+	namespaces            []inventory.Namespace
+	nodes                 []inventory.Node
+	podsByNamespace       map[string][]inventory.Pod
+	containersByNamespace map[string][]inventory.Container
+}
+
+// processSnapshot converts a snapshot of the cluster into inventory types,
+// applying the configured namespace selectors and metadata collection rules
+func processSnapshot(cfg *config.Application, snapshot watcher.Snapshot) snapshotInventory {
+	nodeMap := make(map[string]inventory.Node, len(snapshot.Nodes))
+	for _, node := range snapshot.Nodes {
+		nodeMap[node.Name] = inventory.NodeFromV1(
+			node,
+			cfg.MetadataCollection.Nodes.Annotations,
+			cfg.MetadataCollection.Nodes.Labels,
+			cfg.MetadataCollection.Nodes.Disable,
+		)
+	}
+
+	podsByNamespaceName := make(map[string][]v1.Pod)
+	for _, pod := range snapshot.Pods {
+		podsByNamespaceName[pod.Namespace] = append(podsByNamespaceName[pod.Namespace], *pod)
+	}
+
+	inv := snapshotInventory{
+		nodes:                 make([]inventory.Node, 0, len(nodeMap)),
+		podsByNamespace:       make(map[string][]inventory.Pod),
+		containersByNamespace: make(map[string][]inventory.Container),
+	}
+	for _, node := range nodeMap {
+		inv.nodes = append(inv.nodes, node)
+	}
+
+	// Pods reference their namespace by name, so a namespace that was deleted
+	// and recreated within one interval cannot have its pods attributed to one
+	// object or the other. Each name is processed once, taking the first
+	// occurrence, which the watcher orders as the one still in the cluster.
+	seen := make(map[string]struct{}, len(snapshot.Namespaces))
+	filter := inventory.NewNamespaceFilter(cfg.NamespaceSelectors.Exclude, cfg.NamespaceSelectors.Include)
+	for _, n := range snapshot.Namespaces {
+		if !filter.Keep(n.Name) {
+			continue
+		}
+		if _, duplicate := seen[n.Name]; duplicate {
+			log.Debugf("Namespace \"%s\" appears more than once in the snapshot, only reporting the first", n.Name)
+			continue
+		}
+		seen[n.Name] = struct{}{}
+
+		v1pods := podsByNamespaceName[n.Name]
+		if cfg.NamespaceSelectors.IgnoreEmpty && len(v1pods) == 0 {
+			log.Debugf("Ignoring namespace \"%s\" as it has no pods", n.Name)
+			continue
+		}
+
+		ns := inventory.NamespaceFromV1(
+			n,
+			cfg.MetadataCollection.Namespace.Annotations,
+			cfg.MetadataCollection.Namespace.Labels,
+			cfg.MetadataCollection.Namespace.Disable,
+		)
+		inv.namespaces = append(inv.namespaces, ns)
+		inv.podsByNamespace[ns.UID] = inventory.ProcessPods(
+			v1pods, ns.UID, nodeMap,
+			cfg.MetadataCollection.Pods.Annotations,
+			cfg.MetadataCollection.Pods.Labels,
+			cfg.MetadataCollection.Pods.Disable,
+		)
+		inv.containersByNamespace[ns.UID] = inventory.GetContainersFromPods(
+			v1pods,
+			cfg.IgnoreNotRunning,
+			cfg.MissingRegistryOverride,
+			cfg.MissingTagPolicy.Policy,
+			cfg.MissingTagPolicy.Tag,
+		)
+	}
+
+	return inv
+}
+
+// reportForNamespaces builds a report containing the given subset of the
+// snapshot's namespaces. As with the polling collection method every node is
+// included in each report regardless of which namespaces it is carrying.
+func (inv snapshotInventory) reportForNamespaces(
+	cfg *config.Application,
+	namespaces []inventory.Namespace,
+	serverVersion *version.Info,
+	timestamp string,
+) inventory.Report {
+	pods := make([]inventory.Pod, 0)
+	containers := make([]inventory.Container, 0)
+	for _, ns := range namespaces {
+		pods = append(pods, inv.podsByNamespace[ns.UID]...)
+		containers = append(containers, inv.containersByNamespace[ns.UID]...)
+	}
+
+	log.Infof("Got Inventory Report with %d containers running across %d namespaces", len(containers), len(namespaces))
+	return inventory.Report{
+		Timestamp:             timestamp,
+		Containers:            containers,
+		Pods:                  pods,
+		Namespaces:            namespaces,
+		Nodes:                 inv.nodes,
+		ServerVersionMetadata: serverVersion,
+		ClusterName:           cfg.KubeConfig.Cluster,
+	}
+}
+
+// GetInventoryReportsFromSnapshot builds the account routed, batched inventory
+// reports for a snapshot of the cluster taken from the Kubernetes event stream
+func GetInventoryReportsFromSnapshot(cfg *config.Application, snapshot watcher.Snapshot, serverVersion *version.Info) BatchedReports {
+	log.Info("Starting image inventory collection from the Kubernetes event stream")
+
+	inv := processSnapshot(cfg, snapshot)
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	reports := AccountRoutedReports{}
+	if len(cfg.AccountRoutes) == 0 && cfg.AccountRouteByNamespaceLabel.LabelKey == "" {
+		reports[cfg.AnchoreDetails.Account] = inv.reportForNamespaces(cfg, inv.namespaces, serverVersion, timestamp)
+	} else {
+		accountRoutesForAllNamespaces := GetAccountRoutedNamespaces(
+			cfg.AnchoreDetails.Account, inv.namespaces, cfg.AccountRoutes, cfg.AccountRouteByNamespaceLabel)
+
+		for account, namespaces := range accountRoutesForAllNamespaces {
+			reports[account] = inv.reportForNamespaces(cfg, namespaces, serverVersion, timestamp)
+		}
+	}
+
+	return getBatchedInventoryReports(reports, cfg.InventoryReportLimits)
 }
 
 func GetAllNamespaces(cfg *config.Application) ([]inventory.Namespace, error) {

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/anchore/k8s-inventory/internal/tracker"
@@ -71,6 +72,55 @@ func excludeNamespace(checks []excludeCheck, namespace string) bool {
 	return false
 }
 
+// NamespaceFilter holds the compiled include/exclude rules for namespaces so
+// that they can be built once and reused for every namespace that needs
+// checking (e.g. for each event received from an informer).
+type NamespaceFilter struct {
+	excludeChecks []excludeCheck
+	includes      map[string]struct{}
+}
+
+// NewNamespaceFilter builds a reusable filter from the configured namespace
+// selectors. When includes is non-empty it acts as an allow-list, otherwise
+// every namespace that is not excluded is kept.
+func NewNamespaceFilter(excludes, includes []string) NamespaceFilter {
+	includeSet := make(map[string]struct{}, len(includes))
+	for _, ns := range includes {
+		includeSet[ns] = struct{}{}
+	}
+
+	return NamespaceFilter{
+		excludeChecks: buildExclusionChecklist(excludes),
+		includes:      includeSet,
+	}
+}
+
+// Keep reports whether the named namespace should be part of the inventory
+func (f NamespaceFilter) Keep(namespace string) bool {
+	if excludeNamespace(f.excludeChecks, namespace) {
+		return false
+	}
+	if len(f.includes) > 0 {
+		_, included := f.includes[namespace]
+		return included
+	}
+	return true
+}
+
+// NamespaceFromV1 converts a kubernetes namespace into its inventory
+// representation, applying the configured metadata collection rules
+func NamespaceFromV1(n *v1.Namespace, includeAnnotations, includeLabels []string, disableMetadata bool) Namespace {
+	ns := Namespace{
+		Name: n.Name,
+		UID:  string(n.UID),
+	}
+	if !disableMetadata {
+		ns.Annotations = processAnnotationsOrLabels(n.Annotations, includeAnnotations)
+		ns.Labels = processAnnotationsOrLabels(n.Labels, includeLabels)
+	}
+	return ns
+}
+
 func FetchNamespaces(
 	c client.Client,
 	batchSize, timeout int64,
@@ -81,7 +131,7 @@ func FetchNamespaces(
 	defer tracker.TrackFunctionTime(time.Now(), "Fetching namespaces")
 	nsMap := make(map[string]Namespace)
 
-	exclusionChecklist := buildExclusionChecklist(excludes)
+	filter := NewNamespaceFilter(excludes, nil)
 
 	cont := ""
 	for {
@@ -95,24 +145,10 @@ func FetchNamespaces(
 		if err != nil {
 			return nil, fmt.Errorf("failed to list namespaces: %w", err)
 		}
-		for _, n := range list.Items {
-			if !excludeNamespace(exclusionChecklist, n.Name) {
-				if !disableMetadata {
-					annotations := processAnnotationsOrLabels(n.Annotations, includeAnnotations)
-					labels := processAnnotationsOrLabels(n.Labels, includeLabels)
-
-					nsMap[n.Name] = Namespace{
-						Name:        n.Name,
-						UID:         string(n.UID),
-						Annotations: annotations,
-						Labels:      labels,
-					}
-				} else {
-					nsMap[n.Name] = Namespace{
-						Name: n.Name,
-						UID:  string(n.UID),
-					}
-				}
+		for i := range list.Items {
+			n := &list.Items[i]
+			if filter.Keep(n.Name) {
+				nsMap[n.Name] = NamespaceFromV1(n, includeAnnotations, includeLabels, disableMetadata)
 			}
 		}
 
