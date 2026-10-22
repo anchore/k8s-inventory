@@ -18,3 +18,12 @@ updates:
       prefix: "ci"
     cooldown:
       default-days: 7
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "fix"
+    cooldown:
+      default-days: 7
