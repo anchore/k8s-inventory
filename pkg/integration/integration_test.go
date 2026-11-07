@@ -141,6 +141,22 @@ var (
 		},
 	}
 
+	podWithoutOwnerReferences = v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			UID:       "test-pod-uid",
+			Namespace: "test-namespace",
+		},
+	}
+
+	replicaSetWithoutOwnerReferences = appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-replicaset",
+			UID:       "test-replicaset-uid",
+			Namespace: "test-namespace",
+		},
+	}
+
 	replicaSet = appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-replicaset",
@@ -894,12 +910,115 @@ func TestGetInstanceDataFromK8s(t *testing.T) {
 				instanceName:   "",
 			},
 		},
+		{
+			name: "pod without owner references",
+			args: args{
+				c: &client.Client{
+					Clientset: fake.NewClientset(&podWithoutOwnerReferences),
+				},
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want: want{
+				registrationID: "",
+				instanceName:   "",
+			},
+		},
+		{
+			name: "replica set without owner references",
+			args: args{
+				c: &client.Client{
+					Clientset: fake.NewClientset(&pod, &replicaSetWithoutOwnerReferences),
+				},
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want: want{
+				registrationID: "",
+				instanceName:   "",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resultRegID, resultInstName := getInstanceDataFromK8s(tt.args.c, tt.args.namespace, tt.args.podName)
 			assert.Equal(t, tt.want.registrationID, resultRegID)
 			assert.NotNil(t, tt.want.instanceName, resultInstName)
+		})
+	}
+}
+
+func TestGetReplicaCountFromK8s(t *testing.T) {
+	replicas := int32(3)
+	scaledReplicaSet := replicaSet.DeepCopy()
+	scaledReplicaSet.Spec.Replicas = &replicas
+
+	type args struct {
+		c         *client.Client
+		namespace string
+		podName   string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int32
+		wantErr bool
+	}{
+		{
+			name: "successful get replica count from k8s",
+			args: args{
+				c: &client.Client{
+					Clientset: fake.NewClientset(&pod, scaledReplicaSet),
+				},
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want: replicas,
+		},
+		{
+			name: "nil client",
+			args: args{
+				c:         nil,
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "no pod",
+			args: args{
+				c: &client.Client{
+					Clientset: fake.NewClientset(),
+				},
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want:    0,
+			wantErr: true,
+		},
+		{
+			name: "pod without owner references",
+			args: args{
+				c: &client.Client{
+					Clientset: fake.NewClientset(&podWithoutOwnerReferences),
+				},
+				namespace: "test-namespace",
+				podName:   "test-pod",
+			},
+			want:    0,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReplicaCountFromK8s(tt.args.c, tt.args.namespace, tt.args.podName)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, result)
 		})
 	}
 }
