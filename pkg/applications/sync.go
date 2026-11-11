@@ -129,26 +129,44 @@ type assetContainer struct {
 	ref string
 }
 
+// Asset annotation keys. The ReplicaSet or ControllerRevision key is built from the workload's revision kind.
+const (
+	annotationCluster          = "k8s.cluster"
+	annotationNamespace        = "k8s.namespace"
+	annotationWorkloadKind     = "k8s.workload.kind"
+	annotationWorkloadName     = "k8s.workload.name"
+	annotationWorkloadRevision = "k8s.workload.revision"
+	annotationHelmRelease      = "k8s.helm.release"
+	annotationAppInstance      = "k8s.app.instance"
+	annotationAppPartOf        = "k8s.app.part_of"
+	annotationAppComponent     = "k8s.app.component"
+	annotationOwner            = "k8s.owner"
+	annotationContainer        = "k8s.container"
+	annotationImageTag         = "k8s.image_tag"
+	annotationImageDigest      = "k8s.image_digest"
+	annotationPrefix           = "k8s."
+)
+
 // assetAnnotations returns at most maxAssetAnnotations non-empty annotations, in priority order. The workload's
 // identity and its relations to other workloads come first; the lowest priority annotations repeat what the version
 // (ReplicaSet or ControllerRevision name) and the asset itself (name, image reference) already record, so they are the
 // ones left out when a workload has all of its relations set.
 func assetAnnotations(cluster string, wl inventory.Workload, c inventory.Container) map[string]string {
 	ordered := [][2]string{
-		{"k8s.cluster", cluster},
-		{"k8s.namespace", wl.Namespace},
-		{"k8s.workload.kind", string(wl.Kind)},
-		{"k8s.workload.name", wl.Name},
-		{"k8s.workload.revision", wl.Revision},
-		{"k8s.helm.release", wl.Relations.HelmRelease},
-		{"k8s.app.instance", wl.Relations.Instance},
-		{"k8s.app.part_of", wl.Relations.PartOf},
-		{"k8s.app.component", wl.Relations.Component},
-		{"k8s.owner", owner(wl)},
-		{"k8s." + strings.ToLower(wl.RevisionKind()), wl.RevisionName},
-		{"k8s.container", c.Name},
-		{"k8s.image_tag", c.ImageTag},
-		{"k8s.image_digest", c.ImageDigest},
+		{annotationCluster, cluster},
+		{annotationNamespace, wl.Namespace},
+		{annotationWorkloadKind, string(wl.Kind)},
+		{annotationWorkloadName, wl.Name},
+		{annotationWorkloadRevision, wl.Revision},
+		{annotationHelmRelease, wl.Relations.HelmRelease},
+		{annotationAppInstance, wl.Relations.Instance},
+		{annotationAppPartOf, wl.Relations.PartOf},
+		{annotationAppComponent, wl.Relations.Component},
+		{annotationOwner, owner(wl)},
+		{annotationPrefix + strings.ToLower(wl.RevisionKind()), wl.RevisionName},
+		{annotationContainer, c.Name},
+		{annotationImageTag, c.ImageTag},
+		{annotationImageDigest, c.ImageDigest},
 	}
 	annotations := make(map[string]string, maxAssetAnnotations)
 	for _, kv := range ordered {
