@@ -490,31 +490,57 @@ metadata-collection:
     disable: false # Remove all optional pod metadata from the inventory report
 ```
 
-### Create applications from Deployments
+### Create applications from workloads
 
 When enabled, the agent also creates Anchore applications and application versions from Kubernetes
-Deployments after reporting inventory. This is disabled by default.
+Deployments, StatefulSets and DaemonSets after reporting inventory. This is disabled by default.
 
 ```yaml
-# Can also be set with ANCHORE_K8S_INVENTORY_CREATE_APPLICATIONS_FROM_DEPLOYMENTS=true
-# or the --create-applications-from-deployments flag
-create-applications-from-deployments: false
+# Workload kinds to create applications from: deployments, statefulsets, daemonsets (default: none).
+# Can also be set with ANCHORE_K8S_INVENTORY_CREATE_APPLICATIONS_FROM=deployments,statefulsets
+# or the --create-applications-from flag
+create-applications-from: []
 ```
 
-- Each Deployment maps to an app named `<cluster>/<namespace>/<deployment>` (or `<namespace>/<deployment>` when
-  `kubeconfig.cluster` is not set), in the Anchore account the namespace is routed to.
-- Each rollout of a Deployment (a new ReplicaSet, e.g. after changing the pod template) creates a new app version
-  named `revision-<revision>-<pod-template-hash>`, with `status: released` and linked to the previous version.
-- The container images running in the current rollout are added to the version as `container` assets, named after
-  the container. Anchore Enterprise analyzes the images asynchronously, so it needs access to the image registries.
+The older `create-applications-from-deployments: true` option (and its flag and environment variable) still works
+and is the same as adding `deployments` to the list. It is deprecated.
+
+- Each workload maps to an app named `<cluster>/<namespace>/<kind>/<name>`, for example
+  `prod/shop/deployment/web` or `prod/shop/statefulset/db` (`<namespace>/<kind>/<name>` when `kubeconfig.cluster`
+  is not set), in the Anchore account the namespace is routed to. The kind keeps a Deployment and a StatefulSet
+  with the same name apart.
+- Each rollout creates a new app version named `revision-<revision>-<pod-template-hash>`, with `status: released`
+  and linked to the previous version:
+
+  | Kind | Rollout | Revision number |
+  |---|---|---|
+  | Deployment | a new ReplicaSet | the Deployment's `deployment.kubernetes.io/revision` |
+  | StatefulSet | the ControllerRevision in `status.updateRevision` | the ControllerRevision's `revision` |
+  | DaemonSet | the ControllerRevision with the highest `revision` | the ControllerRevision's `revision` |
+
+  A rollback (`kubectl rollout undo`) gives the old pod template a new, higher revision number, so it creates a
+  new version.
+- The container images running in pods of the current rollout are added to the version as `container` assets,
+  named after the container. During a rollout, and for StatefulSets with a partition or the `OnDelete` update
+  strategy, older pods are still running the previous version's images. Anchore Enterprise analyzes the images
+  asynchronously, so it needs access to the image registries.
+- Kubernetes has no relationship between workloads of different kinds. Where a workload has one, the app
+  description and the asset annotations record the conventions that relate it to others: the Helm release
+  (`meta.helm.sh/release-name`), the `app.kubernetes.io/instance`, `part-of` and `component` labels, and the
+  controlling owner (for example an operator custom resource). Anchore accepts at most 10 annotations per asset,
+  so the agent sets the first 10 that have a value, in this order: `k8s.cluster`, `k8s.namespace`,
+  `k8s.workload.kind`, `k8s.workload.name`, `k8s.workload.revision`, `k8s.helm.release`, `k8s.app.instance`,
+  `k8s.app.part_of`, `k8s.app.component`, `k8s.owner`, `k8s.replicaset` or `k8s.controllerrevision`,
+  `k8s.container`, `k8s.image_tag`, `k8s.image_digest`. The last four repeat what the version description and the
+  asset itself already record.
 - Only containers with a known image digest are added, so each asset references exactly the image that is running.
   Image names are normalized to fully qualified references (for example `nginx:1.27` becomes
   `docker.io/library/nginx:1.27@sha256:...`). Containers without a digest yet (for example still pulling their
-  image), and Deployments whose current rollout has no running pods, are picked up on a later poll. Images without a
+  image), and workloads whose current rollout has no running pods, are picked up on a later poll. Images without a
   registry digest, such as images loaded directly onto nodes (`kind load`), are never added.
 - Existing apps and versions are never modified or deleted. The agent remembers what it has already created, so if
   an app or version is deleted in Anchore while the agent is running it is not recreated until the agent restarts
-  or the Deployment is rolled out again.
+  or the workload is rolled out again.
 - Applications are created after inventory has been reported to every account. If Anchore Enterprise or its Apps
   API is unavailable (timeouts, 502/503/504, or several server errors in a row), application creation for that
   account is skipped until the next poll. A version created just before such a failure may have no assets until
@@ -524,16 +550,20 @@ Requirements:
 
 - Anchore Enterprise v6 or later (the `/v2/apps` API). Older versions log a warning and are skipped.
 - The Anchore user needs the `readApplications`, `createApplications` and `createAssets` permissions.
-- The agent needs Kubernetes RBAC to list Deployments and ReplicaSets, for example by adding this rule to its ClusterRole:
+- The agent needs Kubernetes RBAC to list the workloads of each enabled kind, for example these rules in its
+  ClusterRole:
 
 ```yaml
 - apiGroups: ["apps"]
-  resources: ["deployments", "replicasets"]
+  resources: ["deployments", "replicasets"]          # deployments
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets", "daemonsets", "controllerrevisions"]  # statefulsets, daemonsets
   verbs: ["get", "list", "watch"]
 ```
 
-Failures while creating applications are logged and do not affect inventory reporting. If the RBAC rule is
-missing, a single warning is logged per poll.
+Failures while creating applications are logged and do not affect inventory reporting. If an RBAC rule is
+missing, a single warning is logged per poll for each kind, and the other kinds are still collected.
 
 ### Anchore API configuration
 

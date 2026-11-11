@@ -68,7 +68,7 @@ func TestProcessDeployments(t *testing.T) {
 		rss        []appsv1.ReplicaSet
 		pods       []v1.Pod
 		containers []Container
-		want       []Deployment
+		want       []Workload
 	}{
 		{
 			name: "selects current replicaset mid-rollout and ignores old replicaset pods",
@@ -82,16 +82,16 @@ func TestProcessDeployments(t *testing.T) {
 				{PodUID: "pod-old", Name: "nginx", ImageTag: "nginx:1.25", ImageDigest: "sha256:old"},
 				{PodUID: "pod-new", Name: "nginx", ImageTag: "nginx:1.27", ImageDigest: "sha256:new"},
 			},
-			want: []Deployment{{
-				Name:              "web",
-				Namespace:         "default",
-				NamespaceUID:      "ns-uid",
-				UID:               "dep-uid",
-				Revision:          "2",
-				ReplicaSetName:    "web-new",
-				ReplicaSetUID:     "rs-new",
-				PodTemplateHash:   "bbb",
-				ReplicaSetCreated: rsCreated.UTC(),
+			want: []Workload{{
+				Kind:            KindDeployment,
+				Name:            "web",
+				Namespace:       "default",
+				NamespaceUID:    "ns-uid",
+				UID:             "dep-uid",
+				Revision:        "2",
+				RevisionName:    "web-new",
+				RevisionHash:    "bbb",
+				RevisionCreated: rsCreated.UTC(),
 				Containers: []Container{
 					{PodUID: "pod-new", Name: "nginx", ImageTag: "nginx:1.27", ImageDigest: "sha256:new"},
 				},
@@ -113,16 +113,16 @@ func TestProcessDeployments(t *testing.T) {
 				{PodUID: "pod-a", Name: "sidecar", ImageTag: "busybox:1.36", ImageDigest: "sha256:bb"},
 				{PodUID: "pod-b", Name: "sidecar", ImageTag: "busybox:1.36", ImageDigest: "sha256:bb"},
 			},
-			want: []Deployment{{
-				Name:              "web",
-				Namespace:         "default",
-				NamespaceUID:      "ns-uid",
-				UID:               "dep-uid",
-				Revision:          "2",
-				ReplicaSetName:    "web-new",
-				ReplicaSetUID:     "rs-new",
-				PodTemplateHash:   "bbb",
-				ReplicaSetCreated: rsCreated.UTC(),
+			want: []Workload{{
+				Kind:            KindDeployment,
+				Name:            "web",
+				Namespace:       "default",
+				NamespaceUID:    "ns-uid",
+				UID:             "dep-uid",
+				Revision:        "2",
+				RevisionName:    "web-new",
+				RevisionHash:    "bbb",
+				RevisionCreated: rsCreated.UTC(),
 				Containers: []Container{
 					{PodUID: "pod-b", Name: "nginx", ImageTag: "nginx:1.27", ImageDigest: "sha256:new"},
 					{PodUID: "pod-a", Name: "sidecar", ImageTag: "busybox:1.36", ImageDigest: "sha256:bb"},
@@ -177,4 +177,25 @@ func TestFetchDeploymentsAndReplicaSetsInNamespace(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rss, 1)
 	assert.Equal(t, "web-1", rss[0].Name)
+}
+
+func TestProcessDeploymentsRecordsRelations(t *testing.T) {
+	dep := testDeployment("1")
+	dep.Annotations[HelmReleaseAnnotation] = "harbor"
+	dep.Labels = map[string]string{AppInstanceLabel: "harbor", AppPartOfLabel: "harbor", AppComponentLabel: "core"}
+	controller := true
+	dep.OwnerReferences = []metav1.OwnerReference{
+		{Kind: "Other", Name: "not-controller"},
+		{Kind: "Harbor", Name: "lab", Controller: &controller},
+	}
+	rs := testReplicaSet("web-1", "rs-1", "1", "aaa")
+
+	got := ProcessDeployments([]appsv1.Deployment{dep}, []appsv1.ReplicaSet{rs},
+		[]v1.Pod{testPod("pod-1", "rs-1", v1.PodRunning)},
+		[]Container{{PodUID: "pod-1", Name: "core", ImageTag: "goharbor/harbor-core:v2.14.0", ImageDigest: "sha256:c"}}, "ns-uid")
+	require.Len(t, got, 1)
+	assert.Equal(t, Relations{
+		HelmRelease: "harbor", Instance: "harbor", PartOf: "harbor", Component: "core", OwnerKind: "Harbor", OwnerName: "lab",
+	}, got[0].Relations)
+	assert.Equal(t, "ReplicaSet", got[0].RevisionKind())
 }
