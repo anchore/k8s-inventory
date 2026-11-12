@@ -64,7 +64,7 @@ var rootCmd = &cobra.Command{
 
 			<-neverDone
 		default:
-			reports, deployments, err := pkg.GetInventory(appConfig)
+			reports, workloads, err := pkg.GetInventory(appConfig)
 			if appConfig.Dev.ProfileCPU {
 				pprof.StopCPUProfile()
 			}
@@ -101,7 +101,7 @@ var rootCmd = &cobra.Command{
 					}
 				}
 				if accountReported {
-					appSyncs.Add(appConfig, syncAccount, deployments[account])
+					appSyncs.Add(appConfig, syncAccount, workloads[account])
 				}
 			}
 			// Applications are synced after all inventory is reported; failures are logged only and do not
@@ -136,8 +136,20 @@ func init() {
 		os.Exit(1)
 	}
 
+	opt = "create-applications-from"
+	rootCmd.Flags().StringSlice(opt, nil, "Create Anchore applications and versions from these Kubernetes workload kinds "+
+		"(comma separated: deployments, statefulsets, daemonsets)")
+	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
+		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
+
 	opt = "create-applications-from-deployments"
 	rootCmd.Flags().Bool(opt, false, "If true, will create Anchore applications and versions from Kubernetes deployments")
+	if err := rootCmd.Flags().MarkDeprecated(opt, "use --create-applications-from=deployments instead"); err != nil {
+		fmt.Printf("unable to deprecate flag '%s': %+v", opt, err)
+		os.Exit(1)
+	}
 	if err := viper.BindPFlag(opt, rootCmd.Flags().Lookup(opt)); err != nil {
 		fmt.Printf("unable to bind flag '%s': %+v", opt, err)
 		os.Exit(1)

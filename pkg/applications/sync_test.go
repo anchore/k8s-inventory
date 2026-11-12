@@ -22,7 +22,7 @@ const (
 	testVersionID = "22222222-2222-2222-2222-222222222222"
 	testOldVerID  = "33333333-3333-3333-3333-333333333333"
 	testOlderID   = "44444444-4444-4444-4444-444444444444"
-	appName       = "cluster1/default/web"
+	appName       = "cluster1/default/deployment/web"
 	versionName   = "revision-2-abc123"
 	assetJobPath  = "/v2/apps/" + testAppID + "/jobs/add-container-image-asset"
 	versionsPath  = "/v2/apps/" + testAppID + "/versions"
@@ -37,8 +37,8 @@ var (
 
 func testConfig() *config.Application {
 	return &config.Application{
-		CreateApplicationsFromDeployments: true,
-		KubeConfig:                        config.KubeConf{Cluster: "cluster1"},
+		CreateApplicationsFrom: []string{config.ApplicationsFromDeployments},
+		KubeConfig:             config.KubeConf{Cluster: "cluster1"},
 		AnchoreDetails: config.AnchoreInfo{
 			URL:      testURL,
 			User:     "admin",
@@ -53,14 +53,15 @@ func testDetails() config.AnchoreInfo {
 	return testConfig().AnchoreDetails
 }
 
-func testDeployment() inventory.Deployment {
-	return inventory.Deployment{
-		Name:              "web",
-		Namespace:         "default",
-		Revision:          "2",
-		ReplicaSetName:    "web-abc123",
-		PodTemplateHash:   "abc123",
-		ReplicaSetCreated: released,
+func testDeployment() inventory.Workload {
+	return inventory.Workload{
+		Kind:            inventory.KindDeployment,
+		Name:            "web",
+		Namespace:       "default",
+		Revision:        "2",
+		RevisionName:    "web-abc123",
+		RevisionHash:    "abc123",
+		RevisionCreated: released,
 		Containers: []inventory.Container{
 			{Name: "nginx", ImageTag: "docker.io/nginx:1.27", ImageDigest: nginxDigest},
 			{Name: "sidecar", ImageTag: "docker.io/busybox:1.36", ImageDigest: bbDigest},
@@ -181,7 +182,7 @@ func TestSyncCreatesAppVersionAndAssets(t *testing.T) {
 	mockAddAsset("sidecar", 201, &sidecar)
 
 	s := NewSyncer()
-	err := s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := s.Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 
@@ -191,19 +192,20 @@ func TestSyncCreatesAppVersionAndAssets(t *testing.T) {
 	annotations := map[string]string{}
 	require.NoError(t, json.Unmarshal([]byte(nginx["annotations"]), &annotations))
 	assert.Equal(t, map[string]string{
-		"k8s.cluster":             "cluster1",
-		"k8s.namespace":           "default",
-		"k8s.deployment":          "web",
-		"k8s.deployment.revision": "2",
-		"k8s.replicaset":          "web-abc123",
-		"k8s.container":           "nginx",
-		"k8s.image_tag":           "docker.io/nginx:1.27",
-		"k8s.image_digest":        nginxDigest,
+		"k8s.cluster":           "cluster1",
+		"k8s.namespace":         "default",
+		"k8s.workload.kind":     "Deployment",
+		"k8s.workload.name":     "web",
+		"k8s.workload.revision": "2",
+		"k8s.replicaset":        "web-abc123",
+		"k8s.container":         "nginx",
+		"k8s.image_tag":         "docker.io/nginx:1.27",
+		"k8s.image_digest":      nginxDigest,
 	}, annotations)
 	assert.Equal(t, "docker.io/library/busybox:1.36@"+bbDigest, sidecar["image_reference"])
 
 	// A second sync with no changes must not make any requests
-	err = s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err = s.Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone())
 }
@@ -216,7 +218,7 @@ func TestSyncExistingAppAndVersionAddsMissingAsset(t *testing.T) {
 	mockListAssets("nginx")
 	mockAddAsset("sidecar", 201, nil)
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 }
@@ -252,7 +254,7 @@ func TestSyncNewRevisionSetsPreviousVersion(t *testing.T) {
 		Reply(201).JSON(appJSON(testVersionID, versionName))
 	mockListAssets("nginx", "sidecar")
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 }
@@ -266,7 +268,7 @@ func TestSyncAppCreateConflictRefinds(t *testing.T) {
 	mockFindVersion(appJSON(testVersionID, versionName))
 	mockListAssets("nginx", "sidecar")
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 }
@@ -281,12 +283,12 @@ func TestSyncAssetConflictIsSuccess(t *testing.T) {
 	mockAddAsset("sidecar", 201, nil)
 
 	s := NewSyncer()
-	err := s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := s.Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.NoError(t, err)
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 
 	// Both assets are cached, no further requests
-	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()}))
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()}))
 }
 
 func TestSyncAppsAPIUnsupported(t *testing.T) {
@@ -296,7 +298,7 @@ func TestSyncAppsAPIUnsupported(t *testing.T) {
 
 	other := testDeployment()
 	other.Name = "other"
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment(), other})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment(), other})
 	assert.True(t, errors.Is(err, ErrAppsAPIUnsupported))
 	assert.True(t, gock.IsDone())
 }
@@ -306,7 +308,7 @@ func TestSyncForbidden(t *testing.T) {
 
 	gock.New(testURL).Get("/v2/apps").Reply(403).JSON(map[string]interface{}{"message": "Not authorized", "httpcode": 403})
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "createApplications")
 }
@@ -316,13 +318,13 @@ func TestSyncErrorDoesNotStopOtherDeployments(t *testing.T) {
 
 	failing := testDeployment()
 	failing.Name = "failing"
-	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/failing$").
+	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/deployment/failing$").
 		Reply(400).JSON(map[string]interface{}{"message": "bad request", "httpcode": 400})
 	mockFindApp(appJSON(testAppID, appName))
 	mockFindVersion(appJSON(testVersionID, versionName))
 	mockListAssets("nginx", "sidecar")
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{failing, testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{failing, testDeployment()})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "default/failing")
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
@@ -332,17 +334,119 @@ func TestSyncApplicationsDisabled(t *testing.T) {
 	setup(t)
 
 	cfg := testConfig()
-	cfg.CreateApplicationsFromDeployments = false
-	assert.NoError(t, SyncApplications(cfg, "admin", []inventory.Deployment{testDeployment()}))
+	cfg.CreateApplicationsFrom = nil
+	assert.NoError(t, SyncApplications(cfg, "admin", []inventory.Workload{testDeployment()}))
+}
+
+func testStatefulSet() inventory.Workload {
+	return inventory.Workload{
+		Kind:            inventory.KindStatefulSet,
+		Name:            "web",
+		Namespace:       "default",
+		Revision:        "4",
+		RevisionName:    "web-7c9f8d6b5",
+		RevisionHash:    "7c9f8d6b5",
+		RevisionCreated: released,
+		Relations: inventory.Relations{
+			HelmRelease: "shop", Instance: "shop", PartOf: "shop", Component: "database",
+			OwnerKind: "Postgres", OwnerName: "shop-db",
+		},
+		Containers: []inventory.Container{{Name: "postgres", ImageTag: "postgres:17", ImageDigest: nginxDigest}},
+	}
 }
 
 func TestNames(t *testing.T) {
 	dep := testDeployment()
-	assert.Equal(t, "cluster1/default/web", AppName("cluster1", dep))
-	assert.Equal(t, "default/web", AppName("", dep))
+	assert.Equal(t, "cluster1/default/deployment/web", AppName("cluster1", dep))
+	assert.Equal(t, "default/deployment/web", AppName("", dep))
 	assert.Equal(t, "revision-2-abc123", VersionName(dep))
-	dep.PodTemplateHash = ""
+	dep.RevisionHash = ""
 	assert.Equal(t, "revision-2", VersionName(dep))
+
+	// a StatefulSet with the same name as the Deployment gets its own app
+	sts := testStatefulSet()
+	assert.Equal(t, "cluster1/default/statefulset/web", AppName("cluster1", sts))
+	assert.Equal(t, "revision-4-7c9f8d6b5", VersionName(sts))
+	ds := sts
+	ds.Kind = inventory.KindDaemonSet
+	assert.Equal(t, "cluster1/default/daemonset/web", AppName("cluster1", ds))
+}
+
+func TestAppDescription(t *testing.T) {
+	assert.Equal(t, "Kubernetes Deployment default/web in cluster cluster1, managed by anchore-k8s-inventory",
+		appDescription("cluster1", testDeployment()))
+	assert.Equal(t, "Kubernetes StatefulSet default/web (Helm release shop, part of shop, owned by Postgres/shop-db) "+
+		"in cluster cluster1, managed by anchore-k8s-inventory", appDescription("cluster1", testStatefulSet()))
+
+	noHelm := testStatefulSet()
+	noHelm.Relations = inventory.Relations{Instance: "shop"}
+	assert.Equal(t, "Kubernetes StatefulSet default/web (instance shop), managed by anchore-k8s-inventory", appDescription("", noHelm))
+}
+
+func TestSyncStatefulSetCreatesAppVersionAndAssets(t *testing.T) {
+	setup(t)
+
+	stsApp := "cluster1/default/statefulset/web"
+	stsVersion := "revision-4-7c9f8d6b5"
+	cfg := testConfig()
+	cfg.CreateApplicationsFrom = []string{config.ApplicationsFromStatefulSets}
+
+	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^"+stsApp+"$").Reply(200).JSON(list())
+	gock.New(testURL).Post("/v2/apps").
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"name": stsApp,
+			"description": "Kubernetes StatefulSet default/web (Helm release shop, part of shop, owned by Postgres/shop-db) " +
+				"in cluster cluster1, managed by anchore-k8s-inventory",
+			"contact": map[string]interface{}{"name": "anchore-k8s-inventory"},
+		}).
+		Reply(201).JSON(appJSON(testAppID, stsApp))
+	gock.New(testURL).Get(versionsPath).MatchParam("name", "^"+stsVersion+"$").Reply(200).JSON(list())
+	gock.New(testURL).Get(versionsPath).MatchParam("limit", "1000").Reply(200).JSON(list())
+	gock.New(testURL).Post(versionsPath).
+		MatchType("json").
+		JSON(map[string]interface{}{
+			"name":         stsVersion,
+			"description":  "StatefulSet revision 4 (ControllerRevision web-7c9f8d6b5)",
+			"status":       "released",
+			"release_date": "2026-01-02T03:04:05Z",
+		}).
+		Reply(201).JSON(appJSON(testVersionID, stsVersion))
+	mockListAssets()
+	var pg capturedAsset
+	mockAddAsset("postgres", 201, &pg)
+
+	require.NoError(t, NewSyncer().Sync(cfg, testDetails(), []inventory.Workload{testStatefulSet()}))
+	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
+
+	annotations := map[string]string{}
+	require.NoError(t, json.Unmarshal([]byte(pg["annotations"]), &annotations))
+	assert.Equal(t, map[string]string{
+		"k8s.cluster":           "cluster1",
+		"k8s.namespace":         "default",
+		"k8s.workload.kind":     "StatefulSet",
+		"k8s.workload.name":     "web",
+		"k8s.workload.revision": "4",
+		"k8s.helm.release":      "shop",
+		"k8s.app.instance":      "shop",
+		"k8s.app.part_of":       "shop",
+		"k8s.app.component":     "database",
+		"k8s.owner":             "Postgres/shop-db",
+	}, annotations, "capped at 10: the ControllerRevision, container and image annotations repeat the version and asset")
+}
+
+func TestAssetAnnotationsCapped(t *testing.T) {
+	sts := testStatefulSet()
+	got := assetAnnotations("cluster1", sts, sts.Containers[0])
+	assert.Len(t, got, maxAssetAnnotations)
+	assert.NotContains(t, got, "k8s.image_digest")
+
+	// without relations there is room for the version and image details
+	sts.Relations = inventory.Relations{}
+	got = assetAnnotations("cluster1", sts, sts.Containers[0])
+	assert.Len(t, got, 9)
+	assert.Equal(t, "web-7c9f8d6b5", got["k8s.controllerrevision"])
+	assert.Equal(t, nginxDigest, got["k8s.image_digest"])
 }
 
 func TestAssetAnnotationsOmitsEmpty(t *testing.T) {
@@ -378,11 +482,11 @@ func TestSyncStopsWhenAppsAPIUnavailable(t *testing.T) {
 
 			failing := testDeployment()
 			failing.Name = "failing"
-			tt.mock(gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/failing$").Reply(200))
+			tt.mock(gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/deployment/failing$").Reply(200))
 
 			// No mocks are registered for the second deployment: any request for it fails the test via the
 			// pending/unmatched checks below
-			err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{failing, testDeployment()})
+			err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{failing, testDeployment()})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "unavailable")
 			assert.True(t, gock.IsDone())
@@ -408,7 +512,7 @@ func TestSyncSkipsContainersWithoutDigest(t *testing.T) {
 	mockListAssets("nginx")
 
 	s := NewSyncer()
-	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Workload{dep}))
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 	assert.False(t, gock.HasUnmatchedRequest())
 
@@ -416,7 +520,7 @@ func TestSyncSkipsContainersWithoutDigest(t *testing.T) {
 	dep.Containers[1].ImageDigest = bbDigest
 	var sidecar capturedAsset
 	mockAddAsset("sidecar", 201, &sidecar)
-	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Workload{dep}))
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 	assert.Equal(t, "docker.io/library/busybox:1.36@"+bbDigest, sidecar["image_reference"])
 }
@@ -428,7 +532,7 @@ func TestSyncSkipsDeploymentWithNoDigests(t *testing.T) {
 	for i := range dep.Containers {
 		dep.Containers[i].ImageDigest = ""
 	}
-	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{dep}))
 	assert.False(t, gock.HasUnmatchedRequest())
 }
 
@@ -444,7 +548,7 @@ func TestSyncPrunesCache(t *testing.T) {
 			assets: map[string]struct{}{"nginx": {}, "sidecar": {}}}
 	}
 
-	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()}))
+	require.NoError(t, s.Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()}))
 	assert.Contains(t, s.cache, current)
 	assert.NotContains(t, s.cache, stale)
 	assert.Contains(t, s.cache, otherAccount)
@@ -455,13 +559,13 @@ func TestSyncSingleServerErrorDoesNotStopOtherDeployments(t *testing.T) {
 
 	failing := testDeployment()
 	failing.Name = "failing"
-	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/failing$").
+	gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/deployment/failing$").
 		Reply(500).JSON(map[string]interface{}{"message": "boom", "httpcode": 500})
 	mockFindApp(appJSON(testAppID, appName))
 	mockFindVersion(appJSON(testVersionID, versionName))
 	mockListAssets("nginx", "sidecar")
 
-	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{failing, testDeployment()})
+	err := NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{failing, testDeployment()})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "default/failing")
 	assert.NotContains(t, err.Error(), "unavailable")
@@ -471,14 +575,14 @@ func TestSyncSingleServerErrorDoesNotStopOtherDeployments(t *testing.T) {
 func TestSyncStopsAfterConsecutiveServerErrors(t *testing.T) {
 	setup(t)
 
-	var deps []inventory.Deployment
+	var deps []inventory.Workload
 	for _, name := range []string{"a", "b", "c", "d"} {
 		dep := testDeployment()
 		dep.Name = name
 		deps = append(deps, dep)
 	}
 	for _, name := range []string{"a", "b", "c"} {
-		gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/"+name+"$").
+		gock.New(testURL).Get("/v2/apps").MatchParam("name", "^cluster1/default/deployment/"+name+"$").
 			Reply(500).JSON(map[string]interface{}{"message": "boom", "httpcode": 500})
 	}
 
@@ -500,7 +604,7 @@ func TestSyncSkipsAssetsWithInFlightJobs(t *testing.T) {
 	mockListJobs(job("nginx", "processing"), job("sidecar", "failed"))
 	mockAddAsset("sidecar", 201, nil)
 
-	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{testDeployment()}))
+	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{testDeployment()}))
 	assert.True(t, gock.IsDone(), "pending mocks: %v", gock.Pending())
 	assert.False(t, gock.HasUnmatchedRequest(), "unexpected requests: %v", gock.GetUnmatchedRequests())
 }
@@ -513,7 +617,7 @@ func TestSyncSkipsInvalidImageReferences(t *testing.T) {
 	dep.Containers[1].ImageDigest = "sha256:short"
 
 	// No version is created when none of the containers can be added
-	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Deployment{dep}))
+	require.NoError(t, NewSyncer().Sync(testConfig(), testDetails(), []inventory.Workload{dep}))
 	assert.False(t, gock.HasUnmatchedRequest(), "unexpected requests: %v", gock.GetUnmatchedRequests())
 }
 

@@ -36,31 +36,88 @@ type CliOnlyOptions struct {
 
 // All Application configurations
 type Application struct {
-	ConfigPath                        string
-	Quiet                             bool                `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
-	Log                               Logging             `mapstructure:"log" json:"log,omitempty" yaml:"log"`
-	Registration                      RegistrationOptions `mapstructure:"anchore-registration" json:"anchore-registration,omitempty" yaml:"anchore-registration"`
-	CliOptions                        CliOnlyOptions
-	Dev                               Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
-	KubeConfig                        KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
-	Kubernetes                        KubernetesAPI                `mapstructure:"kubernetes" json:"kubernetes,omitempty" yaml:"kubernetes"`
-	Namespaces                        []string                     `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
-	KubernetesRequestTimeoutSeconds   int64                        `mapstructure:"kubernetes-request-timeout-seconds" json:"kubernetes-request-timeout-seconds,omitempty" yaml:"kubernetes-request-timeout-seconds"`
-	NamespaceSelectors                NamespaceSelector            `mapstructure:"namespace-selectors" json:"namespace-selectors,omitempty" yaml:"namespace-selectors"`
-	AccountRoutes                     AccountRoutes                `mapstructure:"account-routes" json:"account-routes,omitempty" yaml:"account-routes"`
-	AccountRouteByNamespaceLabel      AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label" json:"account-route-by-namespace-label,omitempty" yaml:"account-route-by-namespace-label"`
-	MissingRegistryOverride           string                       `mapstructure:"missing-registry-override" json:"missing-registry-override,omitempty" yaml:"missing-registry-override"`
-	MissingTagPolicy                  MissingTagConf               `mapstructure:"missing-tag-policy" json:"missing-tag-policy,omitempty" yaml:"missing-tag-policy"`
-	RunMode                           mode.Mode
-	Mode                              string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
-	IgnoreNotRunning                  bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
-	PollingIntervalSeconds            int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
-	HealthReportIntervalSeconds       int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
-	InventoryReportLimits             InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
-	MetadataCollection                MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
-	AnchoreDetails                    AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
-	VerboseInventoryReports           bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
-	CreateApplicationsFromDeployments bool                  `mapstructure:"create-applications-from-deployments" json:"create-applications-from-deployments,omitempty" yaml:"create-applications-from-deployments"`
+	ConfigPath                      string
+	Quiet                           bool                `mapstructure:"quiet" json:"quiet,omitempty" yaml:"quiet"`
+	Log                             Logging             `mapstructure:"log" json:"log,omitempty" yaml:"log"`
+	Registration                    RegistrationOptions `mapstructure:"anchore-registration" json:"anchore-registration,omitempty" yaml:"anchore-registration"`
+	CliOptions                      CliOnlyOptions
+	Dev                             Development                  `mapstructure:"dev" json:"dev,omitempty" yaml:"dev"`
+	KubeConfig                      KubeConf                     `mapstructure:"kubeconfig" json:"kubeconfig,omitempty" yaml:"kubeconfig"`
+	Kubernetes                      KubernetesAPI                `mapstructure:"kubernetes" json:"kubernetes,omitempty" yaml:"kubernetes"`
+	Namespaces                      []string                     `mapstructure:"namespaces" json:"namespaces,omitempty" yaml:"namespaces"`
+	KubernetesRequestTimeoutSeconds int64                        `mapstructure:"kubernetes-request-timeout-seconds" json:"kubernetes-request-timeout-seconds,omitempty" yaml:"kubernetes-request-timeout-seconds"`
+	NamespaceSelectors              NamespaceSelector            `mapstructure:"namespace-selectors" json:"namespace-selectors,omitempty" yaml:"namespace-selectors"`
+	AccountRoutes                   AccountRoutes                `mapstructure:"account-routes" json:"account-routes,omitempty" yaml:"account-routes"`
+	AccountRouteByNamespaceLabel    AccountRouteByNamespaceLabel `mapstructure:"account-route-by-namespace-label" json:"account-route-by-namespace-label,omitempty" yaml:"account-route-by-namespace-label"`
+	MissingRegistryOverride         string                       `mapstructure:"missing-registry-override" json:"missing-registry-override,omitempty" yaml:"missing-registry-override"`
+	MissingTagPolicy                MissingTagConf               `mapstructure:"missing-tag-policy" json:"missing-tag-policy,omitempty" yaml:"missing-tag-policy"`
+	RunMode                         mode.Mode
+	Mode                            string                `mapstructure:"mode" json:"mode,omitempty" yaml:"mode"`
+	IgnoreNotRunning                bool                  `mapstructure:"ignore-not-running" json:"ignore-not-running,omitempty" yaml:"ignore-not-running"`
+	PollingIntervalSeconds          int                   `mapstructure:"polling-interval-seconds" json:"polling-interval-seconds,omitempty" yaml:"polling-interval-seconds"`
+	HealthReportIntervalSeconds     int                   `mapstructure:"health-report-interval-seconds" json:"health-report-interval-seconds,omitempty" yaml:"health-report-interval-seconds"`
+	InventoryReportLimits           InventoryReportLimits `mapstructure:"inventory-report-limits" json:"inventory-report-limits,omitempty" yaml:"inventory-report-limits"`
+	MetadataCollection              MetadataCollection    `mapstructure:"metadata-collection" json:"metadata-collection,omitempty" yaml:"metadata-collection"`
+	AnchoreDetails                  AnchoreInfo           `mapstructure:"anchore" json:"anchore,omitempty" yaml:"anchore"`
+	VerboseInventoryReports         bool                  `mapstructure:"verbose-inventory-reports" json:"verbose-inventory-reports,omitempty" yaml:"verbose-inventory-reports"`
+	CreateApplicationsFrom          []string              `mapstructure:"create-applications-from" json:"create-applications-from,omitempty" yaml:"create-applications-from"`
+	// Deprecated: use CreateApplicationsFrom with "deployments". Kept so configs written for the preview keep working.
+	CreateApplicationsFromDeployments bool `mapstructure:"create-applications-from-deployments" json:"create-applications-from-deployments,omitempty" yaml:"create-applications-from-deployments"`
+}
+
+// Workload kinds accepted by create-applications-from
+const (
+	ApplicationsFromDeployments  = "deployments"
+	ApplicationsFromStatefulSets = "statefulsets"
+	ApplicationsFromDaemonSets   = "daemonsets"
+)
+
+var applicationWorkloadKinds = []string{ApplicationsFromDeployments, ApplicationsFromStatefulSets, ApplicationsFromDaemonSets}
+
+// CreatesApplications reports whether Anchore applications are created from any kind of workload
+func (cfg *Application) CreatesApplications() bool {
+	return len(cfg.CreateApplicationsFrom) > 0
+}
+
+// CreatesApplicationsFrom reports whether Anchore applications are created from the workload kind (e.g. "deployments")
+func (cfg *Application) CreatesApplicationsFrom(kind string) bool {
+	for _, k := range cfg.CreateApplicationsFrom {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeCreateApplicationsFrom lower-cases, de-duplicates and validates create-applications-from, and folds in the
+// deprecated create-applications-from-deployments option
+func (cfg *Application) normalizeCreateApplicationsFrom() error {
+	requested := cfg.CreateApplicationsFrom
+	if cfg.CreateApplicationsFromDeployments {
+		requested = append(requested, ApplicationsFromDeployments)
+	}
+	seen := make(map[string]bool)
+	var kinds []string
+	for _, k := range requested {
+		k = strings.ToLower(strings.TrimSpace(k))
+		if k == "" || seen[k] {
+			continue
+		}
+		valid := false
+		for _, v := range applicationWorkloadKinds {
+			if k == v {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("create-applications-from: unknown workload kind %q (valid: %s)", k, strings.Join(applicationWorkloadKinds, ", "))
+		}
+		seen[k] = true
+		kinds = append(kinds, k)
+	}
+	cfg.CreateApplicationsFrom = kinds
+	return nil
 }
 
 type RegistrationOptions struct {
@@ -180,6 +237,7 @@ func setNonCliDefaultValues(v *viper.Viper) {
 	v.SetDefault("namespace-selectors.include", []string{})
 	v.SetDefault("namespace-selectors.exclude", []string{})
 	v.SetDefault("namespace-selectors.ignore-empty", false)
+	v.SetDefault("create-applications-from", []string{})
 	v.SetDefault("create-applications-from-deployments", false)
 }
 
@@ -279,6 +337,10 @@ func (cfg *Application) Build() error {
 	}
 
 	cfg.handleBackwardsCompatibility()
+
+	if err := cfg.normalizeCreateApplicationsFrom(); err != nil {
+		return err
+	}
 
 	if cfg.HealthReportIntervalSeconds < 30 || cfg.HealthReportIntervalSeconds > 600 {
 		return fmt.Errorf("health-report-interval-seconds must be between 30 and 600")

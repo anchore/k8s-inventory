@@ -19,85 +19,50 @@ const (
 	PodTemplateHashLabel         = "pod-template-hash"
 )
 
-// Deployment describes the current rollout of a Kubernetes Deployment. It is used internally to create Anchore
-// applications and is never serialized into the inventory report.
-type Deployment struct {
-	Name              string
-	Namespace         string
-	NamespaceUID      string
-	UID               string
-	Revision          string
-	ReplicaSetName    string
-	ReplicaSetUID     string
-	PodTemplateHash   string
-	ReplicaSetCreated time.Time
-	// Containers running in pods owned by the current ReplicaSet, one per container name
-	Containers []Container
+// listAll pages through a Kubernetes list call, returning every item
+func listAll[T any](batchSize, timeout int64, what, namespace string,
+	list func(opts metav1.ListOptions) ([]T, metav1.ListInterface, error),
+) ([]T, error) {
+	var items []T
+	cont := ""
+	for {
+		opts := metav1.ListOptions{
+			Limit:          batchSize,
+			Continue:       cont,
+			TimeoutSeconds: &timeout,
+		}
+		page, meta, err := list(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list %s in namespace %s: %w", what, namespace, err)
+		}
+		items = append(items, page...)
+		cont = meta.GetContinue()
+		if cont == "" {
+			return items, nil
+		}
+	}
 }
 
 func FetchDeploymentsInNamespace(c client.Client, batchSize, timeout int64, namespace string) ([]appsv1.Deployment, error) {
 	defer tracker.TrackFunctionTime(time.Now(), "Fetching deployments in namespace")
-	var deployments []appsv1.Deployment
-
-	cont := ""
-	for {
-		opts := metav1.ListOptions{
-			Limit:          batchSize,
-			Continue:       cont,
-			TimeoutSeconds: &timeout,
-		}
-
-		list, err := c.Clientset.AppsV1().Deployments(namespace).List(context.Background(), opts)
+	return listAll(batchSize, timeout, "deployments", namespace, func(opts metav1.ListOptions) ([]appsv1.Deployment, metav1.ListInterface, error) {
+		l, err := c.Clientset.AppsV1().Deployments(namespace).List(context.Background(), opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list deployments in namespace %s: %w", namespace, err)
+			return nil, nil, err
 		}
-
-		deployments = append(deployments, list.Items...)
-
-		cont = list.GetListMeta().GetContinue()
-		if cont == "" {
-			break
-		}
-	}
-
-	return deployments, nil
+		return l.Items, l, nil
+	})
 }
 
 func FetchReplicaSetsInNamespace(c client.Client, batchSize, timeout int64, namespace string) ([]appsv1.ReplicaSet, error) {
 	defer tracker.TrackFunctionTime(time.Now(), "Fetching replicasets in namespace")
-	var replicaSets []appsv1.ReplicaSet
-
-	cont := ""
-	for {
-		opts := metav1.ListOptions{
-			Limit:          batchSize,
-			Continue:       cont,
-			TimeoutSeconds: &timeout,
-		}
-
-		list, err := c.Clientset.AppsV1().ReplicaSets(namespace).List(context.Background(), opts)
+	return listAll(batchSize, timeout, "replicasets", namespace, func(opts metav1.ListOptions) ([]appsv1.ReplicaSet, metav1.ListInterface, error) {
+		l, err := c.Clientset.AppsV1().ReplicaSets(namespace).List(context.Background(), opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list replicasets in namespace %s: %w", namespace, err)
+			return nil, nil, err
 		}
-
-		replicaSets = append(replicaSets, list.Items...)
-
-		cont = list.GetListMeta().GetContinue()
-		if cont == "" {
-			break
-		}
-	}
-
-	return replicaSets, nil
-}
-
-func isOwnedBy(refs []metav1.OwnerReference, kind, uid string) bool {
-	for _, ref := range refs {
-		if ref.Kind == kind && string(ref.UID) == uid {
-			return true
-		}
-	}
-	return false
+		return l.Items, l, nil
+	})
 }
 
 // currentReplicaSet returns the ReplicaSet owned by the deployment whose revision matches the deployment's revision
@@ -112,38 +77,10 @@ func currentReplicaSet(dep appsv1.Deployment, revision string, rss []appsv1.Repl
 	return nil
 }
 
-// containersForReplicaSet returns the containers of running pods owned by the ReplicaSet, de-duplicated by container
-// name and preferring containers with an image digest
-func containersForReplicaSet(rsUID string, pods []v1.Pod, containers []Container) []Container {
-	podUIDs := make(map[string]struct{})
-	for _, p := range pods {
-		if p.Status.Phase == v1.PodRunning && isOwnedBy(p.OwnerReferences, "ReplicaSet", rsUID) {
-			podUIDs[string(p.UID)] = struct{}{}
-		}
-	}
-
-	var result []Container
-	index := make(map[string]int)
-	for _, c := range containers {
-		if _, ok := podUIDs[c.PodUID]; !ok {
-			continue
-		}
-		i, seen := index[c.Name]
-		switch {
-		case !seen:
-			index[c.Name] = len(result)
-			result = append(result, c)
-		case result[i].ImageDigest == "" && c.ImageDigest != "":
-			result[i] = c
-		}
-	}
-	return result
-}
-
 // ProcessDeployments determines the current rollout of each deployment and the containers running for it.
 // Deployments without a current ReplicaSet or without running containers are omitted.
-func ProcessDeployments(deps []appsv1.Deployment, rss []appsv1.ReplicaSet, pods []v1.Pod, containers []Container, namespaceUID string) []Deployment {
-	var result []Deployment
+func ProcessDeployments(deps []appsv1.Deployment, rss []appsv1.ReplicaSet, pods []v1.Pod, containers []Container, namespaceUID string) []Workload {
+	var result []Workload
 	for _, dep := range deps {
 		revision := dep.Annotations[DeploymentRevisionAnnotation]
 		if revision == "" {
@@ -155,22 +92,26 @@ func ProcessDeployments(deps []appsv1.Deployment, rss []appsv1.ReplicaSet, pods 
 			log.Debugf("Skipping deployment %s/%s: no replicaset found for revision %s", dep.Namespace, dep.Name, revision)
 			continue
 		}
-		depContainers := containersForReplicaSet(string(rs.UID), pods, containers)
+		rsUID := string(rs.UID)
+		depContainers := containersForPods(pods, containers, func(p v1.Pod) bool {
+			return isOwnedBy(p.OwnerReferences, "ReplicaSet", rsUID)
+		})
 		if len(depContainers) == 0 {
 			log.Debugf("Skipping deployment %s/%s: no running containers for replicaset %s", dep.Namespace, dep.Name, rs.Name)
 			continue
 		}
-		result = append(result, Deployment{
-			Name:              dep.Name,
-			Namespace:         dep.Namespace,
-			NamespaceUID:      namespaceUID,
-			UID:               string(dep.UID),
-			Revision:          revision,
-			ReplicaSetName:    rs.Name,
-			ReplicaSetUID:     string(rs.UID),
-			PodTemplateHash:   rs.Labels[PodTemplateHashLabel],
-			ReplicaSetCreated: rs.CreationTimestamp.UTC(),
-			Containers:        depContainers,
+		result = append(result, Workload{
+			Kind:            KindDeployment,
+			Name:            dep.Name,
+			Namespace:       dep.Namespace,
+			NamespaceUID:    namespaceUID,
+			UID:             string(dep.UID),
+			Revision:        revision,
+			RevisionName:    rs.Name,
+			RevisionHash:    rs.Labels[PodTemplateHashLabel],
+			RevisionCreated: rs.CreationTimestamp.UTC(),
+			Relations:       relationsFor(dep.ObjectMeta),
+			Containers:      depContainers,
 		})
 	}
 	return result
