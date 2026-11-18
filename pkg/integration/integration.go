@@ -380,10 +380,18 @@ func getInstanceDataFromK8s(k8sClient *client.Client, namespace string, podName 
 		log.Errorf("failed to get pod: %v", err)
 		return "", ""
 	}
+	if len(pod.ObjectMeta.OwnerReferences) == 0 {
+		log.Errorf("pod %s has no owner references", podName)
+		return "", ""
+	}
 	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
 	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
 	if err != nil {
 		log.Errorf("failed to get replica set: %v", err)
+		return "", ""
+	}
+	if len(replicaSet.ObjectMeta.OwnerReferences) == 0 {
+		log.Errorf("replica set %s has no owner references", replicaSetName)
 		return "", ""
 	}
 	deploymentName := replicaSet.ObjectMeta.OwnerReferences[0].Name
@@ -410,6 +418,10 @@ func getReplicaCountFromK8s(k8sClient *client.Client, namespace string, podName 
 	if err != nil {
 		log.Errorf("failed to get pod: %v", err)
 		return 0, err
+	}
+	if len(pod.ObjectMeta.OwnerReferences) == 0 {
+		log.Errorf("pod %s has no owner references", podName)
+		return 0, fmt.Errorf("pod %s has no owner references", podName)
 	}
 	replicaSetName := pod.ObjectMeta.OwnerReferences[0].Name
 	replicaSet, err := k8sClient.Clientset.AppsV1().ReplicaSets(namespace).Get(context.Background(), replicaSetName, opts)
