@@ -1,0 +1,46 @@
+# Anchore Kubernetes Inventory
+
+This project is a Kubernetes inventory tool that polls the Kubernetes API to retrieve which images are currently in use across a cluster.
+
+## Purpose
+
+`anchore-k8s-inventory` is a Go-based application that:
+- Polls Kubernetes APIs on an interval to collect container image inventory
+- Reports inventory data to Anchore Enterprise for security scanning and analysis
+- Can run inside a cluster (under Service Account) or outside via kubeconfig
+- Supports namespace filtering and account routing
+
+## Architecture
+
+- **Language**: Go 1.24
+- **Main entry point**: `main.go`
+- **CLI framework**: Cobra (`cmd/`)
+- **Configuration**: Viper-based config management (`internal/config/`)
+- **Core functionality**: 
+  - Kubernetes client operations (`pkg/client/`)
+  - Inventory collection (`pkg/inventory/`)
+  - Reporting to Anchore (`pkg/reporter/`)
+  - Health reporting (`pkg/healthreporter/`)
+  - Integration registration (`pkg/integration/`)
+
+## Key Components
+
+- **Inventory Collection**: Gathers data on containers, pods, namespaces, and nodes
+- **Namespace Selection**: Include/exclude filtering with regex support
+- **Account Routing**: Route inventory to different Anchore accounts based on configuration or namespace labels
+- **Missing Tag Policy**: Handle images without tags (digest, insert dummy, or drop)
+- **Batching**: Split large inventory reports into smaller requests
+- **Metadata Collection**: Configurable collection of annotations/labels
+
+## Deployment Options
+
+1. **CLI**: Direct command execution with kubeconfig
+2. **Container**: Docker container with mounted kubeconfig
+3. **Helm Chart**: Kubernetes deployment as read-only service account
+
+## Integration
+
+- Requires Anchore Enterprise license/subscription
+- Supports Enterprise v5.11.0+ integration registration and health reporting
+- Backwards compatible with older Enterprise versions
+- Can register as integration for monitoring and health status tracking
