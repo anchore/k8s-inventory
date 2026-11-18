@@ -5,8 +5,7 @@
         "level": "debug",
         "file": "./anchore-k8s-inventory.log"
     },
-    "anchore-registration": {
-    },
+    "anchore-registration": {},
     "CliOptions": {
         "ConfigPath": "../../anchore-k8s-inventory.yaml",
         "Verbosity": 0
@@ -58,6 +57,12 @@
         "nodes": {},
         "namespace": {},
         "pods": {}
+    },
+    "inventory-collection": {
+        "method": "informer",
+        "informer": {
+            "cache-sync-timeout-seconds": 300
+        }
     },
     "anchore": {
         "password": "******",

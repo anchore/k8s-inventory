@@ -170,3 +170,71 @@ func TestSensitiveConfigJSON(t *testing.T) {
 		t.Errorf("Config string does not match expected\nactual: %s\nexpected: %s", actual, expected)
 	}
 }
+
+func TestInventoryCollection_validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  InventoryCollection
+		wantErr bool
+	}{
+		{
+			name:   "informer is a valid method",
+			config: InventoryCollection{Method: InventoryCollectionMethodInformer, Informer: Informer{CacheSyncTimeoutSeconds: 300}},
+		},
+		{
+			name:   "poll is a valid method",
+			config: InventoryCollection{Method: InventoryCollectionMethodPoll},
+		},
+		{
+			name:   "a cache sync timeout of zero waits indefinitely",
+			config: InventoryCollection{Method: InventoryCollectionMethodInformer, Informer: Informer{CacheSyncTimeoutSeconds: 0}},
+		},
+		{
+			name:    "a negative cache sync timeout is rejected",
+			config:  InventoryCollection{Method: InventoryCollectionMethodInformer, Informer: Informer{CacheSyncTimeoutSeconds: -1}},
+			wantErr: true,
+		},
+		{
+			name:    "an unknown method is rejected",
+			config:  InventoryCollection{Method: "watch"},
+			wantErr: true,
+		},
+		{
+			name:    "an unset method is rejected",
+			config:  InventoryCollection{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected an error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestDefaultInventoryCollection(t *testing.T) {
+	config, err := LoadConfigFromFile(viper.New(), &CliOnlyOptions{
+		ConfigPath: "../../anchore-k8s-inventory.yaml",
+	})
+	if err != nil {
+		t.Fatalf("failed to load application config: \n\t%+v\n", err)
+	}
+
+	if config.InventoryCollection.Method != InventoryCollectionMethodInformer {
+		t.Errorf("expected the default collection method to be %q, got %q",
+			InventoryCollectionMethodInformer, config.InventoryCollection.Method)
+	}
+	if config.InventoryCollection.Informer.CacheSyncTimeoutSeconds != 300 {
+		t.Errorf("expected the default cache sync timeout to be 300, got %d",
+			config.InventoryCollection.Informer.CacheSyncTimeoutSeconds)
+	}
+}

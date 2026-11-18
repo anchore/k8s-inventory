@@ -65,6 +65,10 @@ metadata-collection:
     include-annotations: []
     include-labels: []
     disable: false
+inventory-collection:
+  method: ""
+  informer:
+    cache-sync-timeout-seconds: 0
 anchore:
   url: ""
   user: ""
